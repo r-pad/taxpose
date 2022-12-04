@@ -1,4 +1,4 @@
-site_name: python_pkg_template
+site_name: my_package
 theme:
   name: material
 plugins:
