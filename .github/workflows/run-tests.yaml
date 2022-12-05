@@ -3,9 +3,6 @@ name: Run Tests
 on:
   workflow_call:
     inputs:
-      pkgname:
-        required: true
-        type: string
       install_string:
         required: True
         type: string
