@@ -45,6 +45,9 @@ profile = "black"
 python_version = 3.8
 warn_return_any = true
 warn_unused_configs = true
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
 
 # # Uncomment this when you have imports for mypy to ignore.
 # [[tool.mypy.overrides]]
