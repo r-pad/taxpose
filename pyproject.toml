@@ -1,12 +1,16 @@
 [project]
-name = "rpad-my-package"
+name = "taxpose"
 version = "0.1.0"
-description = "A Python Package Template"
+description = "TAX-Pose: Task-Specific Cross-Pose Estimation for Robot Manipulation"
 readme = "README.md"
 requires-python = ">=3.6"
 license = {file = "LICENSE.txt"}
 authors = [
-  {email = "baeisner@andrew.cmu.edu", name = "Ben Eisner"}
+  {email = "chuerp@andrew.cmu.edu", name = "Chuer Pan"},
+  {email = "bokorn@andrew.cmu.edu", name = "Brian Okorn"},
+  {email = "haolunz@andrew.cmu.edu", name = "Harry Zhang"},
+  {email = "baeisner@andrew.cmu.edu", name = "Ben Eisner"},
+  {email = "dheld@andrew.cmu.edu", name = "David Held"},
 ]
 dependencies = []
 
@@ -36,10 +40,10 @@ build_docs = [
 
 # This is required to allow us to have notebooks/ at the top level.
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["taxpose"]
 
 [tool.setuptools.package-data]
-rpad = ["py.typed"]
+taxpose = ["py.typed"]
 
 [tool.isort]
 profile = "black"

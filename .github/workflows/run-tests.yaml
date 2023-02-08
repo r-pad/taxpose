@@ -32,10 +32,10 @@ jobs:
         run: pip install "${{ inputs.install_string }}"
 
       - name: Code Quality
-        run: python -m black src/ tests/ --check
+        run: python -m black taxpose/ tests/ --check
 
       - name: MyPy Typechecking
-        run: python -m mypy src/ tests/
+        run: python -m mypy taxpose/ tests/
 
       # Run tests.
       - name: Test with pytest

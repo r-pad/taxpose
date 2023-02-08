@@ -1,4 +1,4 @@
-site_name: my_package
+site_name: taxpose
 theme:
   name: material
 plugins:

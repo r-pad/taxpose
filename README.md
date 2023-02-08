@@ -13,4 +13,4 @@ This is a template for a python package with the following features:
     * On a Pull Request: install dependencies, run style checks, run Python tests
     * After merge: same a Pull Request, but also deploy the docs site to the projects Github Pages URL!!!!
 
-All that needs doing is replacing all occurances of `my_package` and `my-package` with the name of your package, the rest should work out of the box! 
+All that needs doing is replacing all occurances of `my_package` and `my-package` with the name of your package, the rest should work out of the box!
