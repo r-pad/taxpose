@@ -61,6 +61,7 @@ def main(
             snap_to_surface=True,
             full_obj=True,
             even_downsample=True,
+            rotate_anchor=rotate_anchor,
         ),
         goal_dset=PlaceDataset(
             pm_root,
@@ -73,6 +74,7 @@ def main(
             snap_to_surface=True,
             full_obj=True,
             even_downsample=True,
+            rotate_anchor=rotate_anchor,
         ),
         rotate_anchor=rotate_anchor,
     )

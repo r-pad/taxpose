@@ -370,7 +370,7 @@ class PlaceDataset(tgd.Dataset):
             chunk += "_full"
         if self.even_downsample:
             chunk += "_even"
-        return os.path.join(self.root, f"goal_inference_{self.mode}" + chunk)
+        return os.path.join(self.root, f"taxpose_{self.mode}" + chunk)
 
     def process(self):
         if not self.use_processed:
@@ -504,7 +504,7 @@ class PlaceDataset(tgd.Dataset):
             amount = 0.9
             jas = {}
             ranges = env.get_joint_ranges()
-            upper, lower = ranges[joint_name]
+            lower, upper = ranges[joint_name]
             angle = amount * (upper - lower) + lower
             jas[joint_name] = angle
 
@@ -835,9 +835,10 @@ def scenes_by_location(split, mode, goal_desc):
 
 if __name__ == "__main__":
     dset = PlaceDataset(
-        root="/Users/beisner/datasets/partnet-mobility",
+        root=os.path.expanduser("~/datasets/partnet-mobility"),
         use_processed=False,
         n_repeat=1,
         randomize_camera=True,
+        rotate_anchor=True,
     )
     dset[0]

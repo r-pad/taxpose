@@ -687,6 +687,7 @@ BAD_GOAL_SCENES = {
     ("32601", "disk0", "0"),
     ("32601", "disk1", "0"),
     ("23807", "ell", "0"),
+    ("10586", "disk1", "0"),
 }
 
 BAD_OBS_SCENES = {("7179", "suctiontip", "0")}
