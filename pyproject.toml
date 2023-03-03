@@ -16,7 +16,7 @@ dependencies = [
   "dgl ~= 1.0",
   "dglgo ~= 0.0.2",
   "pybullet",
-  "pyg_lib ~= 0.1.0",
+  "pyg_lib ~= 0.1.0; sys_platform = 'linux",
   "rpad-partnet-mobility-utils @ git+https://github.com/r-pad/partnet_mobility_utils.git",
   "rpad-pyg @ git+https://github.com/r-pad/pyg_libs.git#46d20b5f32ce71e78413a0789def155ba1f88b1e",
   "torch ~= 1.13",

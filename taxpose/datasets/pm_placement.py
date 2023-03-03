@@ -233,7 +233,6 @@ def load_action_obj_with_valid_scale(action_obj, action_pos, env):
     action_body_id = None
     i = 0
     MAX_ATTEMPTS = 20
-    breakpoint()
     while not valid_goal:
         # Sample a new scale.
         scale = action_obj.random_scale()
@@ -483,7 +482,7 @@ class PlaceDataset(tgd.Dataset):
 
         # First, create an environment which will generate our source observations.
         if obj_id not in self.envs:
-            env = PMRenderEnv(obj_id, self.raw_dir, camera_pos=[-3, 0, 1.2], gui=False)
+            env = PMRenderEnv(obj_id, self.raw_dir, camera_pos=[-3, 0, 1.2])
             self.envs[obj_id] = env
         env = self.envs[obj_id]
         object_dict = splits.all_objs[CATEGORIES[obj_id].lower()]
@@ -832,3 +831,13 @@ def scenes_by_location(split, mode, goal_desc):
                         scenes.append((obj_id, action_id, goal_id))
 
     return filter_bad_scenes(scenes, mode)
+
+
+if __name__ == "__main__":
+    dset = PlaceDataset(
+        root="/Users/beisner/datasets/partnet-mobility",
+        use_processed=False,
+        n_repeat=1,
+        randomize_camera=True,
+    )
+    dset[0]
