@@ -1,17 +1,16 @@
 import itertools
 import os
 import pickle
-from pathlib import Path
 from typing import Dict, List, Literal, Optional, Protocol, Tuple, Union
 
 import dgl.geometry
 import numpy as np
 import pybullet as p
 import torch
-import torch.utils.data as td
 import torch_cluster
 import torch_geometric.data as tgd
 from rpad.partnet_mobility_utils.render.pybullet import PMRenderEnv, get_obj_z_offset
+from rpad.pyg.dataset import CachedByKeyDataset, NPSeed
 from scipy.spatial.transform import Rotation as R
 
 import taxpose.datasets.pm_splits as splits
@@ -20,8 +19,8 @@ from taxpose.datasets.pm_utils import (
     GOAL_DATA_PATH,
     SNAPPED_GOAL_FILE,
     TAXPOSE_ROOT,
+    ActionObj,
 )
-from taxpose.datasets.utils_to_delete import SingleObjDataset, parallel_sample
 
 SceneID = Union[Tuple[str, str, str], Tuple[str, str, str, str]]
 
@@ -103,14 +102,13 @@ def default_scenes(split, mode="obs", only_cat="all", goal="all") -> List[SceneI
     return filter_bad_scenes(scenes, mode)
 
 
-def randomize_block_pose(seed=None):
-    if seed:
-        np.random.seed(seed)
+def randomize_block_pose(seed: NPSeed = None):
+    rng = np.random.default_rng(seed)
     randomized_pose = np.array(
         [
-            np.random.uniform(low=-1, high=0.5),
-            np.random.uniform(low=-1.4, high=1.4),
-            np.random.uniform(low=0.1, high=0.2),
+            rng.uniform(low=-1, high=0.5),
+            rng.uniform(low=-1.4, high=1.4),
+            rng.uniform(low=0.1, high=0.2),
         ]
     )
     return randomized_pose
@@ -204,12 +202,14 @@ def has_collisions(action_id, sim: PMRenderEnv):
     return collision_counter > 0
 
 
-def find_valid_action_initial_pose(action_body_id, env) -> np.ndarray:
+def find_valid_action_initial_pose(
+    action_body_id, env, seed: NPSeed = None
+) -> np.ndarray:
     valid_pos = False
     i = 0
     MAX_ATTEMPTS = 1000
     while not valid_pos:
-        action_pos = randomize_block_pose()
+        action_pos = randomize_block_pose(seed)
 
         p.resetBasePositionAndOrientation(
             action_body_id,
@@ -227,7 +227,9 @@ def find_valid_action_initial_pose(action_body_id, env) -> np.ndarray:
     return action_pos  # type: ignore
 
 
-def load_action_obj_with_valid_scale(action_obj, action_pos, env):
+def load_action_obj_with_valid_scale(
+    action_obj: ActionObj, action_pos, env, seed: NPSeed = None
+):
     valid_goal = False
     scale = None
     action_body_id = None
@@ -235,7 +237,7 @@ def load_action_obj_with_valid_scale(action_obj, action_pos, env):
     MAX_ATTEMPTS = 20
     while not valid_goal:
         # Sample a new scale.
-        scale = action_obj.random_scale()
+        scale = action_obj.random_scale(seed)
 
         action_body_id = p.loadURDF(
             action_obj.urdf,
@@ -274,7 +276,9 @@ def render_input_new(action_id, sim: PMRenderEnv):
     return P_world, pc_seg, rgb, action_mask
 
 
-def downsample_pcd_fps(pcd, n, use_dgl=True):
+def downsample_pcd_fps(pcd, n, use_dgl=True, seed=None):
+    rng = np.random.default_rng(seed)
+
     if len(pcd) <= n:
         if len(pcd) > 0:
             return torch.arange(0, len(pcd))
@@ -283,11 +287,14 @@ def downsample_pcd_fps(pcd, n, use_dgl=True):
     if use_dgl:
         if len(pcd.shape) == 2:
             pcd = pcd.unsqueeze(0)
-        ixs = dgl.geometry.farthest_point_sampler(pcd, n)
+        start_idx = rng.choice(len(pcd))
+        ixs = dgl.geometry.farthest_point_sampler(pcd, n, start_idx=start_idx)
         ixs = ixs.squeeze()
     else:
         ratio = n / len(pcd)
-        ixs = torch_cluster.fps(pcd, None, ratio)
+        # Random shuffle.
+        pcd = pcd[rng.permutation(len(pcd))]
+        ixs = torch_cluster.fps(pcd, None, ratio, random_start=False)
     return ixs
 
 
@@ -296,10 +303,7 @@ class PlaceDataset(tgd.Dataset):
         self,
         root: str,
         scene_ids: List[SceneID] = None,
-        use_processed: bool = True,
-        n_repeat: int = 50,
         randomize_camera: bool = False,
-        n_proc: int = 60,
         mode: Literal["obs", "goal"] = "obs",
         snap_to_surface: bool = False,
         full_obj: bool = False,
@@ -321,10 +325,7 @@ class PlaceDataset(tgd.Dataset):
         # IDK what this really is....
         self.full_sem_dset = pickle.load(open(SEM_CLASS_DSET_PATH, "rb"))
 
-        self.use_processed = use_processed
-        self.n_repeat = n_repeat
         self.randomize_camera = randomize_camera
-        self.n_proc = n_proc
         self.snap_to_surface = snap_to_surface
         self.full_obj = full_obj
         self.even_downsample = even_downsample
@@ -345,73 +346,28 @@ class PlaceDataset(tgd.Dataset):
                 self.class_map[cat][goal_id] = []
             self.class_map[cat][goal_id].append(scene_id)
 
-        if self.use_processed:
-            # Map from scene_id to dataset. Very hacky way of getting scene id.
-            self.inmem_map: Dict[Tuple, td.Dataset[GIData]] = {
-                tuple(Path(data_path).name.split("_")): SingleObjDataset(data_path)
-                for data_path in self.processed_paths
-            }
-            self.inmem: td.ConcatDataset = td.ConcatDataset(
-                list(self.inmem_map.values())
-            )
-
-    @property
-    def processed_file_names(self) -> List[str]:
-        return [f"{'_'.join(key)}_{self.n_repeat}.pt" for key in self.scene_ids]
-
-    @property
-    def processed_dir(self) -> str:
+    @staticmethod
+    def processed_dir_name(
+        mode, randomize_camera, snap_to_surface, full_obj, even_downsample
+    ) -> str:
         chunk = ""
-        if self.randomize_camera:
+        if randomize_camera:
             chunk += "_random"
-        if self.snap_to_surface:
+        if snap_to_surface:
             chunk += "_snap"
-        if self.full_obj:
+        if full_obj:
             chunk += "_full"
-        if self.even_downsample:
+        if even_downsample:
             chunk += "_even"
-        return os.path.join(self.root, f"taxpose_{self.mode}" + chunk)
-
-    def process(self):
-        if not self.use_processed:
-            return
-
-        else:
-            # Run parallel sampling!
-            parallel_sample(
-                dset_cls=PlaceDataset,
-                dset_args=(
-                    self.root,
-                    self.scene_ids,
-                    False,
-                    self.n_repeat,
-                    self.randomize_camera,
-                    self.n_proc,
-                    self.mode,
-                    self.snap_to_surface,
-                    self.full_obj,
-                    self.even_downsample,
-                    self.rotate_anchor,
-                ),
-                # Needs to be a tuple of arguments, so we can expand it when calling get_args.
-                get_data_args=self.scene_ids,
-                n_repeat=self.n_repeat,
-                n_proc=self.n_proc,
-            )
+        chunk += mode
+        return f"taxpose_{chunk}"
 
     def len(self) -> int:
-        return len(self.scene_ids) * self.n_repeat
+        return len(self.scene_ids)
 
     def get(self, idx: int) -> GIData:
-        if self.use_processed:
-            try:
-                data = self.inmem[idx]  # type: ignore
-            except:
-                breakpoint()
-        else:
-            idx = idx // self.n_repeat
-            scene_id = self.scene_ids[idx]
-            data = self.get_data(*scene_id)
+        scene_id = self.scene_ids[idx]
+        data = self.get_data(*scene_id)
 
         data.t_action_anchor = data.t_action_anchor.float()
         data.action_pos = data.action_pos.float()
@@ -467,6 +423,7 @@ class PlaceDataset(tgd.Dataset):
         goal_id: str,
         loc: str = None,
         scale: Optional[float] = None,
+        seed: NPSeed = None,
     ) -> GIData:
         """Get a single observation sample.
         Args:
@@ -479,6 +436,8 @@ class PlaceDataset(tgd.Dataset):
         Returns:
             ObsActionData and AnchorData, both in the world frame, with a relative transform.
         """
+
+        rng = np.random.default_rng(seed)
 
         # First, create an environment which will generate our source observations.
         if obj_id not in self.envs:
@@ -508,7 +467,7 @@ class PlaceDataset(tgd.Dataset):
             angle = amount * (upper - lower) + lower
             jas[joint_name] = angle
 
-            env.set_joint_angles(jas)
+            env.set_joint_angles(jas, seed=rng)
 
         # Select the action object.
         action_obj = ACTION_OBJS[action_id]
@@ -517,7 +476,7 @@ class PlaceDataset(tgd.Dataset):
         info = object_dict[f"{obj_id}_{goal_id}"]
         floating_goal = np.array([info["x"], info["y"], info["z"]])
         action_body_id, scale = load_action_obj_with_valid_scale(
-            action_obj, floating_goal, env
+            action_obj, floating_goal, env, rng
         )
 
         # Find the actual desired goal position. In the case where we snap to the
@@ -533,7 +492,7 @@ class PlaceDataset(tgd.Dataset):
         # The start position depends on which mode we're in.
         if self.mode == "obs":
             # If it's an observation environment, the block starts somewhere random.
-            action_pos = find_valid_action_initial_pose(action_body_id, env)
+            action_pos = find_valid_action_initial_pose(action_body_id, env, seed=rng)
         else:
             # If it's a goal environment, the block starts at the goal.
             action_pos = action_goal_pos
@@ -548,7 +507,7 @@ class PlaceDataset(tgd.Dataset):
 
         # Render the scene.
         if self.randomize_camera:
-            env.set_camera("random")
+            env.set_camera("random", seed=rng)
         P_world, pc_seg, rgb, action_mask = render_input_new(action_body_id, env)
 
         # We need enough visible points.
@@ -559,7 +518,9 @@ class PlaceDataset(tgd.Dataset):
                 MAX_ATTEMPTS = 20
                 i = 0
                 while sum(action_mask) < 1:
-                    action_pos = find_valid_action_initial_pose(action_body_id, env)
+                    action_pos = find_valid_action_initial_pose(
+                        action_body_id, env, seed=rng
+                    )
                     p.resetBasePositionAndOrientation(
                         action_body_id,
                         posObj=action_pos,
@@ -594,11 +555,11 @@ class PlaceDataset(tgd.Dataset):
 
         # Now, downsample
         if self.even_downsample:
-            action_ixs = downsample_pcd_fps(P_action_world, n=200)
-            anchor_ixs = downsample_pcd_fps(P_anchor_world, n=1800)
+            action_ixs = downsample_pcd_fps(P_action_world, n=200, seed=rng)
+            anchor_ixs = downsample_pcd_fps(P_anchor_world, n=1800, seed=rng)
         else:
-            action_ixs = torch.randperm(len(P_action_world))[:200]
-            anchor_ixs = torch.randperm(len(P_anchor_world))[:1800]
+            action_ixs = torch.from_numpy(rng.permutation(len(P_action_world))[:200])
+            anchor_ixs = torch.from_numpy(rng.permutation(len(P_anchor_world))[:1800])
 
         # Rebuild the world
         P_action_world = P_action_world[action_ixs]
@@ -648,10 +609,17 @@ class PlaceDataset(tgd.Dataset):
 
 class GoalTransferDataset(tgd.Dataset):
     def __init__(
-        self, obs_dset: PlaceDataset, goal_dset: PlaceDataset, rotate_anchor=False
+        self,
+        obs_dset: Union[PlaceDataset, CachedByKeyDataset[PlaceDataset]],
+        goal_dset: Union[PlaceDataset, CachedByKeyDataset[PlaceDataset]],
+        rotate_anchor=False,
     ):
-        self.obs_dset = obs_dset
-        self.goal_dset = goal_dset
+        self.obs_dset = (
+            obs_dset if isinstance(obs_dset, PlaceDataset) else obs_dset.dataset
+        )
+        self.goal_dset = (
+            goal_dset if isinstance(goal_dset, PlaceDataset) else goal_dset.dataset
+        )
 
         # Get all pairs.
         self.pairs: List[Tuple[SceneID, SceneID]] = []

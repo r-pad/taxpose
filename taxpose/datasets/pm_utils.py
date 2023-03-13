@@ -8,6 +8,7 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import pybullet as p
+from rpad.core.distributed import NPSeed
 from rpad.partnet_mobility_utils.render.pybullet import PMRenderEnv
 from scipy.spatial.transform import Rotation as R
 
@@ -105,9 +106,10 @@ class ActionObj:
     urdf: str
     scale: Tuple[int, int]  # Appropriate low, hi.
 
-    def random_scale(self) -> float:
+    def random_scale(self, seed: NPSeed = None) -> float:
         low, high = self.scale
-        return np.random.uniform(low=low, high=high)
+        rng = np.random.default_rng(seed)
+        return rng.uniform(low=low, high=high)
 
 
 ACTION_OBJS: Dict[str, ActionObj] = {
@@ -222,19 +224,6 @@ def get_full_and_bottom_points(sim: PMRenderEnv, obj_id):
         [pc_seg_obj, 100 * np.ones(bottom_pcd_og_pose.shape[0])]
     )
     return P_world_with_bottom, pc_seg_obj_with_bottom, rgb
-
-
-def randomize_block_pose(seed=None):
-    if seed:
-        np.random.seed(seed)
-    randomized_pose = np.array(
-        [
-            np.random.uniform(low=-1, high=0.5),
-            np.random.uniform(low=-1.4, high=1.4),
-            np.random.uniform(low=0.1, high=0.2),
-        ]
-    )
-    return randomized_pose
 
 
 def render_input_new(action_id, sim: PMRenderEnv):
