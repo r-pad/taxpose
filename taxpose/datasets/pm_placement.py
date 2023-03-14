@@ -1,5 +1,4 @@
 import itertools
-import os
 import pickle
 from typing import Dict, List, Literal, Optional, Protocol, Tuple, Union
 
@@ -359,8 +358,8 @@ class PlaceDataset(tgd.Dataset):
             chunk += "_full"
         if even_downsample:
             chunk += "_even"
-        chunk += mode
-        return f"taxpose_{chunk}"
+        chunk += f"_{mode}"
+        return f"taxpose{chunk}"
 
     def len(self) -> int:
         return len(self.scene_ids)
@@ -368,52 +367,6 @@ class PlaceDataset(tgd.Dataset):
     def get(self, idx: int) -> GIData:
         scene_id = self.scene_ids[idx]
         data = self.get_data(*scene_id)
-
-        data.t_action_anchor = data.t_action_anchor.float()
-        data.action_pos = data.action_pos.float()
-        data.anchor_pos = data.anchor_pos.float()
-
-        # TODO: Decide if we want to move this into get_data
-        if self.mode == "obs":
-            if self.rotate_anchor:
-                theta = (np.random.rand() - 0.5) * np.pi / 4
-                R_rand = R.from_rotvec(np.asarray([0, 0, 1]) * theta).as_matrix()
-                T_goal_goalnew = torch.eye(4)
-                T_goal_goalnew[:3, :3] = torch.from_numpy(R_rand)
-
-                P_goal = data.action_pos + data.t_action_anchor
-                P_start = data.action_pos
-                P_anc = data.anchor_pos
-
-                # Take points in the start and move to the goal.
-                T_start_goal = torch.eye(4)
-                T_start_goal[:3, :3] = torch.eye(3)
-                T_start_goal[:3, 3] = data.t_action_anchor
-
-                # P_goalnew = T_goal_goalnew * P_goal
-                # P_goal = T_start_goal * P_start
-                P_goalnew = P_goal @ T_goal_goalnew[:3, :3].T + T_goal_goalnew[:3, 3:].T
-                P_ancnew = P_anc @ T_goal_goalnew[:3, :3].T + T_goal_goalnew[:3, 3:].T
-
-                # This labeling is gross.
-                T_start_goalnew = T_goal_goalnew @ T_start_goal
-
-                anchor_pos = P_ancnew
-                t_action_anchor = T_start_goalnew[:3, 3:].T
-                R_action_anchor = T_start_goalnew[:3, :3]
-                flow = None  # not implemented
-            else:
-                anchor_pos = data.anchor_pos
-                t_action_anchor = data.t_action_anchor
-                R_action_anchor = torch.eye(3)
-                flow = data.flow
-
-            data.anchor_pos = anchor_pos
-            data.t_action_anchor = t_action_anchor
-            data.R_action_anchor = R_action_anchor
-            data.flow = flow
-        else:
-            raise NotImplementedError
         return data
 
     def get_data(
@@ -582,7 +535,7 @@ class PlaceDataset(tgd.Dataset):
             flow[~mask] = 0
             flow = torch.from_numpy(flow[mask == 1]).float()
             if len(flow) != len(P_action_world):
-                breakpoint()
+                raise ValueError("flow is not the same as the point cloud")
         else:
             t_action_anchor = None
             flow = None
@@ -604,7 +557,51 @@ class PlaceDataset(tgd.Dataset):
             loc={"in": 0, "top": 1, "left": 2, "right": 3, "under": 4, None: None}[loc],
         )
 
-        return data  # type: ignore
+        # TODO: Decide what this is really doing.........
+        if self.mode == "obs":
+            data.t_action_anchor = data.t_action_anchor.float()
+            data.action_pos = data.action_pos.float()
+            data.anchor_pos = data.anchor_pos.float()
+
+            if self.rotate_anchor:
+                theta = (rng.random() - 0.5) * np.pi / 4
+                R_rand = R.from_rotvec(np.asarray([0, 0, 1]) * theta).as_matrix()
+                T_goal_goalnew = torch.eye(4)
+                T_goal_goalnew[:3, :3] = torch.from_numpy(R_rand)
+
+                P_goal = data.action_pos + data.t_action_anchor
+                P_start = data.action_pos
+                P_anc = data.anchor_pos
+
+                # Take points in the start and move to the goal.
+                T_start_goal = torch.eye(4)
+                T_start_goal[:3, :3] = torch.eye(3)
+                T_start_goal[:3, 3] = data.t_action_anchor
+
+                # P_goalnew = T_goal_goalnew * P_goal
+                # P_goal = T_start_goal * P_start
+                P_goalnew = P_goal @ T_goal_goalnew[:3, :3].T + T_goal_goalnew[:3, 3:].T
+                P_ancnew = P_anc @ T_goal_goalnew[:3, :3].T + T_goal_goalnew[:3, 3:].T
+
+                # This labeling is gross.
+                T_start_goalnew = T_goal_goalnew @ T_start_goal
+
+                anchor_pos = P_ancnew
+                t_action_anchor = T_start_goalnew[:3, 3:].T
+                R_action_anchor = T_start_goalnew[:3, :3]
+                flow = None  # not implemented
+            else:
+                anchor_pos = data.anchor_pos
+                t_action_anchor = data.t_action_anchor
+                R_action_anchor = torch.eye(3)
+                flow = data.flow
+
+            data.anchor_pos = anchor_pos
+            data.t_action_anchor = t_action_anchor
+            data.R_action_anchor = R_action_anchor
+            data.flow = flow
+
+        return data
 
 
 class GoalTransferDataset(tgd.Dataset):
@@ -799,14 +796,3 @@ def scenes_by_location(split, mode, goal_desc):
                         scenes.append((obj_id, action_id, goal_id))
 
     return filter_bad_scenes(scenes, mode)
-
-
-if __name__ == "__main__":
-    dset = PlaceDataset(
-        root=os.path.expanduser("~/datasets/partnet-mobility"),
-        use_processed=False,
-        n_repeat=1,
-        randomize_camera=True,
-        rotate_anchor=True,
-    )
-    dset[0]
