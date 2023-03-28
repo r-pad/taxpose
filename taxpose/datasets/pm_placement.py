@@ -1,6 +1,6 @@
 import itertools
 import pickle
-from typing import Dict, List, Literal, Optional, Protocol, Tuple, Union
+from typing import Dict, List, Literal, Optional, Protocol, Sequence, Tuple, Union, cast
 
 import dgl.geometry
 import numpy as np
@@ -59,7 +59,7 @@ class GIData(Protocol):
     loc: Optional[int]
 
 
-def filter_bad_scenes(scenes, mode):
+def filter_bad_scenes(scenes: Sequence[SceneID], mode) -> List[SceneID]:
     scenes_set = set(scenes)
     if mode == "goal":
         bad_scenes = splits.BAD_GOAL_SCENES
@@ -301,7 +301,7 @@ class PlaceDataset(tgd.Dataset):
     def __init__(
         self,
         root: str,
-        scene_ids: List[SceneID] = None,
+        scene_ids: Optional[List[SceneID]] = None,
         randomize_camera: bool = False,
         mode: Literal["obs", "goal"] = "obs",
         snap_to_surface: bool = False,
@@ -371,7 +371,7 @@ class PlaceDataset(tgd.Dataset):
         obj_id: str,
         action_id: str,
         goal_id: str,
-        loc: str = None,
+        loc: Optional[str] = None,
         scale: Optional[float] = None,
         seed: NPSeed = None,
     ) -> GIData:
@@ -408,7 +408,7 @@ class PlaceDataset(tgd.Dataset):
             )[1].decode("UTF-8")
 
             amount = 0.9
-            jas = {}
+            jas: Dict[str, float] = {}
             ranges = env.get_joint_ranges()
             lower, upper = ranges[joint_name]
             angle = amount * (upper - lower) + lower
@@ -572,7 +572,7 @@ class PlaceDataset(tgd.Dataset):
             # Compute the ground-truth flow.
             flow = np.tile(t_action_anchor, (P_world.shape[0], 1))
             flow[~mask] = 0
-            flow = torch.from_numpy(flow[mask == 1]).float()
+            flow = torch.from_numpy(flow[mask == 1]).float()  # type: ignore
             if len(flow) != len(P_action_world):
                 raise ValueError("flow is not the same as the point cloud")
         else:
@@ -641,7 +641,7 @@ class PlaceDataset(tgd.Dataset):
             data.flow = flow
 
         env.close()
-        return data
+        return cast(GIData, data)
 
 
 class GoalTransferDataset(tgd.Dataset):
@@ -711,7 +711,7 @@ class GoalTransferDataset(tgd.Dataset):
             labels[len(oanp) : len(oanp) + len(oacp)] = 1
             labels[len(oanp) + len(oacp) : len(oanp) + 2 * len(oacp)] = 2
             labelmap = {0: "anchor", 1: "actor_start", 2: "actor_gt"}
-            segmentation_fig(pos, labels, labelmap).show()
+            # segmentation_fig(pos, labels, labelmap).show()
 
         if self.rotate_anchor:
             theta = (np.random.rand() - 0.5) * np.pi / 4
@@ -760,8 +760,7 @@ class GoalTransferDataset(tgd.Dataset):
             labels[len(oanp) : len(oanp) + len(oacp)] = 1
             labels[len(oanp) + len(oacp) : len(oanp) + 2 * len(oacp)] = 2
             labelmap = {0: "anchor", 1: "actor_start", 2: "actor_gt"}
-            segmentation_fig(pos, labels, labelmap).show()
-        # breakpoint()
+            # segmentation_fig(pos, labels, labelmap).show()
 
         obs_data_action = tgd.Data(
             id=obs_data.action_id,

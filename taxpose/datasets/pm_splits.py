@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Set, Tuple
 
 microwave = {
     # In
@@ -509,4 +509,4 @@ BAD_GOAL_SCENES = {
     ("10347", "disk2", "0"),
 }
 
-BAD_OBS_SCENES = set()
+BAD_OBS_SCENES: Set[Tuple[str, str, str]] = set()
