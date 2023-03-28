@@ -1,6 +1,5 @@
 import json
 import os
-import time
 from dataclasses import dataclass
 from math import floor
 from pathlib import Path
@@ -109,7 +108,9 @@ class ActionObj:
     def random_scale(self, seed: NPSeed = None) -> float:
         low, high = self.scale
         rng = np.random.default_rng(seed)
-        return rng.uniform(low=low, high=high)
+        scale = rng.uniform(low=low, high=high)
+        # print(f"{seed}, {low}, {high} -> {scale}", flush=True)
+        return scale
 
 
 ACTION_OBJS: Dict[str, ActionObj] = {
@@ -127,12 +128,6 @@ ACTION_OBJS: Dict[str, ActionObj] = {
     ),
     "ell": ActionObj("ell", str(RAVENS_ASSETS / "insertion/ell.urdf"), (2, 3)),
 }
-
-
-def get_random_action_obj():
-    np.random.seed((os.getpid() * int(time.time())) % 123456789)
-    action_obj = ACTION_OBJS[np.random.choice(list(ACTION_OBJS.keys()))]
-    return action_obj.urdf, action_obj.random_scale()
 
 
 def get_category(obj_id):

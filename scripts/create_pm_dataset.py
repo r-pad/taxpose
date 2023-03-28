@@ -1,3 +1,4 @@
+import os
 from enum import Enum
 from pathlib import Path
 
@@ -38,7 +39,11 @@ def main(
     snap_to_surface: bool = True,
     full_obj: bool = True,
     even_downsample: bool = True,
+    seed: int = 123456,
 ):
+    # This is so we can properly distribute.
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
+
     if goal_location == "all":
         locs = ["in", "top", "left", "right", "under"]
     else:
@@ -48,11 +53,14 @@ def main(
     goal_scene_ids = []
 
     for loc in locs:
-        otr = scenes_by_location(split.value, "obs", loc.value)
-        gtr = scenes_by_location(split.value, "goal", loc.value)
+        otr = scenes_by_location(split, "obs", loc)
+        gtr = scenes_by_location(split, "goal", loc)
 
-        obs_scene_ids.extend([(t[0], t[1], t[2], loc.value) for t in otr])
-        goal_scene_ids.extend([(t[0], t[1], t[2], loc.value) for t in gtr])
+        obs_scene_ids.extend([(t[0], t[1], t[2], loc) for t in otr])
+        goal_scene_ids.extend([(t[0], t[1], t[2], loc) for t in gtr])
+
+    obs_scene_ids = sorted(obs_scene_ids)
+    goal_scene_ids = sorted(goal_scene_ids)
 
     dset_kwargs = dict(
         root=pm_root,
@@ -62,8 +70,6 @@ def main(
         even_downsample=even_downsample,
         rotate_anchor=rotate_anchor,
     )
-
-    seed = 123456
 
     obs_dset = CachedByKeyDataset(
         dset_cls=PlaceDataset,
@@ -86,7 +92,7 @@ def main(
         n_repeat=n_repeat,
         n_workers=n_workers,
         n_proc_per_worker=n_proc_per_worker,
-        seed=seed,
+        seed=123456,
     )
 
     goal_dset = CachedByKeyDataset(
@@ -98,7 +104,7 @@ def main(
                 "mode": "goal",
             },
         },
-        data_keys=obs_scene_ids,
+        data_keys=goal_scene_ids,
         root=pm_root,
         processed_dirname=PlaceDataset.processed_dir_name(
             "goal",
@@ -110,7 +116,7 @@ def main(
         n_repeat=n_repeat,
         n_workers=n_workers,
         n_proc_per_worker=n_proc_per_worker,
-        seed=seed,
+        seed=654321,
     )
 
     dset = GoalTransferDataset(

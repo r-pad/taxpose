@@ -318,9 +318,6 @@ class PlaceDataset(tgd.Dataset):
         # Keep around a list of (obj_id, action_id, goal_id) pairs.
         self.scene_ids = scene_ids
 
-        # Cache the environments. Only cache at the object level though.
-        self.envs: Dict[str, PMRenderEnv] = {}
-
         # IDK what this really is....
         self.full_sem_dset = pickle.load(open(SEM_CLASS_DSET_PATH, "rb"))
 
@@ -393,10 +390,7 @@ class PlaceDataset(tgd.Dataset):
         rng = np.random.default_rng(seed)
 
         # First, create an environment which will generate our source observations.
-        if obj_id not in self.envs:
-            env = PMRenderEnv(obj_id, self.raw_dir, camera_pos=[-3, 0, 1.2])
-            self.envs[obj_id] = env
-        env = self.envs[obj_id]
+        env = PMRenderEnv(obj_id, self.raw_dir, camera_pos=[-3, 0, 1.2])
         object_dict = splits.all_objs[CATEGORIES[obj_id].lower()]
 
         # Next, check to see if the object needs to be opened in any way.
@@ -442,56 +436,101 @@ class PlaceDataset(tgd.Dataset):
         else:
             action_goal_pos = floating_goal
 
-        # The start position depends on which mode we're in.
+        MAX_ATTEMPTS = 20
+
         if self.mode == "obs":
-            # If it's an observation environment, the block starts somewhere random.
-            action_pos = find_valid_action_initial_pose(action_body_id, env, seed=rng)
-        else:
-            # If it's a goal environment, the block starts at the goal.
+            # If we're in the "obs" mode, we need to sample a pose for the action object.
+            # We do this by sampling a pose, rendering the scene, and checking if the
+            # action object is visible. If it is, we're done. If not, we try again.
+
+            i = 0
+            rgbs = []
+            while True:
+                # Sample a pose.
+                action_pos = find_valid_action_initial_pose(
+                    action_body_id, env, seed=rng
+                )
+
+                # Set the object in the environment.
+                p.resetBasePositionAndOrientation(
+                    action_body_id,
+                    posObj=action_pos,
+                    ornObj=[0, 0, 0, 1],
+                    physicsClientId=env.client_id,
+                )
+
+                # Maybe randomize the camera.
+                if self.randomize_camera:
+                    env.set_camera("random", seed=rng)
+
+                # Render the scene.
+                P_world, pc_seg, rgb, action_mask = render_input_new(
+                    action_body_id, env
+                )
+                rgbs.append(rgb)
+
+                # If we can see the object, we're done.
+                if sum(action_mask) > 0:
+                    break
+
+                i += 1
+                if i > MAX_ATTEMPTS:
+                    p.removeBody(action_body_id, physicsClientId=env.client_id)
+
+                    raise ValueError("couldn't find a valid obs pose :(")
+        elif self.mode == "goal":
+            # If we're in the "goal" mode, the goal is fixed, but the camera angle
+            # might be lousy. We need to sample the camera angle until we can see
+            # the object.
             action_pos = action_goal_pos
 
-        # Place the object at the desired start position.
-        p.resetBasePositionAndOrientation(
-            action_body_id,
-            posObj=action_pos,
-            ornObj=[0, 0, 0, 1],
-            physicsClientId=env.client_id,
-        )
+            # Set the object in the environment.
+            p.resetBasePositionAndOrientation(
+                action_body_id,
+                posObj=action_pos,
+                ornObj=[0, 0, 0, 1],
+                physicsClientId=env.client_id,
+            )
 
-        # Render the scene.
-        if self.randomize_camera:
-            env.set_camera("random", seed=rng)
-        P_world, pc_seg, rgb, action_mask = render_input_new(action_body_id, env)
+            i = 0
+            rgbs = []
+            while True:
+                # Maybe randomize the camera.
+                if self.randomize_camera:
+                    env.set_camera("random", seed=rng)
 
-        # We need enough visible points.
-        if sum(action_mask) < 1:
-            # If we don't find them in obs mode, it's because the random object position has been occluded.
-            # In this case, we just need to resample.
-            if self.mode == "obs":
-                MAX_ATTEMPTS = 20
-                i = 0
-                while sum(action_mask) < 1:
-                    action_pos = find_valid_action_initial_pose(
-                        action_body_id, env, seed=rng
+                # Render the scene.
+                P_world, pc_seg, rgb, action_mask = render_input_new(
+                    action_body_id, env
+                )
+                rgbs.append(rgb)
+
+                # If we can see the object, we're done.
+                if sum(action_mask) > 0:
+                    break
+
+                i += 1
+                if i > MAX_ATTEMPTS or not self.randomize_camera:
+                    p.removeBody(action_body_id, physicsClientId=env.client_id)
+
+                    # Make an animation of the rgbs using matplotlib.
+                    import matplotlib.animation as animation
+                    import matplotlib.pyplot as plt
+
+                    fig = plt.figure()
+                    ims = []
+                    for rgb in rgbs:
+                        im = plt.imshow(rgb, animated=True)
+                        ims.append([im])
+                    ani = animation.ArtistAnimation(
+                        fig, ims, interval=200, blit=True, repeat_delay=1000
                     )
-                    p.resetBasePositionAndOrientation(
-                        action_body_id,
-                        posObj=action_pos,
-                        ornObj=[0, 0, 0, 1],
-                        physicsClientId=env.client_id,
+                    plt.show()
+                    raise ValueError(
+                        "couldn't find a camera pose where the goal was visible"
                     )
-
-                    P_world, pc_seg, rgb, action_mask = render_input_new(
-                        action_body_id, env
-                    )
-
-                    i += 1
-                    if i >= MAX_ATTEMPTS:
-                        raise ValueError("couldn't find a valid goal :(")
-            else:
-                p.removeBody(action_body_id, physicsClientId=env.client_id)
-
-                raise ValueError("the goal we sampled isn't visible! ")
+        else:
+            raise ValueError(f"Invalid mode {self.mode}")
 
         # Separate out the action and anchor points.
         P_action_world = P_world[action_mask]
@@ -601,6 +640,7 @@ class PlaceDataset(tgd.Dataset):
             data.R_action_anchor = R_action_anchor
             data.flow = flow
 
+        env.close()
         return data
 
 
