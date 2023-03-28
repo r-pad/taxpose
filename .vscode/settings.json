@@ -1,6 +1,10 @@
 {
     "editor.formatOnSave": true,
     "python.formatting.provider": "black",
+    "python.linting.pylintArgs": [
+        "--generated-members",
+        "torch.*"
+    ],
     "editor.codeActionsOnSave": {
         "source.organizeImports": true
     }

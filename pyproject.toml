@@ -12,7 +12,22 @@ authors = [
   {email = "baeisner@andrew.cmu.edu", name = "Ben Eisner"},
   {email = "dheld@andrew.cmu.edu", name = "David Held"},
 ]
-dependencies = []
+dependencies = [
+  "dgl ~= 1.0",
+  "dglgo ~= 0.0.2",
+  "jupyterlab",
+  "pybullet",
+  "pyg_lib ~= 0.1; sys_platform == 'linux'",
+  "rpad-partnet-mobility-utils @ git+https://github.com/r-pad/partnet_mobility_utils.git",
+  "rpad-pyg @ git+https://github.com/r-pad/pyg_libs.git#46d20b5f32ce71e78413a0789def155ba1f88b1e",
+  "rpad-visualize-3d @ git+https://github.com/r-pad/visualize_3d.git",
+  "torch ~= 1.13",
+  "torch_cluster ~= 1.6.0",
+  "torch-geometric ~= 2.2.0",
+  "torch_scatter ~= 2.1.0",
+  "torch_sparse ~= 0.6.16",
+  "torch_spline_conv ~= 1.2.1",
+]
 
 [build-system]
 requires = [
@@ -24,23 +39,24 @@ build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
 develop = [
-  "pytest",
+  "autoflake",
   "black >= 22.3.0",
   "isort",
-  "mypy",
-  "pylint",
-  "autoflake",
+  "mypy >= 1.0",
   "pre-commit",
-  "jupyterlab",
+  "pylint",
+  "pytest",
+  "types-tqdm",
 ]
 build_docs = [
   "mkdocs-material",
   "mkdocstrings[python]",
 ]
 
+
 # This is required to allow us to have notebooks/ at the top level.
-[tool.setuptools.packages.find]
-where = ["taxpose"]
+[tool.setuptools]
+packages = ["taxpose"]
 
 [tool.setuptools.package-data]
 taxpose = ["py.typed"]
@@ -56,8 +72,17 @@ mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
 
-# # Uncomment this when you have imports for mypy to ignore.
-# [[tool.mypy.overrides]]
-# module = [
-# ]
-# ignore_missing_imports = true
+# Uncomment this when you have imports for mypy to ignore.
+[[tool.mypy.overrides]]
+module = [
+  "dgl.*",
+  "matplotlib.*",
+  "pybullet.*",
+  "scipy.*",
+  "torch_cluster.*",
+  "torch_geometric.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = "--ignore=third_party/"
