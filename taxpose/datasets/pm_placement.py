@@ -641,153 +641,129 @@ class PlaceDataset(tgd.Dataset):
             data.flow = flow
 
         env.close()
+        # TODO: rewrite this so that there's only a pos and a mask (anchor, action).
+        # OR: return a tuple of data.
         return cast(GIData, data)
 
 
-class GoalTransferDataset(tgd.Dataset):
+class GoalInferenceDataset(tgd.Dataset):
     def __init__(
         self,
         obs_dset: Union[PlaceDataset, CachedByKeyDataset[PlaceDataset]],
         goal_dset: Union[PlaceDataset, CachedByKeyDataset[PlaceDataset]],
         rotate_anchor=False,
+        seed: NPSeed = None,
     ):
-        self.obs_dset = (
-            obs_dset if isinstance(obs_dset, PlaceDataset) else obs_dset.dataset
+        self.obs_dset = obs_dset
+        self.goal_dset = goal_dset
+
+        self.obs_cached = isinstance(obs_dset, CachedByKeyDataset)
+        self.goal_cached = isinstance(goal_dset, CachedByKeyDataset)
+
+        # Get all the different combinations of objects.
+        obs_classmap = (
+            obs_dset.class_map if not self.obs_cached else obs_dset.dataset.class_map
         )
-        self.goal_dset = (
-            goal_dset if isinstance(goal_dset, PlaceDataset) else goal_dset.dataset
+        goal_classmap = (
+            goal_dset.class_map if not self.goal_cached else goal_dset.dataset.class_map
         )
 
         # Get all pairs.
         self.pairs: List[Tuple[SceneID, SceneID]] = []
-        for cat, goal_dict in self.obs_dset.class_map.items():
-            if cat in self.goal_dset.class_map:
+        for cat, goal_dict in obs_classmap.items():
+            if cat in goal_classmap:
                 for goal_id, obs_obj_ids in goal_dict.items():
-                    if goal_id in self.goal_dset.class_map[cat]:
-                        goal_obj_ids = self.goal_dset.class_map[cat][goal_id]
+                    if goal_id in goal_classmap[cat]:
+                        goal_obj_ids = goal_classmap[cat][goal_id]
 
                         self.pairs.extend(itertools.product(obs_obj_ids, goal_obj_ids))
         super().__init__()
 
         self.rotate_anchor = rotate_anchor
+        self.rng = np.random.default_rng(seed)
 
     def len(self):
         return len(self.pairs)
 
-    def get(self, ix: int):
+    def get(self, ix: int) -> Tuple[tgd.Data, tgd.Data, tgd.Data, tgd.Data]:
         # TODO: implement random class balancing...
         obs_scene_id, goal_scene_id = self.pairs[ix]
         assert obs_scene_id[2] == goal_scene_id[2]
         assert CATEGORIES[obs_scene_id[0]] == CATEGORIES[goal_scene_id[0]]
 
-        if self.obs_dset.use_processed:
-            obs_dset = self.obs_dset.inmem_map[obs_scene_id]
-            obs_data = obs_dset[np.random.randint(0, len(obs_dset))]
+        # Get obs and goal data from each dataset.
+        if self.obs_cached:
+            dset: CachedByKeyDataset = self.obs_dset
+            obs_id_dset = dset.inmem_dsets[obs_scene_id]
+            obs_data = obs_id_dset[self.rng.integers(0, len(obs_id_dset))]
         else:
-            obs_data = self.obs_dset.get_data(*obs_scene_id)
+            dset: PlaceDataset = self.obs_dset
+            obs_data = dset.get_data(*obs_scene_id, seed=self.rng)
 
-        if self.goal_dset.use_processed:
-            goal_dset = self.goal_dset.inmem_map[goal_scene_id]
-            goal_data = goal_dset[np.random.randint(0, len(goal_dset))]
+        if self.goal_cached:
+            dset: CachedByKeyDataset = self.goal_dset
+            goal_id_dset = dset.inmem_dsets[goal_scene_id]
+            goal_data = goal_id_dset[self.rng.integers(0, len(goal_id_dset))]
         else:
-            goal_data = self.goal_dset.get_data(*goal_scene_id)
+            dset: PlaceDataset = self.goal_dset
+            goal_data = dset.get_data(*goal_scene_id, seed=self.rng)
+
+        # TODO: IMPLEMENT THE FLOW ABOVE...
 
         # mimic the interface of the original dataset.
-        obs_act_ixs = resample_to_n(len(obs_data.action_pos), n=200)
-        obs_act_pos = obs_data.action_pos[obs_act_ixs].float()
-        assert obs_data.flow is not None
-        obs_act_flow = obs_data.flow[obs_act_ixs].float()
+        obs_act_pos = obs_data.action_pos
+        obs_anc_pos = obs_data.anchor_pos
+        goal_act_pos = goal_data.action_pos
+        goal_anc_pos = goal_data.anchor_pos
 
-        obs_anc_pos = obs_data.anchor_pos.float()
-        t_action_anchor = obs_data.t_action_anchor.float()
+        # Potentially resample... this probably won't ever get used...
 
-        if False:
-            oanp = obs_anc_pos
-            oacp = obs_act_pos
-            tg = t_action_anchor
-            pos = torch.cat([oanp, oacp, oacp + tg], dim=0)
-            labels = torch.zeros(len(pos)).int()
-            labels[: len(oanp)] = 0
-            labels[len(oanp) : len(oanp) + len(oacp)] = 1
-            labels[len(oanp) + len(oacp) : len(oanp) + 2 * len(oacp)] = 2
-            labelmap = {0: "anchor", 1: "actor_start", 2: "actor_gt"}
-            # segmentation_fig(pos, labels, labelmap).show()
+        N_ACTION_POINTS = 200
+        N_ANCHOR_POINTS = 1800
 
-        if self.rotate_anchor:
-            theta = (np.random.rand() - 0.5) * np.pi / 4
-            R_rand = R.from_rotvec(np.asarray([0, 0, 1]) * theta).as_matrix()
-            T_goal_goalnew = torch.eye(4).to(obs_anc_pos.device)
-            T_goal_goalnew[:3, :3] = (
-                torch.from_numpy(R_rand).to(obs_anc_pos.device).float()
-            )
+        if len(obs_act_pos) != N_ACTION_POINTS:
+            obs_act_ixs = resample_to_n(len(obs_act_pos), n=N_ACTION_POINTS)
+            obs_act_pos = obs_act_pos[obs_act_ixs].float()
 
-            P_goal = (obs_act_pos + t_action_anchor).float()
-            P_start = obs_act_pos
-            P_anc = obs_anc_pos
+        if len(obs_anc_pos) != N_ANCHOR_POINTS:
+            obs_anc_ixs = resample_to_n(len(obs_anc_pos), n=N_ANCHOR_POINTS)
+            obs_anc_pos = obs_anc_pos[obs_anc_ixs].float()
 
-            # Take points in the start and move to the goal.
-            T_start_goal = torch.eye(4).to(obs_anc_pos.device)
-            T_start_goal[:3, :3] = torch.eye(3).to(obs_anc_pos.device)
-            T_start_goal[:3, 3] = t_action_anchor
+        if len(goal_act_pos) != N_ACTION_POINTS:
+            goal_act_ixs = resample_to_n(len(goal_act_pos), n=N_ACTION_POINTS)
+            goal_act_pos = goal_act_pos[goal_act_ixs].float()
 
-            T_goal_start = T_start_goal.inverse()
+        if len(goal_anc_pos) != N_ANCHOR_POINTS:
+            goal_anc_ixs = resample_to_n(len(goal_anc_pos), n=N_ANCHOR_POINTS)
+            goal_anc_pos = goal_anc_pos[goal_anc_ixs].float()
 
-            # P_goalnew = T_goal_goalnew * P_goal
-            # P_goal = T_start_goal * P_start
-            P_goalnew = P_goal @ T_goal_goalnew[:3, :3].T + T_goal_goalnew[:3, 3:].T
-            P_ancnew = P_anc @ T_goal_goalnew[:3, :3].T + T_goal_goalnew[:3, 3:].T
-
-            # This labeling is gross.
-            T_start_goalnew = T_goal_goalnew @ T_start_goal
-
-            obs_anc_pos = P_ancnew
-            t_action_anchor = T_start_goalnew[:3, 3:].T
-            R_action_anchor = T_start_goalnew[:3, :3]
-            flow = None  # not implemented
-        else:
-            R_action_anchor = torch.eye(3).to(obs_anc_pos.device)
-
-        if False:
-            oanp = obs_anc_pos
-            oacp = obs_act_pos
-            tg = t_action_anchor
-            Rg = R_action_anchor
-            oacp_new = oacp @ Rg.T + tg
-            oacp_new2 = P_goalnew
-            pos = torch.cat([oanp, oacp, oacp_new], dim=0)
-            labels = torch.zeros(len(pos)).int()
-            labels[: len(oanp)] = 0
-            labels[len(oanp) : len(oanp) + len(oacp)] = 1
-            labels[len(oanp) + len(oacp) : len(oanp) + 2 * len(oacp)] = 2
-            labelmap = {0: "anchor", 1: "actor_start", 2: "actor_gt"}
-            # segmentation_fig(pos, labels, labelmap).show()
+        t_action_anchor = obs_data.t_action_anchor
+        R_action_anchor = obs_data.R_action_anchor
 
         obs_data_action = tgd.Data(
             id=obs_data.action_id,
-            pos=obs_act_pos.float(),
-            flow=obs_act_flow,
             goal_id=obs_data.goal_id,
-            t_action_anchor=t_action_anchor.float(),
-            R_action_anchor=R_action_anchor.reshape(1, -1).float(),
+            pos=obs_act_pos,
+            # flow=obs_act_flow,
+            t_action_anchor=t_action_anchor,
+            R_action_anchor=R_action_anchor,
             loc=goal_data.loc if hasattr(goal_data, "loc") else None,
         )
         obs_data_anchor = tgd.Data(
             id=obs_data.obj_id,
-            pos=obs_anc_pos.float(),
-            flow=torch.zeros(len(obs_data.anchor_pos), 3).float(),
+            pos=obs_anc_pos,
+            # flow=torch.zeros(len(obs_data.anchor_pos), 3).float(),
         )
         goal_data_action = tgd.Data(
             id=goal_data.action_id,
-            pos=goal_data.action_pos[
-                resample_to_n(len(goal_data.action_pos), n=200)
-            ].float(),
+            pos=goal_act_pos,
         )
         goal_data_anchor = tgd.Data(
             id=goal_data.obj_id,
-            pos=goal_data.anchor_pos.float(),
+            pos=goal_anc_pos,
         )
 
-        return goal_data_action, goal_data_anchor, obs_data_action, obs_data_anchor
+        return obs_data_action, obs_data_anchor, goal_data_action, goal_data_anchor
 
 
 def resample_to_n(k, n=200):

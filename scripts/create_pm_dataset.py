@@ -6,7 +6,7 @@ import typer
 from rpad.pyg.dataset import CachedByKeyDataset
 
 from taxpose.datasets.pm_placement import (
-    GoalTransferDataset,
+    GoalInferenceDataset,
     PlaceDataset,
     scenes_by_location,
 )
@@ -15,7 +15,6 @@ from taxpose.datasets.pm_placement import (
 class Split(str, Enum):
     train = "train"
     test = "test"
-    unseen = "unseen"
 
 
 class GoalLocation(str, Enum):
@@ -119,7 +118,7 @@ def main(
         seed=654321,
     )
 
-    dset = GoalTransferDataset(
+    dset = GoalInferenceDataset(
         obs_dset=obs_dset,
         goal_dset=goal_dset,
         rotate_anchor=rotate_anchor,

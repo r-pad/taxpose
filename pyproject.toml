@@ -15,17 +15,19 @@ authors = [
 dependencies = [
   "dgl ~= 1.0",
   "dglgo ~= 0.0.2",
+  "h5py",
   "jupyterlab",
   "pybullet",
   "pyg_lib ~= 0.1; sys_platform == 'linux'",
+  "pytorch3d ~= 0.7.2",
   "rpad-partnet-mobility-utils @ git+https://github.com/r-pad/partnet_mobility_utils.git",
   "rpad-pyg @ git+https://github.com/r-pad/pyg_libs.git#46d20b5f32ce71e78413a0789def155ba1f88b1e",
   "rpad-visualize-3d @ git+https://github.com/r-pad/visualize_3d.git",
-  "torch ~= 1.13",
+  "torch ~= 1.11",
   "torch_cluster ~= 1.6.0",
   "torch-geometric ~= 2.2.0",
-  "torch_scatter ~= 2.1.0",
-  "torch_sparse ~= 0.6.16",
+  "torch_scatter ~= 2.0.9",
+  "torch_sparse ~= 0.6.15",
   "torch_spline_conv ~= 1.2.1",
 ]
 
@@ -56,10 +58,13 @@ build_docs = [
 
 # This is required to allow us to have notebooks/ at the top level.
 [tool.setuptools]
-packages = ["taxpose"]
+packages = ["taxpose", "third_party"]
 
 [tool.setuptools.package-data]
 taxpose = ["py.typed"]
+
+[tool.black]
+exclude = "third_party/*"
 
 [tool.isort]
 profile = "black"
@@ -86,3 +91,11 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = "--ignore=third_party/"
+
+[tool.pylint]
+disable = [
+  "C0103", # Invalid name.
+  "C0114", # Missing module docstring.
+  "C0115", # Missing class docstring.
+  "C0116", # Missing function or method docstring.
+]

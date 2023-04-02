@@ -24,10 +24,16 @@ jobs:
       ##############################################
 
       - name: Install CPU version of torch.
-        run: pip install torch==1.13.1+cpu torchvision==0.14.1+cpu torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cpu
+        run: pip install torch==1.11.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu
 
       - name: Install the torch-geometric.
-        run: pip install pyg_lib==0.1.0 torch_scatter==2.1.0 torch_sparse==0.6.16 torch_cluster==1.6.0 torch_spline_conv==1.2.1 -f https://data.pyg.org/whl/torch-1.13.0+cpu.html
+        run: pip install pyg_lib==0.1.0 torch_scatter==2.1.0 torch_sparse==0.6.16 torch_cluster==1.6.0 torch_spline_conv==1.2.1 -f https://data.pyg.org/whl/torch-1.11.0+cpu.html
+
+      - name: Install pytorch3d dependencies.
+        run: pip install fvcore iopath
+
+      - name: Install pytorch3d
+        run: pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py310_cu113_pyt1110/download.html
 
       - name: Install Dependencies
         run: pip install -e ".[build_docs]"
