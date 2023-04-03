@@ -1,5 +1,6 @@
 import itertools
 import pickle
+from enum import Enum
 from typing import Dict, List, Literal, Optional, Protocol, Sequence, Tuple, Union, cast
 
 import dgl.geometry
@@ -861,3 +862,95 @@ def scenes_by_location(split, mode, goal_desc):
                         scenes.append((obj_id, action_id, goal_id))
 
     return filter_bad_scenes(scenes, mode)
+
+
+class DatasetSplit(str, Enum):
+    TRAIN = "train"
+    TEST = "test"
+
+
+class DatasetType(str, Enum):
+    SINGLE = "single"
+    DISHWASHER_TOP = "dishwasher_top"
+    DISHWASHER_IN = "dishwasher_in"
+    IN = "in"
+    TOP = "top"
+    LEFT = "left"
+    RIGHT = "right"
+    UNDER = "under"
+    ALL = "all"
+
+
+def create_goal_inference_dataset(
+    pm_root: str,
+    dataset: DatasetType,
+    split: DatasetSplit,
+    randomize_camera: bool = True,
+    rotate_anchor: bool = True,
+    snap_to_surface: bool = True,
+    full_obj: bool = True,
+    even_downsample: bool = True,
+    n_repeat: int = 50,
+    n_workers: int = 30,
+    n_proc_per_worker: int = 2,
+    seed: Optional[int] = None,
+) -> GoalInferenceDataset:
+    if dataset == DatasetType.SINGLE:
+        scene_ids = [("11299", "ell", "0", "in")]
+    elif dataset == DatasetType.DISHWASHER_TOP:
+        scene_ids = default_scenes(split, "obs", "dishwasher", "3")
+        scene_ids = [(t[0], t[1], t[2], "top") for t in scene_ids]
+    elif dataset == DatasetType.DISHWASHER_IN:
+        scene_ids = default_scenes(split, "obs", "dishwasher", "0")
+        scene_ids = [(t[0], t[1], t[2], "in") for t in scene_ids]
+    elif dataset in {
+        DatasetType.IN,
+        DatasetType.TOP,
+        DatasetType.LEFT,
+        DatasetType.RIGHT,
+        DatasetType.UNDER,
+    }:
+        scene_ids = scenes_by_location(split, "obs", dataset)
+        scene_ids = [(t[0], t[1], t[2], dataset) for t in scene_ids]
+    elif dataset == DatasetType.ALL:
+        scene_ids = []
+        for loc in {
+            DatasetType.IN,
+            DatasetType.TOP,
+            DatasetType.LEFT,
+            DatasetType.RIGHT,
+            DatasetType.UNDER,
+        }:
+            otr = scenes_by_location(split, "obs", loc)
+            scene_ids.extend([(t[0], t[1], t[2], loc) for t in otr])
+    else:
+        raise ValueError("bad dataset")
+
+    return GoalInferenceDataset(
+        dset=CachedByKeyDataset(
+            dset_cls=PlaceDataset,
+            dset_kwargs={
+                "root": pm_root,
+                "randomize_camera": randomize_camera,
+                "snap_to_surface": snap_to_surface,
+                "full_obj": full_obj,
+                "even_downsample": even_downsample,
+                "rotate_anchor": rotate_anchor,
+                "scene_ids": scene_ids,
+                "mode": "obs",
+            },
+            data_keys=scene_ids,
+            root=pm_root,
+            processed_dirname=PlaceDataset.processed_dir_name(
+                "obs",
+                randomize_camera,
+                snap_to_surface,
+                full_obj,
+                even_downsample,
+            ),
+            n_repeat=n_repeat,
+            n_workers=n_workers,
+            n_proc_per_worker=n_proc_per_worker,
+            seed=seed,
+        )
+    )

@@ -1,151 +1,150 @@
 import os
+from collections import defaultdict
 from datetime import datetime
+from typing import Dict, List, Tuple
 
+import numpy as np
+import pandas as pd
 import pytorch3d
 import torch
 import torch_geometric.loader as tgl
 import typer
-from rpad.pyg.dataset import CachedByKeyDataset
 from tqdm import tqdm
 
 import wandb
 from taxpose.datasets.pm_placement import (
-    GoalInferenceDataset,
+    CATEGORIES,
+    DatasetSplit,
+    DatasetType,
     PlaceDataset,
-    default_scenes,
-    scenes_by_location,
+    create_goal_inference_dataset,
 )
 from taxpose.models.taxpose import BrianChuerLoss, SE3LossTheirs
 from taxpose.models.taxpose import TAXPoseModel as Model
 
+app = typer.Typer()
 
-def create_datasets(
-    root: str,
-    dataset: str,
-    randomize_camera: bool = True,
-    rotate_anchor: bool = True,
-    snap_to_surface: bool = True,
-    full_obj: bool = True,
-    even_downsample: bool = True,
-    n_repeat: int = 50,
-    n_workers: int = 30,
-    n_proc_per_worker: int = 2,
-):
-    if dataset == "single":
-        obs_train_scene_ids = [("11299", "ell", "0", "in")]
-        goal_train_scene_ids = [("11299", "ell", "0", "in")]
-        obs_test_scene_ids = [("11299", "ell", "0", "in")]
-        goal_test_scene_ids = [("11299", "ell", "0", "in")]
-    elif dataset == "dishwasher_top":
-        obs_train_scene_ids = default_scenes("train", "obs", "dishwasher", "3")
-        goal_train_scene_ids = default_scenes("train", "goal", "dishwasher", "3")
-        obs_test_scene_ids = default_scenes("test", "obs", "dishwasher", "3")
-        goal_test_scene_ids = default_scenes("test", "goal", "dishwasher", "3")
 
-        obs_train_scene_ids = [(t[0], t[1], t[2], "top") for t in obs_train_scene_ids]
-        goal_train_scene_ids = [(t[0], t[1], t[2], "top") for t in goal_train_scene_ids]
-        obs_test_scene_ids = [(t[0], t[1], t[2], "top") for t in obs_test_scene_ids]
-        goal_test_scene_ids = [(t[0], t[1], t[2], "top") for t in goal_test_scene_ids]
-    elif dataset == "dishwasher_in":
-        obs_train_scene_ids = default_scenes("train", "obs", "dishwasher", "0")
-        goal_train_scene_ids = default_scenes("train", "goal", "dishwasher", "0")
-        obs_test_scene_ids = default_scenes("test", "obs", "dishwasher", "0")
-        goal_test_scene_ids = default_scenes("test", "goal", "dishwasher", "0")
+def theta_err(R_pred: torch.FloatTensor, R_gt: torch.FloatTensor):
+    # Normalize. This prevents NaNs.
+    def normalize(x):
+        return x / torch.norm(x, dim=-1, keepdim=True)
 
-        obs_train_scene_ids = [(t[0], t[1], t[2], "in") for t in obs_train_scene_ids]
-        goal_train_scene_ids = [(t[0], t[1], t[2], "in") for t in goal_train_scene_ids]
-        obs_test_scene_ids = [(t[0], t[1], t[2], "in") for t in obs_test_scene_ids]
-        goal_test_scene_ids = [(t[0], t[1], t[2], "in") for t in goal_test_scene_ids]
-    elif dataset in {"in", "top", "left", "right", "under"}:
-        obs_train_scene_ids = scenes_by_location("train", "obs", dataset)
-        goal_train_scene_ids = scenes_by_location("train", "goal", dataset)
-        obs_test_scene_ids = scenes_by_location("test", "obs", dataset)
-        goal_test_scene_ids = scenes_by_location("test", "goal", dataset)
+    R_pred = normalize(R_pred)
+    dR = R_pred.transpose(-2, -1) @ R_gt
 
-        obs_train_scene_ids = [(t[0], t[1], t[2], dataset) for t in obs_train_scene_ids]
-        goal_train_scene_ids = [
-            (t[0], t[1], t[2], dataset) for t in goal_train_scene_ids
-        ]
-        obs_test_scene_ids = [(t[0], t[1], t[2], dataset) for t in obs_test_scene_ids]
-        goal_test_scene_ids = [(t[0], t[1], t[2], dataset) for t in goal_test_scene_ids]
-    elif dataset == "all":
-        obs_train_scene_ids = []
-        goal_train_scene_ids = []
-        obs_test_scene_ids = []
-        goal_test_scene_ids = []
-        for loc in {"in", "top", "left", "right", "under"}:
-            otr = scenes_by_location("train", "obs", loc)
-            gtr = scenes_by_location("train", "goal", loc)
-            ote = scenes_by_location("test", "obs", loc)
-            gte = scenes_by_location("test", "goal", loc)
+    # Batched trace. Ugly.
+    # In future versions of torch, we can just vmap.
+    t_dR = torch.diagonal(dR, offset=0, dim1=-2, dim2=-1).sum(-1)
 
-            obs_train_scene_ids.extend([(t[0], t[1], t[2], loc) for t in otr])
-            goal_train_scene_ids.extend([(t[0], t[1], t[2], loc) for t in gtr])
-            obs_test_scene_ids.extend([(t[0], t[1], t[2], loc) for t in ote])
-            goal_test_scene_ids.extend([(t[0], t[1], t[2], loc) for t in gte])
+    th = torch.arccos((torch.clamp(t_dR, -1, 1) - 1) / 2.0)
 
-    else:
-        raise ValueError("bad dataset name")
+    if torch.isnan(th).any():
+        raise ValueError("NaN in theta error")
 
-    # A helper to create individual datasets, since many of the
-    # arguments are the same.
-    def _create_place_dset(mode, ids, seed):
-        dset = CachedByKeyDataset(
-            dset_cls=PlaceDataset,
-            dset_kwargs={
-                "root": root,
-                "randomize_camera": randomize_camera,
-                "snap_to_surface": snap_to_surface,
-                "full_obj": full_obj,
-                "even_downsample": even_downsample,
-                "rotate_anchor": rotate_anchor,
-                "scene_ids": ids,
-                "mode": mode,
-            },
-            data_keys=ids,
-            root=root,
-            processed_dirname=PlaceDataset.processed_dir_name(
-                mode,
-                randomize_camera,
-                snap_to_surface,
-                full_obj,
-                even_downsample,
-            ),
-            n_repeat=n_repeat,
-            n_workers=n_workers,
-            n_proc_per_worker=n_proc_per_worker,
-            seed=seed,
-        )
+    return torch.rad2deg(th)
 
-        return dset
 
-    # The goal transfer dataset is a combination of two place datasets.
-    # train_dset = GoalTransferDataset(
-    #     obs_dset=_create_place_dset("obs", obs_train_scene_ids, 123456),
-    #     goal_dset=_create_place_dset("goal", goal_train_scene_ids, 654321),
-    #     rotate_anchor=rotate_anchor,
-    # )
-    # test_dset = GoalTransferDataset(
-    #     obs_dset=_create_place_dset("obs", obs_test_scene_ids, 123456),
-    #     goal_dset=_create_place_dset("goal", goal_test_scene_ids, 654321),
-    #     rotate_anchor=rotate_anchor,
-    # )
+def t_err(t_pred, t_gt):
+    return torch.norm(t_pred - t_gt, dim=-1)
 
-    train_dset = GoalInferenceDataset(
-        _create_place_dset("obs", obs_train_scene_ids, 123456)
+
+def classwise_mean(
+    results: Dict[str, List[Dict[str, float]]]
+) -> Dict[str, Dict[str, float]]:
+    classwise = defaultdict(lambda: defaultdict(list))
+    for k, ds in results.items():
+        for d in ds:
+            for m, v in d.items():
+                classwise[m][CATEGORIES[k]].append(v)
+
+    return {k: {m: np.mean(v) for m, v in d.items()} for k, d in classwise.items()}
+
+
+def global_mean(results: Dict[str, List[Dict[str, float]]]) -> Dict[str, float]:
+    metricswise = defaultdict(list)
+    for ds in results.values():
+        for d in ds:
+            for m, v in d.items():
+                metricswise[m].append(v)
+    return {m: np.mean(v) for m, v in metricswise.items()}
+
+
+def class_weighted_mean(
+    classwise_means: Dict[str, Dict[str, float]]
+) -> Dict[str, float]:
+    return {k: np.mean(list(v.values())) for k, v in classwise_means.items()}
+
+
+def global_mean_to_pandas(means: Dict[str, float], methodname="ours") -> pd.DataFrame:
+    return pd.DataFrame.from_dict(means, orient="index", columns=[methodname]).T
+
+
+def classwise_mean_to_pandas(
+    classwise_means: Dict[str, Dict[str, float]], methodname="ours"
+) -> pd.DataFrame:
+    return {
+        k: pd.DataFrame.from_dict(v, orient="index", columns=[methodname]).T
+        for k, v in classwise_means.items()
+    }
+
+
+@torch.no_grad()
+def run_eval(
+    model, dset: PlaceDataset, batch_size: int, device: str, num_workers: int = 0
+) -> Tuple[Dict[str, float], Dict[str, Dict[str, float]], Dict[str, Dict[str, float]]]:
+    """Run evaluation on a dataset.
+
+    Args:
+        model: Model to predict relative poses.
+        dset (PlaceDataset): Dataset to evaluate on.
+        batch_size (int): Batch size.
+        device (str): Device.
+        num_workers (int, optional): Loader workers. Defaults to 0.
+
+    Returns:
+        Tuple[Dict[str, float], Dict[str, Dict[str, float]], Dict[str, Dict[str, float]]]:
+            global metrics, classwise metrics, per-object metrics.
+    """
+    loader = tgl.DataLoader(
+        dset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
     )
 
-    # test_dset = GoalInferenceDataset(
-    #     _create_place_dset("obs", obs_test_scene_ids, 654321)
-    # )
-    test_dset = None
+    obj_metrics = defaultdict(list)
 
-    return train_dset, test_dset
+    for action, anchor in tqdm(loader):
+        action = action.to(device)
+        anchor = anchor.to(device)
+
+        R_gt = action.R_action_anchor.reshape(-1, 3, 3)
+        t_gt = action.t_action_anchor
+
+        R_pred, t_pred, aws, _, _, _ = model(action, anchor)
+
+        R_errs = theta_err(R_pred, R_gt)
+        t_errs = t_err(t_pred, t_gt)
+
+        # Aggregate results.
+        for j in range(len(anchor)):
+            obj_metrics[anchor.id[j]].append(
+                {
+                    "R_err": R_errs[j].item(),
+                    "t_err": t_errs[j].item(),
+                }
+            )
+
+    class_means = classwise_mean(obj_metrics)
+    global_means = global_mean(obj_metrics)
+    return global_means, class_means, obj_metrics
 
 
-def main(
-    dataset: str,
-    arch="brianchuer",
+@app.command()
+def train(
+    dataset: DatasetType = typer.Option(...),
+    arch="brianchuer-gc",
     root="/home/beisner/datasets/partnet-mobility",
     batch_size: int = 16,
     use_bc_loss: bool = True,
@@ -157,13 +156,14 @@ def main(
     n_proc_per_worker: int = 2,
 ):
     torch.autograd.set_detect_anomaly(True)
-    n_print = 1
 
     device = "cuda:0"
 
-    train_dset, test_dset = create_datasets(
-        root=root,
+    # Get the dataset.
+    train_dset = create_goal_inference_dataset(
+        pm_root=root,
         dataset=dataset,
+        split="train",
         randomize_camera=True,
         rotate_anchor=True,
         snap_to_surface=True,
@@ -172,9 +172,38 @@ def main(
         n_repeat=n_repeat,
         n_workers=n_workers,
         n_proc_per_worker=n_proc_per_worker,
+        seed=123456,
     )
 
-    train_dset[0]
+    # Two smaller datasets for validation.
+    eval_train_dset = create_goal_inference_dataset(
+        pm_root=root,
+        dataset=dataset,
+        split="train",
+        randomize_camera=True,
+        rotate_anchor=True,
+        snap_to_surface=True,
+        full_obj=True,
+        even_downsample=True,
+        n_repeat=1,
+        n_workers=n_workers,
+        n_proc_per_worker=n_proc_per_worker,
+        seed=123456,
+    )
+    eval_test_dset = create_goal_inference_dataset(
+        pm_root=root,
+        dataset=dataset,
+        split="test",
+        randomize_camera=True,
+        rotate_anchor=True,
+        snap_to_surface=True,
+        full_obj=True,
+        even_downsample=True,
+        n_repeat=1,
+        n_workers=n_workers,
+        n_proc_per_worker=n_proc_per_worker,
+        seed=654321,
+    )
 
     train_loader = tgl.DataLoader(
         train_dset, batch_size=batch_size, shuffle=True, num_workers=0
@@ -200,7 +229,19 @@ def main(
     )
 
     for i in range(1, n_epochs + 1):
+        # Run the evals.
+        model.eval()
+        for name, dset in [("train", eval_train_dset), ("test", eval_test_dset)]:
+            global_means, class_means, obj_metrics = run_eval(
+                model, dset, batch_size, device
+            )
+            wandb.log(
+                {f"{name}/{k}": v for k, v in global_means.items()},
+                commit=False,
+            )
+
         pbar = tqdm(train_loader)
+        model.train()
         for action, anchor in pbar:
             action = action.to(device)
             anchor = anchor.to(device)
@@ -209,7 +250,7 @@ def main(
 
             R_gt = action.R_action_anchor.reshape(-1, 3, 3)
             t_gt = action.t_action_anchor
-            mat = torch.zeros(action.num_graphs, 4, 4).to(device)
+            mat = torch.zeros(len(action), 4, 4).to(device)
             mat[:, :3, :3] = R_gt
             mat[:, :3, 3] = t_gt
             mat[:, 3, 3] = 1
@@ -220,13 +261,9 @@ def main(
                 device=device, matrix=mat.transpose(-1, -2)
             )
 
-            # T_action_anchor_gt = (
-            #     pytorch3d.transforms.Transform3d().rotate(R_gt).translate(t_gt)
-            # ).to(device)
-
             if use_bc_loss:
                 loss = crit(
-                    action.pos.reshape(action.num_graphs, -1, 3),
+                    action.pos.reshape(len(action), -1, 3),
                     pred_T_action,
                     gt_T_action,
                     Fx,
@@ -238,22 +275,76 @@ def main(
             opt.step()
             wandb.log({"loss": loss.item()})
 
-            if i % n_print == 0:
-                if use_bc_loss:
-                    desc = f"Epoch {i:03d}:  Loss:{loss.item():.3f}"
+            if use_bc_loss:
+                desc = f"Epoch {i:03d}:  Loss:{loss.item():.3f}"
 
-                else:
-                    desc = f"Epoch {i:03d}:  Loss:{loss.item():.3f}, R_loss:{R_loss.item():.3f}, t_loss:{t_loss.item():.3f}"
+            else:
+                desc = f"Epoch {i:03d}:  Loss:{loss.item():.3f}, R_loss:{R_loss.item():.3f}, t_loss:{t_loss.item():.3f}"
 
-                pbar.set_description(desc)
-                # print(
-                #     f"{i}\tLoss:{loss.item()}\tR_loss:{R_loss.item()}\tt_loss:{t_loss.item()}"
-                # )
+            pbar.set_description(desc)
+
         if dataset != "single":
             torch.save(model.state_dict(), os.path.join(d, f"weights_{i:03d}.pt"))
 
-    # dcp_sg_plot(action.pos, anchor.pos, t_gt, t_pred, R_gt, R_pred, None).show()
+
+@app.command()
+def evaluate(
+    dataset: DatasetType = typer.Option(...),
+    split: DatasetSplit = typer.Option(...),
+    weights: str = typer.Option(...),
+    arch="brianchuer-gc",
+    root=os.path.expanduser("~/datasets/partnet-mobility"),
+    batch_size: int = 32,  # Higher because we're not doing backprop.
+    embedding_dim: int = 512,
+    n_repeat: int = 50,
+    results_dir: str = "results",
+):
+    device = "cuda:0"
+
+    results_dir = os.path.join(results_dir, dataset.value, split.value, arch)
+    os.makedirs(results_dir, exist_ok=True)
+
+    # Load the model.
+    model = Model(arch, attn=True, embedding_dim=embedding_dim).to(device)
+    model.load_state_dict(torch.load(weights))
+    model.eval()
+
+    # Get the dataset.
+    dset = create_goal_inference_dataset(
+        pm_root=root,
+        dataset=dataset,
+        split=split,
+        randomize_camera=True,
+        rotate_anchor=True,
+        snap_to_surface=True,
+        full_obj=True,
+        even_downsample=True,
+        n_repeat=n_repeat,
+        n_workers=30,
+        n_proc_per_worker=2,
+        seed=123456 if split == "train" else 654321,
+    )
+
+    # Run the evaluation.
+    global_means, class_means, obj_metrics = run_eval(model, dset, batch_size, device)
+
+    # Print the results.
+    print("Global metrics: - PER OBJECT")
+    gm = global_mean_to_pandas(global_means)
+    gm.to_csv(os.path.join(results_dir, "global_metrics.csv"))
+    print(gm)
+
+    print("Global metrics: - CLASS-WEIGHTED")
+    gm_cw = global_mean_to_pandas(class_weighted_mean(class_means))
+    gm_cw.to_csv(os.path.join(results_dir, "global_metrics_classweighted.csv"))
+    print(gm_cw)
+
+    print("Classwise metrics:")
+    for k, v in classwise_mean_to_pandas(class_means).items():
+        v.to_csv(os.path.join(results_dir, f"classwise_{k}.csv"))
+        print(k)
+        print(v)
 
 
 if __name__ == "__main__":
-    typer.run(main)
+    app()
