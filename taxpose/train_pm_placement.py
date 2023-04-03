@@ -8,6 +8,7 @@ import typer
 from rpad.pyg.dataset import CachedByKeyDataset
 from tqdm import tqdm
 
+import wandb
 from taxpose.datasets.pm_placement import (
     GoalInferenceDataset,
     PlaceDataset,
@@ -67,7 +68,7 @@ def create_datasets(
         ]
         obs_test_scene_ids = [(t[0], t[1], t[2], dataset) for t in obs_test_scene_ids]
         goal_test_scene_ids = [(t[0], t[1], t[2], dataset) for t in goal_test_scene_ids]
-    elif dataset == "gc":
+    elif dataset == "all":
         obs_train_scene_ids = []
         goal_train_scene_ids = []
         obs_test_scene_ids = []
@@ -119,16 +120,25 @@ def create_datasets(
         return dset
 
     # The goal transfer dataset is a combination of two place datasets.
+    # train_dset = GoalTransferDataset(
+    #     obs_dset=_create_place_dset("obs", obs_train_scene_ids, 123456),
+    #     goal_dset=_create_place_dset("goal", goal_train_scene_ids, 654321),
+    #     rotate_anchor=rotate_anchor,
+    # )
+    # test_dset = GoalTransferDataset(
+    #     obs_dset=_create_place_dset("obs", obs_test_scene_ids, 123456),
+    #     goal_dset=_create_place_dset("goal", goal_test_scene_ids, 654321),
+    #     rotate_anchor=rotate_anchor,
+    # )
+
     train_dset = GoalInferenceDataset(
-        obs_dset=_create_place_dset("obs", obs_train_scene_ids, 123456),
-        goal_dset=_create_place_dset("goal", goal_train_scene_ids, 654321),
-        rotate_anchor=rotate_anchor,
+        _create_place_dset("obs", obs_train_scene_ids, 123456)
     )
-    test_dset = GoalInferenceDataset(
-        obs_dset=_create_place_dset("obs", obs_test_scene_ids, 123456),
-        goal_dset=_create_place_dset("goal", goal_test_scene_ids, 654321),
-        rotate_anchor=rotate_anchor,
-    )
+
+    # test_dset = GoalInferenceDataset(
+    #     _create_place_dset("obs", obs_test_scene_ids, 654321)
+    # )
+    test_dset = None
 
     return train_dset, test_dset
 
@@ -183,9 +193,15 @@ def main(
     d = f"checkpoints/manual/{datetime.now().strftime('%Y-%m-%d_%H_%M_%S')}"
     os.makedirs(d, exist_ok=True)
 
+    wandb.init(
+        project="taxpose",
+        entity="r-pad",
+        config={"dataset": dataset, "arch": arch, "lr": lr, "batch_size": batch_size},
+    )
+
     for i in range(1, n_epochs + 1):
         pbar = tqdm(train_loader)
-        for action, anchor, _, _ in pbar:
+        for action, anchor in pbar:
             action = action.to(device)
             anchor = anchor.to(device)
 
@@ -220,6 +236,7 @@ def main(
 
             loss.backward()
             opt.step()
+            wandb.log({"loss": loss.item()})
 
             if i % n_print == 0:
                 if use_bc_loss:

@@ -29,6 +29,7 @@ dependencies = [
   "torch_scatter ~= 2.0.9",
   "torch_sparse ~= 0.6.15",
   "torch_spline_conv ~= 1.2.1",
+  "wandb",
 ]
 
 [build-system]

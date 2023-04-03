@@ -647,6 +647,56 @@ class PlaceDataset(tgd.Dataset):
 
 
 class GoalInferenceDataset(tgd.Dataset):
+    """Temporary wrapper for the PlaceDataset to make it compatible with the
+    training code.
+
+    # TODO: delete this class, and rewrite the GIDatase."""
+
+    def __init__(
+        self,
+        dset: Union[PlaceDataset, CachedByKeyDataset[PlaceDataset]],
+    ):
+        super().__init__()
+        self.dset = dset
+
+    def len(self) -> int:
+        return len(self.dset)
+
+    def get(self, ix: int) -> tgd.Data:
+        data = self.dset[ix]
+
+        N_ACTION_POINTS = 200
+        N_ANCHOR_POINTS = 1800
+
+        act_pos = data.action_pos
+        anc_pos = data.anchor_pos
+
+        if len(act_pos) != N_ACTION_POINTS:
+            obs_act_ixs = resample_to_n(len(act_pos), n=N_ACTION_POINTS)
+            act_pos = act_pos[obs_act_ixs].float()
+
+        if len(anc_pos) != N_ANCHOR_POINTS:
+            obs_anc_ixs = resample_to_n(len(anc_pos), n=N_ANCHOR_POINTS)
+            anc_pos = anc_pos[obs_anc_ixs].float()
+
+        action_data = tgd.Data(
+            id=data.action_id,
+            goal_id=data.goal_id,
+            pos=act_pos,
+            # flow=obs_act_flow,
+            t_action_anchor=data.t_action_anchor,
+            R_action_anchor=data.R_action_anchor,
+            loc=data.loc if hasattr(data, "loc") else None,
+        )
+        anchor_data = tgd.Data(
+            id=data.obj_id,
+            pos=anc_pos,
+            # flow=torch.zeros(len(obs_data.anchor_pos), 3).float(),
+        )
+        return action_data, anchor_data
+
+
+class GoalTransferDataset(tgd.Dataset):
     def __init__(
         self,
         obs_dset: Union[PlaceDataset, CachedByKeyDataset[PlaceDataset]],

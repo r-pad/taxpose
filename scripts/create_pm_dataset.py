@@ -6,7 +6,7 @@ import typer
 from rpad.pyg.dataset import CachedByKeyDataset
 
 from taxpose.datasets.pm_placement import (
-    GoalInferenceDataset,
+    GoalTransferDataset,
     PlaceDataset,
     scenes_by_location,
 )
@@ -118,7 +118,7 @@ def main(
         seed=654321,
     )
 
-    dset = GoalInferenceDataset(
+    dset = GoalTransferDataset(
         obs_dset=obs_dset,
         goal_dset=goal_dset,
         rotate_anchor=rotate_anchor,
