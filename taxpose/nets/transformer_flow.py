@@ -2,24 +2,15 @@
 # -*- coding: utf-8 -*-
 # Pulled from DCP
 
-import copy
 import math
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from taxpose.nets.brian_chuer_model import CustomTransformer
 from taxpose.nets.pointnet import PointNet
-from third_party.dcp.model import (
-    DGCNN,
-    Decoder,
-    DecoderLayer,
-    Encoder,
-    EncoderDecoder,
-    EncoderLayer,
-    MultiHeadedAttention,
-    PositionwiseFeedForward,
-)
+from third_party.dcp.model import DGCNN
 
 
 class EquivariantFeatureEmbeddingNetwork(nn.Module):
@@ -39,62 +30,6 @@ class EquivariantFeatureEmbeddingNetwork(nn.Module):
         points_embedding = self.emb_nn(points_dmean)  # B, emb_dims, num_points
 
         return points_embedding
-
-
-class BidirectionalTransformer(nn.Module):
-    def __init__(
-        self,
-        emb_dims=512,
-        n_blocks=1,
-        dropout=0.0,
-        ff_dims=1024,
-        n_heads=4,
-        return_attn=False,
-        bidirectional=True,
-    ):
-        super(BidirectionalTransformer, self).__init__()
-        self.emb_dims = emb_dims
-        self.N = n_blocks
-        self.dropout = dropout
-        self.ff_dims = ff_dims
-        self.n_heads = n_heads
-        self.return_attn = return_attn
-        self.bidirectional = bidirectional
-        c = copy.deepcopy
-        attn = MultiHeadedAttention(self.n_heads, self.emb_dims)
-        ff = PositionwiseFeedForward(self.emb_dims, self.ff_dims, self.dropout)
-        self.model = EncoderDecoder(
-            Encoder(EncoderLayer(self.emb_dims, c(attn), c(ff), self.dropout), self.N),
-            Decoder(
-                DecoderLayer(self.emb_dims, c(attn), c(attn), c(ff), self.dropout),
-                self.N,
-            ),
-            nn.Sequential(),
-            nn.Sequential(),
-            nn.Sequential(),
-        )
-
-    def forward(self, *input):
-        src = input[0]
-        tgt = input[1]
-        src = src.transpose(2, 1).contiguous()
-        tgt = tgt.transpose(2, 1).contiguous()
-        src_embedding = self.model(tgt, src, None, None).transpose(2, 1).contiguous()
-        src_attn = self.model.decoder.layers[-1].src_attn.attn
-
-        if self.bidirectional:
-            tgt_embedding = (
-                self.model(src, tgt, None, None).transpose(2, 1).contiguous()
-            )
-            tgt_attn = self.model.decoder.layers[-1].src_attn.attn
-
-            if self.return_attn:
-                return src_embedding, tgt_embedding, src_attn, tgt_attn
-            return src_embedding, tgt_embedding
-
-        if self.return_attn:
-            return src_embedding, src_attn
-        return src_embedding
 
 
 class MLP(nn.Module):
@@ -267,10 +202,10 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.freeze_embnn = freeze_embnn
         self.use_transformer_attention = use_transformer_attention
 
-        self.transformer_action = BidirectionalTransformer(
+        self.transformer_action = CustomTransformer(
             emb_dims=emb_dims, return_attn=True, bidirectional=False
         )
-        self.transformer_anchor = BidirectionalTransformer(
+        self.transformer_anchor = CustomTransformer(
             emb_dims=emb_dims, return_attn=True, bidirectional=False
         )
         self.head_action = ResidualMLPHead(
