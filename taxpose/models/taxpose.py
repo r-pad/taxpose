@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
 
-from taxpose.nets.brian_chuer_model import BrianChuerAdapter
+from taxpose.nets.transformer_flow_pm import BrianChuerAdapter
 from third_party.dcp.model import DGCNN
 
 mse_criterion = nn.MSELoss(reduction="sum")

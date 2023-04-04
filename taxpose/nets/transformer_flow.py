@@ -8,8 +8,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from taxpose.nets.brian_chuer_model import CustomTransformer
 from taxpose.nets.pointnet import PointNet
+from taxpose.nets.transformer_flow_pm import CustomTransformer
 from third_party.dcp.model import DGCNN
 
 
