@@ -1,3 +1,4 @@
+import json
 import pickle
 from dataclasses import dataclass
 from enum import Enum
@@ -85,6 +86,10 @@ def __id_to_cat():
 
 
 CATEGORIES = __id_to_cat()
+
+
+def get_category(obj_id):
+    return CATEGORIES[obj_id]
 
 
 def randomize_block_pose(seed: NPSeed = None):
@@ -187,6 +192,21 @@ def has_collisions(action_id, sim: PMRenderEnv):
     return collision_counter > 0
 
 
+def subsample_pcd(P_world, pc_seg_obj):
+    subsample = np.where(pc_seg_obj == 99)[0]
+    np.random.shuffle(subsample)
+    subsample = subsample[:200]
+    subsample_obj = np.where(pc_seg_obj != 99)[0]
+    np.random.shuffle(subsample_obj)
+    subsample_obj = subsample_obj[:1800]
+    pc_seg_obj = np.concatenate([pc_seg_obj[subsample_obj], pc_seg_obj[subsample]])
+    P_world = np.concatenate([P_world[subsample_obj], P_world[subsample]])
+    while len(P_world) < 2000:
+        pc_seg_obj = np.concatenate([pc_seg_obj, pc_seg_obj[-1:]])
+        P_world = np.concatenate([P_world, P_world[-1:]])
+    return P_world, pc_seg_obj
+
+
 def find_valid_action_initial_pose(
     action_body_id, env, seed: NPSeed = None
 ) -> np.ndarray:
@@ -281,6 +301,31 @@ def downsample_pcd_fps(pcd, n, use_dgl=True, seed=None):
         pcd = pcd[rng.permutation(len(pcd))]
         ixs = torch_cluster.fps(pcd, None, ratio, random_start=False)
     return ixs
+
+
+def get_dataset_ids_all(seen_cats, unseen_cats):
+    split_file = json.load(open(GCOND_DSET_PATH))
+    train_res = []
+    val_res = []
+    test_res = []
+    for cat in seen_cats:
+        cat = cat.capitalize()
+        for mode in split_file:
+            if cat in split_file[mode] and mode == "train":
+                train_res += split_file[mode][cat]["train"]
+    for cat in seen_cats:
+        cat = cat.capitalize()
+        for mode in split_file:
+            if cat in split_file[mode] and mode == "train":
+                val_res += split_file[mode][cat]["test"]
+    for cat in unseen_cats:
+        cat = cat.capitalize()
+        for mode in split_file:
+            if cat in split_file[mode] and mode == "test":
+                test_res += split_file[mode][cat]["test"]
+    if "7292" in train_res:
+        train_res.remove("7292")
+    return train_res, val_res, test_res
 
 
 class GIData(Protocol):
