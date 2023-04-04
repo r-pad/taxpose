@@ -5,17 +5,12 @@ from pathlib import Path
 import typer
 from rpad.pyg.dataset import CachedByKeyDataset
 
-from taxpose.datasets.pm_placement import (
-    GoalTransferDataset,
-    PlaceDataset,
-    scenes_by_location,
-)
+from taxpose.datasets.pm_placement import PlaceDataset, scenes_by_location
 
 
 class Split(str, Enum):
     train = "train"
     test = "test"
-    unseen = "unseen"
 
 
 class GoalLocation(str, Enum):
@@ -117,12 +112,6 @@ def main(
         n_workers=n_workers,
         n_proc_per_worker=n_proc_per_worker,
         seed=654321,
-    )
-
-    dset = GoalTransferDataset(
-        obs_dset=obs_dset,
-        goal_dset=goal_dset,
-        rotate_anchor=rotate_anchor,
     )
 
 

@@ -1,5 +1,5 @@
-import itertools
 import pickle
+from enum import Enum
 from typing import Dict, List, Literal, Optional, Protocol, Sequence, Tuple, Union, cast
 
 import dgl.geometry
@@ -641,153 +641,61 @@ class PlaceDataset(tgd.Dataset):
             data.flow = flow
 
         env.close()
+        # TODO: rewrite this so that there's only a pos and a mask (anchor, action).
+        # OR: return a tuple of data.
         return cast(GIData, data)
 
 
-class GoalTransferDataset(tgd.Dataset):
+class GoalInferenceDataset(tgd.Dataset):
+    """Temporary wrapper for the PlaceDataset to make it compatible with the
+    training code.
+
+    # TODO: delete this class, and rewrite the GIDataset. This is a
+    useless wrapper i want to delete, but I want to prioritize release...
+    """
+
     def __init__(
         self,
-        obs_dset: Union[PlaceDataset, CachedByKeyDataset[PlaceDataset]],
-        goal_dset: Union[PlaceDataset, CachedByKeyDataset[PlaceDataset]],
-        rotate_anchor=False,
+        dset: Union[PlaceDataset, CachedByKeyDataset[PlaceDataset]],
     ):
-        self.obs_dset = (
-            obs_dset if isinstance(obs_dset, PlaceDataset) else obs_dset.dataset
-        )
-        self.goal_dset = (
-            goal_dset if isinstance(goal_dset, PlaceDataset) else goal_dset.dataset
-        )
-
-        # Get all pairs.
-        self.pairs: List[Tuple[SceneID, SceneID]] = []
-        for cat, goal_dict in self.obs_dset.class_map.items():
-            if cat in self.goal_dset.class_map:
-                for goal_id, obs_obj_ids in goal_dict.items():
-                    if goal_id in self.goal_dset.class_map[cat]:
-                        goal_obj_ids = self.goal_dset.class_map[cat][goal_id]
-
-                        self.pairs.extend(itertools.product(obs_obj_ids, goal_obj_ids))
         super().__init__()
+        self.dset = dset
 
-        self.rotate_anchor = rotate_anchor
+    def len(self) -> int:
+        return len(self.dset)
 
-    def len(self):
-        return len(self.pairs)
+    def get(self, ix: int) -> tgd.Data:
+        data = self.dset[ix]
 
-    def get(self, ix: int):
-        # TODO: implement random class balancing...
-        obs_scene_id, goal_scene_id = self.pairs[ix]
-        assert obs_scene_id[2] == goal_scene_id[2]
-        assert CATEGORIES[obs_scene_id[0]] == CATEGORIES[goal_scene_id[0]]
+        N_ACTION_POINTS = 200
+        N_ANCHOR_POINTS = 1800
 
-        if self.obs_dset.use_processed:
-            obs_dset = self.obs_dset.inmem_map[obs_scene_id]
-            obs_data = obs_dset[np.random.randint(0, len(obs_dset))]
-        else:
-            obs_data = self.obs_dset.get_data(*obs_scene_id)
+        act_pos = data.action_pos
+        anc_pos = data.anchor_pos
 
-        if self.goal_dset.use_processed:
-            goal_dset = self.goal_dset.inmem_map[goal_scene_id]
-            goal_data = goal_dset[np.random.randint(0, len(goal_dset))]
-        else:
-            goal_data = self.goal_dset.get_data(*goal_scene_id)
+        if len(act_pos) != N_ACTION_POINTS:
+            obs_act_ixs = resample_to_n(len(act_pos), n=N_ACTION_POINTS)
+            act_pos = act_pos[obs_act_ixs].float()
 
-        # mimic the interface of the original dataset.
-        obs_act_ixs = resample_to_n(len(obs_data.action_pos), n=200)
-        obs_act_pos = obs_data.action_pos[obs_act_ixs].float()
-        assert obs_data.flow is not None
-        obs_act_flow = obs_data.flow[obs_act_ixs].float()
+        if len(anc_pos) != N_ANCHOR_POINTS:
+            obs_anc_ixs = resample_to_n(len(anc_pos), n=N_ANCHOR_POINTS)
+            anc_pos = anc_pos[obs_anc_ixs].float()
 
-        obs_anc_pos = obs_data.anchor_pos.float()
-        t_action_anchor = obs_data.t_action_anchor.float()
-
-        if False:
-            oanp = obs_anc_pos
-            oacp = obs_act_pos
-            tg = t_action_anchor
-            pos = torch.cat([oanp, oacp, oacp + tg], dim=0)
-            labels = torch.zeros(len(pos)).int()
-            labels[: len(oanp)] = 0
-            labels[len(oanp) : len(oanp) + len(oacp)] = 1
-            labels[len(oanp) + len(oacp) : len(oanp) + 2 * len(oacp)] = 2
-            labelmap = {0: "anchor", 1: "actor_start", 2: "actor_gt"}
-            # segmentation_fig(pos, labels, labelmap).show()
-
-        if self.rotate_anchor:
-            theta = (np.random.rand() - 0.5) * np.pi / 4
-            R_rand = R.from_rotvec(np.asarray([0, 0, 1]) * theta).as_matrix()
-            T_goal_goalnew = torch.eye(4).to(obs_anc_pos.device)
-            T_goal_goalnew[:3, :3] = (
-                torch.from_numpy(R_rand).to(obs_anc_pos.device).float()
-            )
-
-            P_goal = (obs_act_pos + t_action_anchor).float()
-            P_start = obs_act_pos
-            P_anc = obs_anc_pos
-
-            # Take points in the start and move to the goal.
-            T_start_goal = torch.eye(4).to(obs_anc_pos.device)
-            T_start_goal[:3, :3] = torch.eye(3).to(obs_anc_pos.device)
-            T_start_goal[:3, 3] = t_action_anchor
-
-            T_goal_start = T_start_goal.inverse()
-
-            # P_goalnew = T_goal_goalnew * P_goal
-            # P_goal = T_start_goal * P_start
-            P_goalnew = P_goal @ T_goal_goalnew[:3, :3].T + T_goal_goalnew[:3, 3:].T
-            P_ancnew = P_anc @ T_goal_goalnew[:3, :3].T + T_goal_goalnew[:3, 3:].T
-
-            # This labeling is gross.
-            T_start_goalnew = T_goal_goalnew @ T_start_goal
-
-            obs_anc_pos = P_ancnew
-            t_action_anchor = T_start_goalnew[:3, 3:].T
-            R_action_anchor = T_start_goalnew[:3, :3]
-            flow = None  # not implemented
-        else:
-            R_action_anchor = torch.eye(3).to(obs_anc_pos.device)
-
-        if False:
-            oanp = obs_anc_pos
-            oacp = obs_act_pos
-            tg = t_action_anchor
-            Rg = R_action_anchor
-            oacp_new = oacp @ Rg.T + tg
-            oacp_new2 = P_goalnew
-            pos = torch.cat([oanp, oacp, oacp_new], dim=0)
-            labels = torch.zeros(len(pos)).int()
-            labels[: len(oanp)] = 0
-            labels[len(oanp) : len(oanp) + len(oacp)] = 1
-            labels[len(oanp) + len(oacp) : len(oanp) + 2 * len(oacp)] = 2
-            labelmap = {0: "anchor", 1: "actor_start", 2: "actor_gt"}
-            # segmentation_fig(pos, labels, labelmap).show()
-
-        obs_data_action = tgd.Data(
-            id=obs_data.action_id,
-            pos=obs_act_pos.float(),
-            flow=obs_act_flow,
-            goal_id=obs_data.goal_id,
-            t_action_anchor=t_action_anchor.float(),
-            R_action_anchor=R_action_anchor.reshape(1, -1).float(),
-            loc=goal_data.loc if hasattr(goal_data, "loc") else None,
+        action_data = tgd.Data(
+            id=data.action_id,
+            goal_id=data.goal_id,
+            pos=act_pos,
+            # flow=obs_act_flow,
+            t_action_anchor=data.t_action_anchor,
+            R_action_anchor=data.R_action_anchor,
+            loc=data.loc if hasattr(data, "loc") else None,
         )
-        obs_data_anchor = tgd.Data(
-            id=obs_data.obj_id,
-            pos=obs_anc_pos.float(),
-            flow=torch.zeros(len(obs_data.anchor_pos), 3).float(),
+        anchor_data = tgd.Data(
+            id=data.obj_id,
+            pos=anc_pos,
+            # flow=torch.zeros(len(obs_data.anchor_pos), 3).float(),
         )
-        goal_data_action = tgd.Data(
-            id=goal_data.action_id,
-            pos=goal_data.action_pos[
-                resample_to_n(len(goal_data.action_pos), n=200)
-            ].float(),
-        )
-        goal_data_anchor = tgd.Data(
-            id=goal_data.obj_id,
-            pos=goal_data.anchor_pos.float(),
-        )
-
-        return goal_data_action, goal_data_anchor, obs_data_action, obs_data_anchor
+        return action_data, anchor_data
 
 
 def resample_to_n(k, n=200):
@@ -835,3 +743,95 @@ def scenes_by_location(split, mode, goal_desc):
                         scenes.append((obj_id, action_id, goal_id))
 
     return filter_bad_scenes(scenes, mode)
+
+
+class DatasetSplit(str, Enum):
+    TRAIN = "train"
+    TEST = "test"
+
+
+class DatasetType(str, Enum):
+    SINGLE = "single"
+    DISHWASHER_TOP = "dishwasher_top"
+    DISHWASHER_IN = "dishwasher_in"
+    IN = "in"
+    TOP = "top"
+    LEFT = "left"
+    RIGHT = "right"
+    UNDER = "under"
+    ALL = "all"
+
+
+def create_goal_inference_dataset(
+    pm_root: str,
+    dataset: DatasetType,
+    split: DatasetSplit,
+    randomize_camera: bool = True,
+    rotate_anchor: bool = True,
+    snap_to_surface: bool = True,
+    full_obj: bool = True,
+    even_downsample: bool = True,
+    n_repeat: int = 50,
+    n_workers: int = 30,
+    n_proc_per_worker: int = 2,
+    seed: Optional[int] = None,
+) -> GoalInferenceDataset:
+    if dataset == DatasetType.SINGLE:
+        scene_ids = [("11299", "ell", "0", "in")]
+    elif dataset == DatasetType.DISHWASHER_TOP:
+        _scene_ids = default_scenes(split, "obs", "dishwasher", "3")
+        scene_ids = [(t[0], t[1], t[2], "top") for t in _scene_ids]
+    elif dataset == DatasetType.DISHWASHER_IN:
+        _scene_ids = default_scenes(split, "obs", "dishwasher", "0")
+        scene_ids = [(t[0], t[1], t[2], "in") for t in _scene_ids]
+    elif dataset in {
+        DatasetType.IN,
+        DatasetType.TOP,
+        DatasetType.LEFT,
+        DatasetType.RIGHT,
+        DatasetType.UNDER,
+    }:
+        _scene_ids = scenes_by_location(split, "obs", dataset)
+        scene_ids = [(t[0], t[1], t[2], dataset) for t in _scene_ids]
+    elif dataset == DatasetType.ALL:
+        scene_ids = []
+        for loc in {
+            DatasetType.IN,
+            DatasetType.TOP,
+            DatasetType.LEFT,
+            DatasetType.RIGHT,
+            DatasetType.UNDER,
+        }:
+            otr = scenes_by_location(split, "obs", loc)
+            scene_ids.extend([(t[0], t[1], t[2], loc) for t in otr])
+    else:
+        raise ValueError("bad dataset")
+
+    return GoalInferenceDataset(
+        dset=CachedByKeyDataset(
+            dset_cls=PlaceDataset,
+            dset_kwargs={
+                "root": pm_root,
+                "randomize_camera": randomize_camera,
+                "snap_to_surface": snap_to_surface,
+                "full_obj": full_obj,
+                "even_downsample": even_downsample,
+                "rotate_anchor": rotate_anchor,
+                "scene_ids": scene_ids,
+                "mode": "obs",
+            },
+            data_keys=scene_ids,
+            root=pm_root,
+            processed_dirname=PlaceDataset.processed_dir_name(
+                "obs",
+                randomize_camera,
+                snap_to_surface,
+                full_obj,
+                even_downsample,
+            ),
+            n_repeat=n_repeat,
+            n_workers=n_workers,
+            n_proc_per_worker=n_proc_per_worker,
+            seed=seed,
+        )
+    )
