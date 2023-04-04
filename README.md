@@ -182,46 +182,9 @@ TODO: This is a bit hacky...
 # Evaluate
 ```
 
-#### E2E BC
+#### E2E BC, E2E DAgger, Traj Flow, Goal Flow
 
-TODO
-
-```
-# Train
-
-# Evaluate
-```
-
-
-#### E2E DAgger
-
-TODO
-
-```
-# Train
-
-# Evaluate
-```
-
-#### Traj Flow
-
-TODO
-
-```
-# Train
-
-# Evaluate
-```
-
-#### Goal Flow
-
-TODO
-
-```
-# Train
-
-# Evaluate
-```
+These baselines are currently in a partially-functional state. The code is provided, but not currently reproducible.
 
 ### Generate Results Table.
 
