@@ -163,7 +163,7 @@ def get_ids(dset, ids, nrep=1):
     envs_all = set()
     for oid in ids:
         for traj_name in all_trajs:
-            if oid in traj_name:
+            if oid in traj_name and traj_name.endswith("npy"):
                 traj_len = len(np.load(f"{dset}/{traj_name}")) - 1
                 for idx in range(traj_len):
                     envs_all.add(f"{traj_name[:-4]}_{idx}")
@@ -189,8 +189,8 @@ def train(
     )
     train_ids, val_ids, unseen_ids = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
     train_envs = get_ids(freefloat_dset, train_ids)
-    val_envs = get_ids(freefloat_dset, val_ids)[::50]
-    unseen_envs = get_ids(freefloat_dset, unseen_ids)[::50]
+    val_envs = get_ids(freefloat_dset, val_ids)
+    unseen_envs = None
 
     model: pl.LightningModule
     model = BCNet()
@@ -209,7 +209,7 @@ def train(
         root=root,
         obj_ids=val_envs,
         nrepeat=1,
-        process=process,
+        process=True,
         even_sampling=even_sampling,
         randomize_camera=randomize_camera,
     )

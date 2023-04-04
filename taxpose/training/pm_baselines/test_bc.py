@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+import time
 
 import imageio
 import numpy as np
@@ -302,8 +303,6 @@ if __name__ == "__main__":
                 full_sem_dset,
                 object_dict,
                 which_goal,
-                in_dist=in_dist,
-                snap_to_surface=False,
             )
 
             # Log starting position

@@ -207,9 +207,7 @@ def maniskill_plot(
     )
     fig.update_layout(scene3=pvp._3d_scene(pos + f_pred))
 
-    fig.update_layout(
-        title=f"Goal {goal_id} Category {get_category_full_dataset(goal_id[0].split('_')[0])}, Object {obj_id} Category {get_category_full_dataset(obj_id[0].split('_')[0])}"
-    )
+    fig.update_layout(title=f"Goal {goal_id}")
 
     return fig
 

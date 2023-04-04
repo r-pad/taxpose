@@ -177,7 +177,7 @@ def train(
         f"~/discriminative_embeddings/part_embedding/goal_inference/baselines/free_floating_traj_interp_multigoals"
     )
     train_ids, val_ids, unseen_ids = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
-    train_envs = get_ids(freefloat_dset, train_ids)
+    train_envs = get_ids(freefloat_dset, train_ids)[::1000]
     val_envs = get_ids(freefloat_dset, val_ids)[::500]
     unseen_envs = None
 

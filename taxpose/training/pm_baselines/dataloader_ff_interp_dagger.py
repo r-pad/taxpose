@@ -23,6 +23,15 @@ from torch_geometric.data import Data
 from taxpose.datasets.pm_placement import get_category, render_input, subsample_pcd
 
 
+def articulate_specific_joints(sim, joint_list, amount):
+    for i in range(p.getNumJoints(sim.obj_id, sim.client_id)):
+        jinfo = p.getJointInfo(sim.obj_id, i, sim.client_id)
+        if jinfo[12].decode("UTF-8") in joint_list:
+            lower, upper = jinfo[8], jinfo[9]
+            angle = amount * (upper - lower) + lower
+            p.resetJointState(sim.obj_id, i, angle, 0, sim.client_id)
+
+
 def randomize_dagger(src_pose, dst_pose):
     normalized_vec = (dst_pose - src_pose) / np.linalg.norm(dst_pose - src_pose)
     r = np.random.uniform(low=0, high=np.linalg.norm(dst_pose - src_pose))
@@ -209,7 +218,7 @@ class GCDaggerDataset(tgd.Dataset):
                 obj_id.split("_")[0], self.raw_dir, camera_pos=[-3, 0, 1.2], gui=False
             )
             block = os.path.expanduser(
-                "~/discriminative_embeddings/part_embedding/envs/assets/block/block.urdf"
+                "~/discriminative_embeddings/third_party/ravens/ravens/environments/assets/block/block.urdf"
             )
             obs_block_id = p.loadURDF(
                 block, physicsClientId=obs_env.client_id, globalScaling=4
@@ -250,7 +259,10 @@ class GCDaggerDataset(tgd.Dataset):
                         ]
 
             obj_link_id = object_dict[obj_id.split("_")[0] + f"_{which_goal}"]["ind"]
-            obj_id_links_tomove = move_joints[obj_link_id]
+            try:
+                obj_id_links_tomove = move_joints[obj_link_id]
+            except:
+                obj_id_links_tomove = "link_0"
             for mode in self.full_sem_dset:
                 if partsem in self.full_sem_dset[mode]:
                     if goal_id.split("_")[0] in self.full_sem_dset[mode][partsem]:
@@ -258,7 +270,10 @@ class GCDaggerDataset(tgd.Dataset):
                             goal_id.split("_")[0]
                         ]
             goal_link_id = object_dict[goal_id]["ind"]
-            goal_id_links_tomove = move_joints[goal_link_id]
+            try:
+                goal_id_links_tomove = move_joints[goal_link_id]
+            except:
+                goal_id_links_tomove = "link_0"
 
         if goal_id not in self.goal_envs:
             goal_env = PMRenderEnv(
@@ -274,10 +289,10 @@ class GCDaggerDataset(tgd.Dataset):
 
         # Open the joints.
         if partsem != "none":
-            obs_env.articulate_specific_joints(obj_id_links_tomove, 0.9)
-            goal_env.articulate_specific_joints(goal_id_links_tomove, 0.9)
+            articulate_specific_joints(obs_env, obj_id_links_tomove, 0.9)
+            articulate_specific_joints(goal_env, goal_id_links_tomove, 0.9)
         goal_block = os.path.expanduser(
-            "~/discriminative_embeddings/part_embedding/envs/assets/block/block.urdf"
+            "~/discriminative_embeddings/third_party/ravens/ravens/environments/assets/block/block.urdf"
         )
         goal_block_id = p.loadURDF(
             goal_block, physicsClientId=goal_env.client_id, globalScaling=4
