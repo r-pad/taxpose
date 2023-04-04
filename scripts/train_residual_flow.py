@@ -7,7 +7,7 @@ import torch
 from pytorch_lightning.loggers import WandbLogger
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
-from taxpose.models.transformer_flow import ResidualFlow_DiffEmbTransformer
+from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
