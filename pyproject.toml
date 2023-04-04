@@ -16,10 +16,13 @@ dependencies = [
   "dgl ~= 1.0",
   "dglgo ~= 0.0.2",
   "h5py",
+  "hydra-core",
+  "imageio",
   "jupyterlab",
   "pybullet",
   "pyg_lib ~= 0.1; sys_platform == 'linux'",
   "pytorch3d ~= 0.7.2",
+  "pytorch_lightning < 2.0",
   "rpad-partnet-mobility-utils @ git+https://github.com/r-pad/partnet_mobility_utils.git",
   "rpad-pyg @ git+https://github.com/r-pad/pyg_libs.git",
   "rpad-visualize-3d @ git+https://github.com/r-pad/visualize_3d.git",
@@ -68,6 +71,7 @@ taxpose = ["py.typed"]
 exclude = "third_party/*"
 
 [tool.isort]
+known_third_party = ["wandb"]
 profile = "black"
 
 [tool.mypy]
@@ -103,3 +107,4 @@ disable = [
   "C0115", # Missing class docstring.
   "C0116", # Missing function or method docstring.
 ]
+known-third-party = ["wandb"]
