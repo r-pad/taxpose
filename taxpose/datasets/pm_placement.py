@@ -1,5 +1,7 @@
 import pickle
+from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Dict, List, Literal, Optional, Protocol, Sequence, Tuple, Union, cast
 
 import dgl.geometry
@@ -8,25 +10,68 @@ import pybullet as p
 import torch
 import torch_cluster
 import torch_geometric.data as tgd
+from rpad.core.distributed import NPSeed
 from rpad.partnet_mobility_utils.render.pybullet import PMRenderEnv, get_obj_z_offset
-from rpad.pyg.dataset import CachedByKeyDataset, NPSeed
+from rpad.pyg.dataset import CachedByKeyDataset
 from scipy.spatial.transform import Rotation as R
 
 import taxpose.datasets.pm_splits as splits
-from taxpose.datasets.pm_utils import (
-    ACTION_OBJS,
-    GOAL_DATA_PATH,
-    SNAPPED_GOAL_FILE,
-    TAXPOSE_ROOT,
-    ActionObj,
-)
 
-SceneID = Union[Tuple[str, str, str], Tuple[str, str, str, str]]
-
+TAXPOSE_ROOT = Path(__file__).parent.parent.parent
+GOAL_DATA_PATH = TAXPOSE_ROOT / "taxpose" / "datasets" / "pm_data"
+GCOND_DSET_PATH = str(TAXPOSE_ROOT / "goalcond-pm-objs-split.json")
+RAVENS_ASSETS = TAXPOSE_ROOT / "third_party/ravens/ravens/environments/assets"
+SNAPPED_GOAL_FILE = GOAL_DATA_PATH / "snapped_goals.pkl"
 SEM_CLASS_DSET_PATH = GOAL_DATA_PATH / "sem_class_transfer_dset_more.pkl"
 ACTION_CLOUD_DIR = (
     TAXPOSE_ROOT / "taxpose" / "datasets" / "pm_data" / "action_point_clouds"
 )
+
+SEEN_CATS = [
+    "microwave",
+    "dishwasher",
+    "chair",
+    "oven",
+    "fridge",
+    "safe",
+    "table",
+    "drawer",
+    "washingmachine",
+]
+UNSEEN_CATS: List[str] = []
+
+
+SceneID = Union[Tuple[str, str, str], Tuple[str, str, str, str]]
+
+
+@dataclass
+class ActionObj:
+    name: str
+    urdf: str
+    scale: Tuple[int, int]  # Appropriate low, hi.
+
+    def random_scale(self, seed: NPSeed = None) -> float:
+        low, high = self.scale
+        rng = np.random.default_rng(seed)
+        scale = rng.uniform(low=low, high=high)
+        return scale
+
+
+ACTION_OBJS: Dict[str, ActionObj] = {
+    "block": ActionObj("block", str(RAVENS_ASSETS / "block/block.urdf"), (2, 4)),
+    "bowl": ActionObj("bowl", str(RAVENS_ASSETS / "bowl/bowl.urdf"), (2, 3)),
+    "suctiontip": ActionObj(
+        "suctiontip", str(RAVENS_ASSETS / "ur5/suction/suction-head.urdf"), (2, 4)
+    ),
+    "disk0": ActionObj("disk0", str(RAVENS_ASSETS / "hanoi/disk0.urdf"), (2, 4)),
+    "disk1": ActionObj("disk1", str(RAVENS_ASSETS / "hanoi/disk1.urdf"), (2, 4)),
+    "disk2": ActionObj("disk2", str(RAVENS_ASSETS / "hanoi/disk2.urdf"), (2, 4)),
+    "disk3": ActionObj("disk3", str(RAVENS_ASSETS / "hanoi/disk3.urdf"), (2, 4)),
+    "slimdisk": ActionObj(
+        "slimdisk", str(RAVENS_ASSETS / "hanoi/slimdisk.urdf"), (2, 4)
+    ),
+    "ell": ActionObj("ell", str(RAVENS_ASSETS / "insertion/ell.urdf"), (2, 3)),
+}
 
 
 # TODO: move to splits.
@@ -40,65 +85,6 @@ def __id_to_cat():
 
 
 CATEGORIES = __id_to_cat()
-
-
-class GIData(Protocol):
-    mode: Literal["obs", "goal"]
-
-    # Action Info
-    action_id: str
-    goal_id: str
-    action_pos: torch.FloatTensor
-    t_action_anchor: Optional[torch.FloatTensor]
-    R_action_anchor: Optional[torch.FloatTensor]
-    flow: Optional[torch.FloatTensor]
-
-    # Anchor Info
-    obj_id: str
-    anchor_pos: torch.FloatTensor
-    loc: Optional[int]
-
-
-def filter_bad_scenes(scenes: Sequence[SceneID], mode) -> List[SceneID]:
-    scenes_set = set(scenes)
-    if mode == "goal":
-        bad_scenes = splits.BAD_GOAL_SCENES
-    else:
-        bad_scenes = splits.BAD_OBS_SCENES
-
-    for bad_scene in bad_scenes:
-        if bad_scene in scenes_set:
-            scenes_set.remove(bad_scene)
-    scenes = list(scenes_set)
-    return scenes
-
-
-def default_scenes(split, mode="obs", only_cat="all", goal="all") -> List[SceneID]:
-    scenes = []
-
-    # Get all the objs for that split, binned by category.
-    cat_dict = {
-        cat.lower(): split_dict[split]
-        for cat, split_dict in splits.split_data["train"].items()
-    }
-
-    if goal == "all":
-        goal_ids = ["0", "1", "2", "3"]
-    else:
-        goal_ids = [goal]
-
-    # Get all the
-    for cat, obj_ids in cat_dict.items():
-        if only_cat != "all" and cat != only_cat:
-            continue
-        for obj_id in obj_ids:
-            for goal_id in goal_ids:
-                key = f"{obj_id}_{goal_id}"
-                if key in splits.all_objs[cat]:
-                    for action_id in list(ACTION_OBJS.keys()):
-                        scenes.append((obj_id, action_id, goal_id))
-
-    return filter_bad_scenes(scenes, mode)
 
 
 def randomize_block_pose(seed: NPSeed = None):
@@ -264,7 +250,7 @@ def load_action_obj_with_valid_scale(
     return action_body_id, scale
 
 
-def render_input_new(action_id, sim: PMRenderEnv):
+def render_input_simple(action_id, sim: PMRenderEnv):
     rgb, _, _, _, P_world, pc_seg, _ = sim.render(link_seg=False)
 
     is_obj = pc_seg != -1
@@ -295,6 +281,23 @@ def downsample_pcd_fps(pcd, n, use_dgl=True, seed=None):
         pcd = pcd[rng.permutation(len(pcd))]
         ixs = torch_cluster.fps(pcd, None, ratio, random_start=False)
     return ixs
+
+
+class GIData(Protocol):
+    mode: Literal["obs", "goal"]
+
+    # Action Info
+    action_id: str
+    goal_id: str
+    action_pos: torch.FloatTensor
+    t_action_anchor: Optional[torch.FloatTensor]
+    R_action_anchor: Optional[torch.FloatTensor]
+    flow: Optional[torch.FloatTensor]
+
+    # Anchor Info
+    obj_id: str
+    anchor_pos: torch.FloatTensor
+    loc: Optional[int]
 
 
 class PlaceDataset(tgd.Dataset):
@@ -464,7 +467,7 @@ class PlaceDataset(tgd.Dataset):
                     env.set_camera("random", seed=rng)
 
                 # Render the scene.
-                P_world, pc_seg, rgb, action_mask = render_input_new(
+                P_world, pc_seg, rgb, action_mask = render_input_simple(
                     action_body_id, env
                 )
                 rgbs.append(rgb)
@@ -500,7 +503,7 @@ class PlaceDataset(tgd.Dataset):
                     env.set_camera("random", seed=rng)
 
                 # Render the scene.
-                P_world, pc_seg, rgb, action_mask = render_input_new(
+                P_world, pc_seg, rgb, action_mask = render_input_simple(
                     action_body_id, env
                 )
                 rgbs.append(rgb)
@@ -646,6 +649,20 @@ class PlaceDataset(tgd.Dataset):
         return cast(GIData, data)
 
 
+def resample_to_n(k, n=200):
+    ixs = torch.arange(k)
+    orig_ixs = torch.arange(k)
+    while len(ixs) < n:
+        num_needed = n - len(ixs)
+        if num_needed > len(ixs):
+            ixs = torch.cat([ixs, ixs], dim=-2)
+        else:
+            resampled = orig_ixs[torch.randperm(len(orig_ixs))[:num_needed]]
+            ixs = torch.cat([ixs, resampled], dim=-2)
+
+    return ixs
+
+
 class GoalInferenceDataset(tgd.Dataset):
     """Temporary wrapper for the PlaceDataset to make it compatible with the
     training code.
@@ -698,18 +715,46 @@ class GoalInferenceDataset(tgd.Dataset):
         return action_data, anchor_data
 
 
-def resample_to_n(k, n=200):
-    ixs = torch.arange(k)
-    orig_ixs = torch.arange(k)
-    while len(ixs) < n:
-        num_needed = n - len(ixs)
-        if num_needed > len(ixs):
-            ixs = torch.cat([ixs, ixs], dim=-2)
-        else:
-            resampled = orig_ixs[torch.randperm(len(orig_ixs))[:num_needed]]
-            ixs = torch.cat([ixs, resampled], dim=-2)
+def filter_bad_scenes(scenes: Sequence[SceneID], mode) -> List[SceneID]:
+    scenes_set = set(scenes)
+    if mode == "goal":
+        bad_scenes = splits.BAD_GOAL_SCENES
+    else:
+        bad_scenes = splits.BAD_OBS_SCENES
 
-    return ixs
+    for bad_scene in bad_scenes:
+        if bad_scene in scenes_set:
+            scenes_set.remove(bad_scene)
+    scenes = list(scenes_set)
+    return scenes
+
+
+def default_scenes(split, mode="obs", only_cat="all", goal="all") -> List[SceneID]:
+    scenes = []
+
+    # Get all the objs for that split, binned by category.
+    cat_dict = {
+        cat.lower(): split_dict[split]
+        for cat, split_dict in splits.split_data["train"].items()
+    }
+
+    if goal == "all":
+        goal_ids = ["0", "1", "2", "3"]
+    else:
+        goal_ids = [goal]
+
+    # Get all the
+    for cat, obj_ids in cat_dict.items():
+        if only_cat != "all" and cat != only_cat:
+            continue
+        for obj_id in obj_ids:
+            for goal_id in goal_ids:
+                key = f"{obj_id}_{goal_id}"
+                if key in splits.all_objs[cat]:
+                    for action_id in list(ACTION_OBJS.keys()):
+                        scenes.append((obj_id, action_id, goal_id))
+
+    return filter_bad_scenes(scenes, mode)
 
 
 def scenes_by_location(split, mode, goal_desc):
