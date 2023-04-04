@@ -37,7 +37,7 @@ def theta_err(R_pred: torch.FloatTensor, R_gt: torch.FloatTensor):
     # In future versions of torch, we can just vmap.
     t_dR = torch.diagonal(dR, offset=0, dim1=-2, dim2=-1).sum(-1)
 
-    th = torch.arccos((torch.clamp(t_dR, -1, 1) - 1) / 2.0)
+    th = torch.arccos((torch.clamp(t_dR, -1, 3) - 1) / 2.0)
 
     if torch.isnan(th).any():
         raise ValueError("NaN in theta error")
