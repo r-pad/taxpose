@@ -1,4 +1,3 @@
-import itertools
 import pickle
 from enum import Enum
 from typing import Dict, List, Literal, Optional, Protocol, Sequence, Tuple, Union, cast
@@ -651,7 +650,9 @@ class GoalInferenceDataset(tgd.Dataset):
     """Temporary wrapper for the PlaceDataset to make it compatible with the
     training code.
 
-    # TODO: delete this class, and rewrite the GIDatase."""
+    # TODO: delete this class, and rewrite the GIDataset. This is a
+    useless wrapper i want to delete, but I want to prioritize release...
+    """
 
     def __init__(
         self,
@@ -695,126 +696,6 @@ class GoalInferenceDataset(tgd.Dataset):
             # flow=torch.zeros(len(obs_data.anchor_pos), 3).float(),
         )
         return action_data, anchor_data
-
-
-class GoalTransferDataset(tgd.Dataset):
-    def __init__(
-        self,
-        obs_dset: Union[PlaceDataset, CachedByKeyDataset[PlaceDataset]],
-        goal_dset: Union[PlaceDataset, CachedByKeyDataset[PlaceDataset]],
-        rotate_anchor=False,
-        seed: NPSeed = None,
-    ):
-        self.obs_dset = obs_dset
-        self.goal_dset = goal_dset
-
-        self.obs_cached = isinstance(obs_dset, CachedByKeyDataset)
-        self.goal_cached = isinstance(goal_dset, CachedByKeyDataset)
-
-        # Get all the different combinations of objects.
-        obs_classmap = (
-            obs_dset.class_map if not self.obs_cached else obs_dset.dataset.class_map
-        )
-        goal_classmap = (
-            goal_dset.class_map if not self.goal_cached else goal_dset.dataset.class_map
-        )
-
-        # Get all pairs.
-        self.pairs: List[Tuple[SceneID, SceneID]] = []
-        for cat, goal_dict in obs_classmap.items():
-            if cat in goal_classmap:
-                for goal_id, obs_obj_ids in goal_dict.items():
-                    if goal_id in goal_classmap[cat]:
-                        goal_obj_ids = goal_classmap[cat][goal_id]
-
-                        self.pairs.extend(itertools.product(obs_obj_ids, goal_obj_ids))
-        super().__init__()
-
-        self.rotate_anchor = rotate_anchor
-        self.rng = np.random.default_rng(seed)
-
-    def len(self):
-        return len(self.pairs)
-
-    def get(self, ix: int) -> Tuple[tgd.Data, tgd.Data, tgd.Data, tgd.Data]:
-        # TODO: implement random class balancing...
-        obs_scene_id, goal_scene_id = self.pairs[ix]
-        assert obs_scene_id[2] == goal_scene_id[2]
-        assert CATEGORIES[obs_scene_id[0]] == CATEGORIES[goal_scene_id[0]]
-
-        # Get obs and goal data from each dataset.
-        if self.obs_cached:
-            dset: CachedByKeyDataset = self.obs_dset
-            obs_id_dset = dset.inmem_dsets[obs_scene_id]
-            obs_data = obs_id_dset[self.rng.integers(0, len(obs_id_dset))]
-        else:
-            dset: PlaceDataset = self.obs_dset
-            obs_data = dset.get_data(*obs_scene_id, seed=self.rng)
-
-        if self.goal_cached:
-            dset: CachedByKeyDataset = self.goal_dset
-            goal_id_dset = dset.inmem_dsets[goal_scene_id]
-            goal_data = goal_id_dset[self.rng.integers(0, len(goal_id_dset))]
-        else:
-            dset: PlaceDataset = self.goal_dset
-            goal_data = dset.get_data(*goal_scene_id, seed=self.rng)
-
-        # TODO: IMPLEMENT THE FLOW ABOVE...
-
-        # mimic the interface of the original dataset.
-        obs_act_pos = obs_data.action_pos
-        obs_anc_pos = obs_data.anchor_pos
-        goal_act_pos = goal_data.action_pos
-        goal_anc_pos = goal_data.anchor_pos
-
-        # Potentially resample... this probably won't ever get used...
-
-        N_ACTION_POINTS = 200
-        N_ANCHOR_POINTS = 1800
-
-        if len(obs_act_pos) != N_ACTION_POINTS:
-            obs_act_ixs = resample_to_n(len(obs_act_pos), n=N_ACTION_POINTS)
-            obs_act_pos = obs_act_pos[obs_act_ixs].float()
-
-        if len(obs_anc_pos) != N_ANCHOR_POINTS:
-            obs_anc_ixs = resample_to_n(len(obs_anc_pos), n=N_ANCHOR_POINTS)
-            obs_anc_pos = obs_anc_pos[obs_anc_ixs].float()
-
-        if len(goal_act_pos) != N_ACTION_POINTS:
-            goal_act_ixs = resample_to_n(len(goal_act_pos), n=N_ACTION_POINTS)
-            goal_act_pos = goal_act_pos[goal_act_ixs].float()
-
-        if len(goal_anc_pos) != N_ANCHOR_POINTS:
-            goal_anc_ixs = resample_to_n(len(goal_anc_pos), n=N_ANCHOR_POINTS)
-            goal_anc_pos = goal_anc_pos[goal_anc_ixs].float()
-
-        t_action_anchor = obs_data.t_action_anchor
-        R_action_anchor = obs_data.R_action_anchor
-
-        obs_data_action = tgd.Data(
-            id=obs_data.action_id,
-            goal_id=obs_data.goal_id,
-            pos=obs_act_pos,
-            # flow=obs_act_flow,
-            t_action_anchor=t_action_anchor,
-            R_action_anchor=R_action_anchor,
-            loc=goal_data.loc if hasattr(goal_data, "loc") else None,
-        )
-        obs_data_anchor = tgd.Data(
-            id=obs_data.obj_id,
-            pos=obs_anc_pos,
-            # flow=torch.zeros(len(obs_data.anchor_pos), 3).float(),
-        )
-        goal_data_action = tgd.Data(
-            id=goal_data.action_id,
-            pos=goal_act_pos,
-        )
-        goal_data_anchor = tgd.Data(
-            id=goal_data.obj_id,
-            pos=goal_anc_pos,
-        )
-
-        return obs_data_action, obs_data_anchor, goal_data_action, goal_data_anchor
 
 
 def resample_to_n(k, n=200):
@@ -898,11 +779,11 @@ def create_goal_inference_dataset(
     if dataset == DatasetType.SINGLE:
         scene_ids = [("11299", "ell", "0", "in")]
     elif dataset == DatasetType.DISHWASHER_TOP:
-        scene_ids = default_scenes(split, "obs", "dishwasher", "3")
-        scene_ids = [(t[0], t[1], t[2], "top") for t in scene_ids]
+        _scene_ids = default_scenes(split, "obs", "dishwasher", "3")
+        scene_ids = [(t[0], t[1], t[2], "top") for t in _scene_ids]
     elif dataset == DatasetType.DISHWASHER_IN:
-        scene_ids = default_scenes(split, "obs", "dishwasher", "0")
-        scene_ids = [(t[0], t[1], t[2], "in") for t in scene_ids]
+        _scene_ids = default_scenes(split, "obs", "dishwasher", "0")
+        scene_ids = [(t[0], t[1], t[2], "in") for t in _scene_ids]
     elif dataset in {
         DatasetType.IN,
         DatasetType.TOP,
@@ -910,8 +791,8 @@ def create_goal_inference_dataset(
         DatasetType.RIGHT,
         DatasetType.UNDER,
     }:
-        scene_ids = scenes_by_location(split, "obs", dataset)
-        scene_ids = [(t[0], t[1], t[2], dataset) for t in scene_ids]
+        _scene_ids = scenes_by_location(split, "obs", dataset)
+        scene_ids = [(t[0], t[1], t[2], dataset) for t in _scene_ids]
     elif dataset == DatasetType.ALL:
         scene_ids = []
         for loc in {

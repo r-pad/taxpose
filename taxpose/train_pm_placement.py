@@ -52,13 +52,15 @@ def t_err(t_pred, t_gt):
 def classwise_mean(
     results: Dict[str, List[Dict[str, float]]]
 ) -> Dict[str, Dict[str, float]]:
-    classwise = defaultdict(lambda: defaultdict(list))
+    classwise: Dict[str, Dict[str, List[float]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
     for k, ds in results.items():
         for d in ds:
             for m, v in d.items():
                 classwise[m][CATEGORIES[k]].append(v)
 
-    return {k: {m: np.mean(v) for m, v in d.items()} for k, d in classwise.items()}
+    return {k: {m: np.mean(v) for m, v in d.items()} for k, d in classwise.items()}  # type: ignore
 
 
 def global_mean(results: Dict[str, List[Dict[str, float]]]) -> Dict[str, float]:
@@ -67,13 +69,13 @@ def global_mean(results: Dict[str, List[Dict[str, float]]]) -> Dict[str, float]:
         for d in ds:
             for m, v in d.items():
                 metricswise[m].append(v)
-    return {m: np.mean(v) for m, v in metricswise.items()}
+    return {m: np.mean(v) for m, v in metricswise.items()}  # type: ignore
 
 
 def class_weighted_mean(
     classwise_means: Dict[str, Dict[str, float]]
 ) -> Dict[str, float]:
-    return {k: np.mean(list(v.values())) for k, v in classwise_means.items()}
+    return {k: np.mean(list(v.values())) for k, v in classwise_means.items()}  # type: ignore
 
 
 def global_mean_to_pandas(means: Dict[str, float], methodname="ours") -> pd.DataFrame:
@@ -92,7 +94,11 @@ def classwise_mean_to_pandas(
 @torch.no_grad()
 def run_eval(
     model, dset: PlaceDataset, batch_size: int, device: str, num_workers: int = 0
-) -> Tuple[Dict[str, float], Dict[str, Dict[str, float]], Dict[str, Dict[str, float]]]:
+) -> Tuple[
+    Dict[str, float],
+    Dict[str, Dict[str, float]],
+    Dict[str, List[Dict[str, float]]],
+]:
     """Run evaluation on a dataset.
 
     Args:
@@ -113,7 +119,7 @@ def run_eval(
         num_workers=num_workers,
     )
 
-    obj_metrics = defaultdict(list)
+    obj_metrics: Dict[str, List[Dict[str, float]]] = defaultdict(list)
 
     for action, anchor in tqdm(loader):
         action = action.to(device)
@@ -149,7 +155,7 @@ def train(
     batch_size: int = 16,
     use_bc_loss: bool = True,
     n_epochs: int = 50,
-    lr: float = 0.001,
+    lr: float = 0.0001,
     n_repeat: int = 50,
     embedding_dim: int = 512,
     n_workers: int = 30,
@@ -163,7 +169,7 @@ def train(
     train_dset = create_goal_inference_dataset(
         pm_root=root,
         dataset=dataset,
-        split="train",
+        split=DatasetSplit.TRAIN,
         randomize_camera=True,
         rotate_anchor=True,
         snap_to_surface=True,
@@ -179,7 +185,7 @@ def train(
     eval_train_dset = create_goal_inference_dataset(
         pm_root=root,
         dataset=dataset,
-        split="train",
+        split=DatasetSplit.TRAIN,
         randomize_camera=True,
         rotate_anchor=True,
         snap_to_surface=True,
@@ -193,7 +199,7 @@ def train(
     eval_test_dset = create_goal_inference_dataset(
         pm_root=root,
         dataset=dataset,
-        split="test",
+        split=DatasetSplit.TEST,
         randomize_camera=True,
         rotate_anchor=True,
         snap_to_surface=True,
@@ -217,7 +223,7 @@ def train(
     if use_bc_loss:
         crit = BrianChuerLoss()
     else:
-        crit = SE3LossTheirs()
+        crit = SE3LossTheirs()  # type: ignore
 
     d = f"checkpoints/manual/{datetime.now().strftime('%Y-%m-%d_%H_%M_%S')}"
     os.makedirs(d, exist_ok=True)
