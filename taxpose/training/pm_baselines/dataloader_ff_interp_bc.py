@@ -2,22 +2,18 @@
 This is the dataloader file for free-floating object placement task.
 i.e. Placing a box into the oven
 """
-import logging
-import multiprocessing
 import os
 import pickle
-import time
 from typing import Callable, Dict, List, Optional, Protocol
 
 import numpy as np
 import pybullet as p
 import torch
-import torch.utils.data as td
 import torch_geometric.data as tgd
-import tqdm
+from rpad.core.distributed import NPSeed
 from rpad.partnet_mobility_utils.data import PMObject as PMRawData
 from rpad.partnet_mobility_utils.render.pybullet import PMRenderEnv
-from rpad.pyg.dataset import SinglePathDataset as SingleObjDataset
+from rpad.pyg.dataset import CachedByKeyDataset
 from torch_geometric.data import Data
 
 from taxpose.datasets.pm_placement import (
@@ -39,59 +35,12 @@ def articulate_specific_joints(sim, joint_list, amount):
             p.resetJointState(sim.obj_id, i, angle, 0, sim.client_id)
 
 
-def randomize_pcd_pose(src_pose, max_r):
-    r = np.random.uniform(low=0, high=max_r)
-    phi = np.random.uniform(0, np.pi)
-    theta = np.random.uniform(0, 2 * np.pi)
-    delta_x = r * np.cos(theta) * np.sin(phi)
-    delta_y = r * np.sin(theta) * np.sin(phi)
-    delta_z = r * np.cos(phi)
-    return src_pose + np.array([delta_x, delta_y, delta_z])
-
-
 class PCData(Protocol):
     id: str  # Object ID.
 
     pos: torch.Tensor
 
     x: Optional[torch.Tensor] = None
-
-
-_dset = None
-_args = None
-
-
-def _init():
-    global _dset
-    # _dset = SemGoalCondFlowDataset(*_args)
-    _dset = GCBCDataset(*_args)
-
-
-def _sample(d):
-    global _dset
-    dset = _dset
-    (i, env_name) = d
-    os.sched_setaffinity(os.getpid(), [i % 50])
-    base = f"{env_name}_{dset.nrepeat}.pt"
-    outfile = os.path.join(dset.processed_dir, base)
-    if os.path.exists(outfile):
-        logging.info(f"data exists for {env_name}")
-        return False
-    else:
-        logging.info(f"sampling {dset.nrepeat} times for {env_name}")
-
-    data_list = []
-    try:
-        for j in range(dset.nrepeat):
-            data_list.append(dset.get_sample(i * dset.nrepeat + j))
-
-        data, slices = tgd.InMemoryDataset.collate(data_list)
-        torch.save((data, slices), outfile)
-    except Exception as e:
-        breakpoint()
-        print(f"failed for {env_name}")
-        return True
-    return False
 
 
 class GCBCDataset(tgd.Dataset):
@@ -103,8 +52,6 @@ class GCBCDataset(tgd.Dataset):
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
         pre_filter: Optional[Callable] = None,
-        nrepeat: int = 50,
-        process: bool = True,
         even_sampling: bool = False,
         randomize_camera: bool = False,
         n_points: Optional[int] = 1200,
@@ -116,30 +63,30 @@ class GCBCDataset(tgd.Dataset):
         self.full_sem_dset = pickle.load(open(SEM_CLASS_DSET_PATH, "rb"))
 
         self.freefloat_dset_path = freefloat_dset_path
-        self.nrepeat = nrepeat
         self.even_sampling = even_sampling
         self.randomize_camera = randomize_camera
         self.n_points = n_points
         self.raw_data: Dict[str, PMRawData] = {}
         self.goal_raw_data: Dict[str, PMRawData] = {}
-        self.use_processed = process
         self.object_dict = pickle.load(open(ALL_BLOCK_DSET_PATH, "rb"))
 
         super().__init__(root, transform, pre_transform, pre_filter)
 
-        if self.use_processed:
-            self.inmem: td.ConcatDataset = td.ConcatDataset(
-                [SingleObjDataset(data_path) for data_path in self.processed_paths]
-            )
-
     @property
     def processed_dir(self) -> str:
+        return os.path.join(
+            self.root,
+            GCBCDataset.processed_base(self.randomize_camera, self.even_sampling),
+        )
+
+    @staticmethod
+    def processed_base(randomize_camera, even_sampling) -> str:
         chunk = ""
-        if self.randomize_camera:
+        if randomize_camera:
             chunk += "_random"
-        if self.even_sampling:
+        if even_sampling:
             chunk += "_even"
-        return os.path.join(self.root, f"goal_cond_bc_traj" + chunk)
+        return f"goal_cond_bc_traj" + chunk
 
     @property
     def processed_file_names(self) -> List[str]:
@@ -148,53 +95,10 @@ class GCBCDataset(tgd.Dataset):
     def len(self) -> int:
         return len(self.env_names)
 
-    def process(self):
-        if not self.use_processed:
-            return
-
-        else:
-            global _args
-            _args = (
-                self.root,
-                self.freefloat_dset_path,
-                self.obj_ids,
-                self.transform,
-                self.pre_transform,
-                self.pre_filter,
-                self.nrepeat,
-                False,
-                self.even_sampling,
-                self.randomize_camera,
-                self.n_points,
-            )
-            # _init()
-            # for i, envname in enumerate(self.env_names):
-            #     _sample((i, envname))
-
-            pool = multiprocessing.Pool(
-                processes=os.cpu_count() - 20, initializer=_init
-            )
-
-            failed_attempts = list(
-                tqdm.tqdm(
-                    pool.imap(_sample, enumerate(self.env_names)),
-                    total=len(self.env_names),
-                )
-            )
-
-            if sum(failed_attempts) > 0:
-                raise ValueError("JUST PRINTED THE FAILED ATTEMPTS")
-
     def get(self, idx: int) -> Data:
-        if self.use_processed:
-            return self.inmem[idx]
-        else:
-            return self.get_sample(idx)
+        return self.get_data(idx)
 
-    def get_sample(self, idx: int) -> Data:
-        idx = idx // self.nrepeat
-        obj_id = self.obj_ids[idx % len(self.obj_ids)]
-
+    def get_data(self, obj_id: str, seed: NPSeed = None) -> Data:
         # Get the trajectory
         traj_name = f"{'_'.join(obj_id.split('_')[:-1])}.npy"
         traj = np.load(os.path.join(self.freefloat_dset_path, traj_name))
@@ -223,9 +127,10 @@ class GCBCDataset(tgd.Dataset):
         curr_xyz = traj[curr_traj_idx]
         curr_xyz_p1 = traj[curr_traj_idx + 1]
 
-        np.random.seed((os.getpid() * int(time.time())) % 123456789)
+        rng = np.random.default_rng(seed)
+
         goal_id_list = list(object_dict.keys())
-        goal_id = np.random.choice(goal_id_list)
+        goal_id = rng.choice(goal_id_list)
         which_goal = obj_id.split("_")[1]
         goal_id = f"{goal_id.split('_')[0]}_{which_goal}"
 
@@ -285,15 +190,17 @@ class GCBCDataset(tgd.Dataset):
         )
 
         if self.randomize_camera:
-            obs_env.randomize_camera()
+            obs_env.set_camera("random", rng)
 
         # Obs data
         P_world, pc_seg_obj, _ = render_input(obs_block_id, obs_env)
-        P_world, pc_seg_obj = subsample_pcd(P_world, pc_seg_obj)
+        P_world, pc_seg_obj = subsample_pcd(P_world, pc_seg_obj, rng)
 
         # Goal data
         P_world_goal, pc_seg_obj_goal, _ = render_input(goal_block_id, goal_env)
-        P_world_goal, pc_seg_obj_goal = subsample_pcd(P_world_goal, pc_seg_obj_goal)
+        P_world_goal, pc_seg_obj_goal = subsample_pcd(
+            P_world_goal, pc_seg_obj_goal, rng
+        )
 
         action = curr_xyz_p1 - curr_xyz
         flow = np.tile(action, (P_world.shape[0], 1))
@@ -324,3 +231,36 @@ class GCBCDataset(tgd.Dataset):
         goal_env.close()
 
         return goal_data, obs_data
+
+
+def create_gcbc_dataset(
+    root,
+    freefloat_dset_path,
+    obj_ids,
+    even_sampling=False,
+    randomize_camera=False,
+    n_points=1200,
+    n_repeat=1,
+    n_workers=30,
+    n_proc_per_worker=2,
+    seed=0,
+) -> CachedByKeyDataset[GCBCDataset]:
+    """Creates the GCBC dataset."""
+    return CachedByKeyDataset(
+        dset_cls=GCBCDataset,
+        dset_kwargs={
+            "root": root,
+            "freefloat_dset_path": freefloat_dset_path,
+            "obj_ids": obj_ids,
+            "even_sampling": even_sampling,
+            "randomize_camera": randomize_camera,
+            "n_points": n_points,
+        },
+        data_keys=obj_ids,
+        root=root,
+        processed_dirname=GCBCDataset.processed_base(randomize_camera, even_sampling),
+        n_repeat=n_repeat,
+        n_workers=n_workers,
+        n_proc_per_worker=n_proc_per_worker,
+        seed=seed,
+    )

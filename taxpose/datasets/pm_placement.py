@@ -194,12 +194,13 @@ def has_collisions(action_id, sim: PMRenderEnv):
     return collision_counter > 0
 
 
-def subsample_pcd(P_world, pc_seg_obj):
+def subsample_pcd(P_world, pc_seg_obj, seed: NPSeed = None):
+    rng = np.random.default_rng(seed)
     subsample = np.where(pc_seg_obj == 99)[0]
-    np.random.shuffle(subsample)
+    rng.shuffle(subsample)
     subsample = subsample[:200]
     subsample_obj = np.where(pc_seg_obj != 99)[0]
-    np.random.shuffle(subsample_obj)
+    rng.shuffle(subsample_obj)
     subsample_obj = subsample_obj[:1800]
     pc_seg_obj = np.concatenate([pc_seg_obj[subsample_obj], pc_seg_obj[subsample]])
     P_world = np.concatenate([P_world[subsample_obj], P_world[subsample]])

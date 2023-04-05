@@ -17,7 +17,7 @@ from torch_geometric.data.batch import Batch
 from torch_geometric.data.data import Data
 
 from taxpose.datasets.pm_placement import get_dataset_ids_all
-from taxpose.training.pm_baselines.dataloader_ff_interp_bc import GCBCDataset
+from taxpose.training.pm_baselines.dataloader_ff_interp_bc import create_gcbc_dataset
 
 SEEN_CATS = [
     "microwave",
@@ -154,10 +154,6 @@ class WandBCallback(plc.Callback):
                 )
 
 
-def _init_fn(worker_id):
-    os.sched_setaffinity(os.getpid(), [worker_id])
-
-
 def get_ids(dset, ids, nrep=1):
     all_trajs = os.listdir(dset)[:]
     envs_all = set()
@@ -177,13 +173,12 @@ def train(
     mask_flow: bool = False,
     epochs: int = 100,
     model_type: str = "flownet",
-    process: bool = True,
     even_sampling: bool = False,
     randomize_camera: bool = False,
 ):
     # We're doing batch training so don't do too much.
-    os.environ["OPENBLAS_NUM_THREADS"] = "10"
-    os.environ["NUMEXPR_MAX_THREADS"] = "10"
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    os.environ["NUMEXPR_MAX_THREADS"] = "1"
 
     train_ids, val_ids, unseen_ids = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
     train_envs = get_ids(freefloat_dset, train_ids)
@@ -193,63 +188,48 @@ def train(
     model: pl.LightningModule
     model = BCNet()
 
-    nrepeat = 1
+    n_repeat = 1
 
-    train_dset = GCBCDataset(
+    train_dset = create_gcbc_dataset(
         root=root,
         freefloat_dset_path=freefloat_dset,
         obj_ids=train_envs,
-        nrepeat=nrepeat,
-        process=process,
+        n_repeat=n_repeat,
         even_sampling=even_sampling,
         randomize_camera=randomize_camera,
+        n_workers=60,
+        n_proc_per_worker=1,
+        seed=123456,
     )
-    test_dset = GCBCDataset(
+    print("created train dataset")
+
+    test_dset = create_gcbc_dataset(
         root=root,
         freefloat_dset_path=freefloat_dset,
         obj_ids=val_envs,
-        nrepeat=1,
-        process=True,
+        n_repeat=1,
         even_sampling=even_sampling,
         randomize_camera=randomize_camera,
+        seed=654321,
     )
+    print("created test dataset")
 
     train_loader = tgl.DataLoader(
         train_dset,
         batch_size=8,
         shuffle=True,
         num_workers=0,
-        # worker_init_fn=_init_fn,
     )
     test_loader = tgl.DataLoader(
         test_dset, batch_size=min(len(test_dset), 4), shuffle=False, num_workers=0
     )
-
-    unseen_dset = None
-    unseen_loader = None
-    if unseen_envs is not None:
-        unseen_dset = GCBCDataset(
-            root=root,
-            freefloat_dset_path=freefloat_dset,
-            obj_ids=unseen_envs,
-            nrepeat=1,
-            process=process,
-            even_sampling=even_sampling,
-            randomize_camera=randomize_camera,
-        )
-        unseen_loader = tgl.DataLoader(
-            unseen_dset,
-            batch_size=min(len(unseen_dset), 64),
-            shuffle=False,
-            num_workers=0,
-        )
 
     logger: Optional[plog.WandbLogger]
     cbs: Optional[List[plc.Callback]]
     if wandb:
         if model_type == "flownet":
             logger = plog.WandbLogger(
-                project=f"goal_conditioned_bc",
+                project=f"taxpose_goal_conditioned_bc",
                 config={
                     "train_ids": train_envs,
                     "test_ids": val_envs,
@@ -258,7 +238,7 @@ def train(
             )
             model_dir = f"checkpoints/gc_bc/{logger.experiment.name}"
             cbs = [
-                WandBCallback(train_dset, test_dset, unseen_dset),
+                WandBCallback(train_dset, test_dset),
                 plc.ModelCheckpoint(dirpath=model_dir, every_n_epochs=1),
             ]
         else:
@@ -276,9 +256,7 @@ def train(
         max_epochs=epochs,
     )
 
-    val_loaders = (
-        [test_loader, unseen_loader] if unseen_loader is not None else test_loader
-    )
+    val_loaders = test_loader
     trainer.fit(model, train_loader, val_dataloaders=val_loaders)
 
     if wandb and logger is not None:
