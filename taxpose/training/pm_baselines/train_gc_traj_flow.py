@@ -284,6 +284,7 @@ def get_ids(dset, ids, nrep=1):
 
 def train(
     root: str = os.path.expanduser("~/partnet-mobility"),
+    freefloat_dset: str = "./data/free_floating_traj_interp_multigoals",
     wandb: bool = True,
     mask_flow: bool = False,
     epochs: int = 60,
@@ -296,9 +297,6 @@ def train(
     os.environ["OPENBLAS_NUM_THREADS"] = "10"
     os.environ["NUMEXPR_MAX_THREADS"] = "10"
 
-    freefloat_dset = os.path.expanduser(
-        f"~/discriminative_embeddings/part_embedding/goal_inference/baselines/free_floating_traj_interp_multigoals"
-    )
     train_ids, val_ids, unseen_ids = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
     train_envs = get_ids(freefloat_dset, train_ids)
     val_envs = get_ids(freefloat_dset, val_ids)[::500]

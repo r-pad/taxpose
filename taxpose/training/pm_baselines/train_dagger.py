@@ -161,6 +161,7 @@ def get_ids(dset, ids, nrep=1):
 
 def train(
     root: str = os.path.expanduser("~/partnet-mobility"),
+    freefloat_dset: str = "./data/free_floating_traj_interp_multigoals",
     wandb: bool = True,
     mask_flow: bool = False,
     epochs: int = 60,
@@ -173,9 +174,6 @@ def train(
     os.environ["OPENBLAS_NUM_THREADS"] = "10"
     os.environ["NUMEXPR_MAX_THREADS"] = "10"
 
-    freefloat_dset = os.path.expanduser(
-        f"~/discriminative_embeddings/part_embedding/goal_inference/baselines/free_floating_traj_interp_multigoals"
-    )
     train_ids, val_ids, unseen_ids = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
     train_envs = get_ids(freefloat_dset, train_ids)[::1000]
     val_envs = get_ids(freefloat_dset, val_ids)[::500]
@@ -188,6 +186,7 @@ def train(
 
     train_dset = GCDaggerDataset(
         root=root,
+        freefloat_dset_path=freefloat_dset,
         obj_ids=train_envs,
         nrepeat=nrepeat,
         process=process,
@@ -196,6 +195,7 @@ def train(
     )
     test_dset = GCDaggerDataset(
         root=root,
+        freefloat_dset_path=freefloat_dset,
         obj_ids=val_envs,
         nrepeat=1,
         process=process,
@@ -219,6 +219,7 @@ def train(
     if unseen_envs is not None:
         unseen_dset = GCDaggerDataset(
             root=root,
+            freefloat_dset_path=freefloat_dset,
             obj_ids=unseen_envs,
             nrepeat=1,
             process=process,

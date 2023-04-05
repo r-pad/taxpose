@@ -19,7 +19,14 @@ from rpad.partnet_mobility_utils.render.pybullet import PMRenderEnv
 from rpad.pyg.dataset import SinglePathDataset as SingleObjDataset
 from torch_geometric.data import Data
 
-from taxpose.datasets.pm_placement import get_category, render_input, subsample_pcd
+from taxpose.datasets.pm_placement import (
+    ALL_BLOCK_DSET_PATH,
+    RAVENS_ASSETS,
+    SEM_CLASS_DSET_PATH,
+    get_category,
+    render_input,
+    subsample_pcd,
+)
 
 
 def articulate_specific_joints(sim, joint_list, amount):
@@ -90,6 +97,7 @@ class GCBCDataset(tgd.Dataset):
     def __init__(
         self,
         root: str,
+        freefloat_dset_path: str,
         obj_ids=None,
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
@@ -104,15 +112,9 @@ class GCBCDataset(tgd.Dataset):
 
         # Extract the name.
         self.obj_ids = obj_ids
-        self.full_sem_dset = pickle.load(
-            open(
-                os.path.expanduser(
-                    "~/discriminative_embeddings/goal_inf_dset/sem_class_transfer_dset_more.pkl"
-                ),
-                "rb",
-            )
-        )
+        self.full_sem_dset = pickle.load(open(SEM_CLASS_DSET_PATH, "rb"))
 
+        self.freefloat_dset_path = freefloat_dset_path
         self.nrepeat = nrepeat
         self.even_sampling = even_sampling
         self.randomize_camera = randomize_camera
@@ -122,14 +124,7 @@ class GCBCDataset(tgd.Dataset):
         self.raw_data: Dict[str, PMRawData] = {}
         self.goal_raw_data: Dict[str, PMRawData] = {}
         self.use_processed = process
-        self.object_dict = pickle.load(
-            open(
-                os.path.expanduser(
-                    f"~/discriminative_embeddings/goal_inf_dset/all_block_dset_multi.pkl"
-                ),
-                "rb",
-            )
-        )
+        self.object_dict = pickle.load(open(ALL_BLOCK_DSET_PATH, "rb"))
 
         super().__init__(root, transform, pre_transform, pre_filter)
 
@@ -162,6 +157,7 @@ class GCBCDataset(tgd.Dataset):
             global _args
             _args = (
                 self.root,
+                self.freefloat_dset_path,
                 self.obj_ids,
                 self.transform,
                 self.pre_transform,
@@ -201,20 +197,15 @@ class GCBCDataset(tgd.Dataset):
         obj_id = self.obj_ids[idx % len(self.obj_ids)]
 
         # Get the trajectory
-        freefloat_dset = os.path.expanduser(
-            f"~/discriminative_embeddings/part_embedding/goal_inference/baselines/free_floating_traj_interp_multigoals"
-        )
         traj_name = f"{'_'.join(obj_id.split('_')[:-1])}.npy"
-        traj = np.load(os.path.join(freefloat_dset, traj_name))
+        traj = np.load(os.path.join(self.freefloat_dset_path, traj_name))
         curr_traj_idx = int(obj_id.split("_")[-1])
 
         if obj_id not in self.envs:
             obs_env = PMRenderEnv(
                 obj_id.split("_")[0], self.raw_dir, camera_pos=[-3, 0, 1.2], gui=False
             )
-            block = os.path.expanduser(
-                "~/discriminative_embeddings/third_party/ravens/ravens/environments/assets/block/block.urdf"
-            )
+            block = f"{RAVENS_ASSETS}/block/block.urdf"
             obs_block_id = p.loadURDF(
                 block, physicsClientId=obs_env.client_id, globalScaling=4
             )
@@ -283,9 +274,8 @@ class GCBCDataset(tgd.Dataset):
         if partsem != "none":
             articulate_specific_joints(obs_env, obj_id_links_tomove, 0.9)
             articulate_specific_joints(goal_env, goal_id_links_tomove, 0.9)
-        goal_block = os.path.expanduser(
-            "~/discriminative_embeddings/third_party/ravens/ravens/environments/assets/block/block.urdf"
-        )
+
+        goal_block = f"{RAVENS_ASSETS}/block/block.urdf"
         goal_block_id = p.loadURDF(
             goal_block, physicsClientId=goal_env.client_id, globalScaling=4
         )

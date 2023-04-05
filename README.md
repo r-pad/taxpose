@@ -184,7 +184,12 @@ TODO: This is a bit hacky...
 
 #### E2E BC, E2E DAgger, Traj Flow, Goal Flow
 
+TODO: Add instructions for generating the dataset. Otherwise, provide link to the Google drive link.
+
+[free_floationg_traj_interp_multigoals.zip](https://drive.google.com/file/d/18aLo7PZ9wv58GO2kJxlS8ai8OKE5Pm1l/view?usp=share_link)
+
 These baselines are currently in a partially-functional state. The code is provided, but not currently reproducible.
+
 
 ### Generate Results Table.
 
