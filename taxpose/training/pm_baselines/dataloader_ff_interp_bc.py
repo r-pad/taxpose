@@ -2,6 +2,7 @@
 This is the dataloader file for free-floating object placement task.
 i.e. Placing a box into the oven
 """
+import logging
 import multiprocessing
 import os
 import pickle
@@ -70,14 +71,14 @@ def _sample(d):
     global _dset
     dset = _dset
     (i, env_name) = d
-    os.sched_setaffinity(os.getpid(), [i % 128])
+    os.sched_setaffinity(os.getpid(), [i % 50])
     base = f"{env_name}_{dset.nrepeat}.pt"
     outfile = os.path.join(dset.processed_dir, base)
     if os.path.exists(outfile):
-        print(f"data exists for {env_name}")
+        logging.info(f"data exists for {env_name}")
         return False
     else:
-        print(f"sampling {dset.nrepeat} times for {env_name}")
+        logging.info(f"sampling {dset.nrepeat} times for {env_name}")
 
     data_list = []
     try:
@@ -119,8 +120,6 @@ class GCBCDataset(tgd.Dataset):
         self.even_sampling = even_sampling
         self.randomize_camera = randomize_camera
         self.n_points = n_points
-        self.envs: Dict[str, PMRenderEnv] = {}
-        self.goal_envs: Dict[str, PMRenderEnv] = {}
         self.raw_data: Dict[str, PMRawData] = {}
         self.goal_raw_data: Dict[str, PMRawData] = {}
         self.use_processed = process
@@ -201,26 +200,24 @@ class GCBCDataset(tgd.Dataset):
         traj = np.load(os.path.join(self.freefloat_dset_path, traj_name))
         curr_traj_idx = int(obj_id.split("_")[-1])
 
-        if obj_id not in self.envs:
-            obs_env = PMRenderEnv(
-                obj_id.split("_")[0], self.raw_dir, camera_pos=[-3, 0, 1.2], gui=False
-            )
-            block = f"{RAVENS_ASSETS}/block/block.urdf"
-            obs_block_id = p.loadURDF(
-                block, physicsClientId=obs_env.client_id, globalScaling=4
-            )
-            curr_xyz = traj[curr_traj_idx]
-            curr_xyz_p1 = traj[curr_traj_idx + 1]
-            p.resetBasePositionAndOrientation(
-                obs_block_id,
-                posObj=curr_xyz,
-                ornObj=[0, 0, 0, 1],
-                physicsClientId=obs_env.client_id,
-            )
-            self.envs[obj_id] = obs_env
-            self.raw_data[obj_id] = PMRawData(
-                os.path.join(self.raw_dir, obj_id.split("_")[0])
-            )
+        obs_env = PMRenderEnv(
+            obj_id.split("_")[0], self.raw_dir, camera_pos=[-3, 0, 1.2], gui=False
+        )
+        block = f"{RAVENS_ASSETS}/block/block.urdf"
+        obs_block_id = p.loadURDF(
+            block, physicsClientId=obs_env.client_id, globalScaling=4
+        )
+        curr_xyz = traj[curr_traj_idx]
+        curr_xyz_p1 = traj[curr_traj_idx + 1]
+        p.resetBasePositionAndOrientation(
+            obs_block_id,
+            posObj=curr_xyz,
+            ornObj=[0, 0, 0, 1],
+            physicsClientId=obs_env.client_id,
+        )
+        self.raw_data[obj_id] = PMRawData(
+            os.path.join(self.raw_dir, obj_id.split("_")[0])
+        )
 
         object_dict = self.object_dict[get_category(obj_id.split("_")[0]).lower()]
         curr_xyz = traj[curr_traj_idx]
@@ -258,17 +255,12 @@ class GCBCDataset(tgd.Dataset):
             except:
                 goal_id_links_tomove = "link_0"
 
-        if goal_id not in self.goal_envs:
-            goal_env = PMRenderEnv(
-                goal_id.split("_")[0], self.raw_dir, camera_pos=[-3, 0, 1.2], gui=False
-            )
-            self.goal_envs[goal_id] = goal_env
-            self.goal_raw_data[goal_id] = PMRawData(
-                os.path.join(self.raw_dir, goal_id.split("_")[0])
-            )
-
-        obs_env = self.envs[obj_id]
-        goal_env = self.goal_envs[goal_id]
+        goal_env = PMRenderEnv(
+            goal_id.split("_")[0], self.raw_dir, camera_pos=[-3, 0, 1.2], gui=False
+        )
+        self.goal_raw_data[goal_id] = PMRawData(
+            os.path.join(self.raw_dir, goal_id.split("_")[0])
+        )
 
         # Open the joints.
         if partsem != "none":
@@ -327,5 +319,8 @@ class GCBCDataset(tgd.Dataset):
             mask=torch.from_numpy(mask_goal[:output_len]).float(),
             x=torch.from_numpy(mask_goal[:output_len].reshape((-1, 1))).float(),
         )
+
+        obs_env.close()
+        goal_env.close()
 
         return goal_data, obs_data
