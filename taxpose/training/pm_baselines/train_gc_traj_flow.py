@@ -18,7 +18,9 @@ from torch_geometric.data.batch import Batch
 from torch_geometric.data.data import Data
 
 from taxpose.datasets.pm_placement import SEEN_CATS, UNSEEN_CATS, get_dataset_ids_all
-from taxpose.training.pm_baselines.dataloader_ff_interp_dagger import GCDaggerDataset
+from taxpose.training.pm_baselines.dataloader_ff_interp_dagger import (
+    create_gcdagger_dataset,
+)
 from taxpose.training.pm_baselines.naive_nets import FRNetCLIPort, GoalInfFlowNetParams
 
 
@@ -276,29 +278,28 @@ def get_ids(dset, ids, nrep=1):
     for oid in ids:
         for traj_name in all_trajs:
             if oid in traj_name and traj_name.endswith("npy"):
-                traj_len = len(np.load(f"{dset}/{traj_name}"))
-                for idx in range(traj_len * 10):
+                traj_len = len(np.load(f"{dset}/{traj_name}")) - 1
+                for idx in range(traj_len):
                     envs_all.add(f"{traj_name[:-4]}_{idx}")
     return list(envs_all)
 
 
 def train(
     root: str = os.path.expanduser("~/partnet-mobility"),
+    freefloat_dset: str = "./data/free_floating_traj_interp_multigoals",
     wandb: bool = True,
     mask_flow: bool = False,
     epochs: int = 60,
     model_type: str = "flownet",
-    process: bool = True,
     even_sampling: bool = False,
     randomize_camera: bool = False,
+    n_workers: int = 60,
+    n_proc_per_worker: int = 1,
 ):
     # We're doing batch training so don't do too much.
-    os.environ["OPENBLAS_NUM_THREADS"] = "10"
-    os.environ["NUMEXPR_MAX_THREADS"] = "10"
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    os.environ["NUMEXPR_MAX_THREADS"] = "1"
 
-    freefloat_dset = os.path.expanduser(
-        f"~/discriminative_embeddings/part_embedding/goal_inference/baselines/free_floating_traj_interp_multigoals"
-    )
     train_ids, val_ids, unseen_ids = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
     train_envs = get_ids(freefloat_dset, train_ids)
     val_envs = get_ids(freefloat_dset, val_ids)[::500]
@@ -307,23 +308,29 @@ def train(
     model: pl.LightningModule
     model = TrajFlowNet()
 
-    nrepeat = 1
+    n_repeat = 1
 
-    train_dset = GCDaggerDataset(
+    train_dset = create_gcdagger_dataset(
         root=root,
+        freefloat_dset_path=freefloat_dset,
         obj_ids=train_envs,
-        nrepeat=nrepeat,
-        process=process,
+        n_repeat=n_repeat,
         even_sampling=even_sampling,
         randomize_camera=randomize_camera,
+        n_workers=n_workers,
+        n_proc_per_worker=n_proc_per_worker,
+        seed=123456,
     )
-    test_dset = GCDaggerDataset(
+    test_dset = create_gcdagger_dataset(
         root=root,
+        freefloat_dset_path=freefloat_dset,
         obj_ids=val_envs,
-        nrepeat=1,
-        process=process,
+        n_repeat=1,
         even_sampling=even_sampling,
         randomize_camera=randomize_camera,
+        n_workers=n_workers,
+        n_proc_per_worker=n_proc_per_worker,
+        seed=654321,
     )
 
     train_loader = tgl.DataLoader(
@@ -331,29 +338,10 @@ def train(
         batch_size=64,
         shuffle=True,
         num_workers=0,
-        # worker_init_fn=_init_fn,
     )
     test_loader = tgl.DataLoader(
         test_dset, batch_size=min(len(test_dset), 4), shuffle=False, num_workers=0
     )
-
-    unseen_dset = None
-    unseen_loader = None
-    if unseen_envs is not None:
-        unseen_dset = GCDaggerDataset(
-            root=root,
-            obj_ids=unseen_envs,
-            nrepeat=1,
-            process=process,
-            even_sampling=even_sampling,
-            randomize_camera=randomize_camera,
-        )
-        unseen_loader = tgl.DataLoader(
-            unseen_dset,
-            batch_size=min(len(unseen_dset), 64),
-            shuffle=False,
-            num_workers=0,
-        )
 
     logger: Optional[plog.WandbLogger]
     cbs: Optional[List[plc.Callback]]
@@ -369,7 +357,7 @@ def train(
             )
             model_dir = f"checkpoints/gc_traj_flow/{logger.experiment.name}"
             cbs = [
-                WandBCallback(train_dset, test_dset, unseen_dset),
+                WandBCallback(train_dset, test_dset),
                 plc.ModelCheckpoint(dirpath=model_dir, every_n_epochs=1),
             ]
         else:
@@ -387,9 +375,7 @@ def train(
         max_epochs=epochs,
     )
 
-    val_loaders = (
-        [test_loader, unseen_loader] if unseen_loader is not None else test_loader
-    )
+    val_loaders = test_loader
     trainer.fit(model, train_loader, val_dataloaders=val_loaders)
 
     if wandb and logger is not None:

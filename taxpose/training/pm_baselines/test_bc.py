@@ -13,7 +13,10 @@ from scipy.spatial.transform import Rotation as R
 from tqdm import tqdm
 
 from taxpose.datasets.pm_placement import (
+    GOAL_INF_DSET_PATH,
+    RAVENS_ASSETS,
     SEEN_CATS,
+    SEM_CLASS_DSET_PATH,
     UNSEEN_CATS,
     get_category,
     get_dataset_ids_all,
@@ -125,9 +128,8 @@ def create_test_env(
         camera_pos=[-3, 0, 1.2],
         gui=False,
     )
-    block = os.path.expanduser(
-        "~/discriminative_embeddings/third_party/ravens/ravens/environments/assets/block/block.urdf"
-    )
+    block = f"{RAVENS_ASSETS}/block/block.urdf"
+
     obs_block_id = p.loadURDF(block, physicsClientId=obs_env.client_id, globalScaling=4)
 
     partsem = object_dict[obj_id.split("_")[0] + f"_{which_goal}"]["partsem"]
@@ -179,9 +181,8 @@ def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
             goal_id_links_tomove = "link_0"
         articulate_specific_joints(goal_env, goal_id_links_tomove, 0.9)
 
-    goal_block = os.path.expanduser(
-        "~/discriminative_embeddings/third_party/ravens/ravens/environments/assets/block/block.urdf"
-    )
+    goal_block = f"{RAVENS_ASSETS}/block/block.urdf"
+
     goal_block_id = p.loadURDF(
         goal_block, physicsClientId=goal_env.client_id, globalScaling=4
     )
@@ -255,21 +256,9 @@ if __name__ == "__main__":
     in_dist = args.indist
 
     # Get which joint to open
-    full_sem_dset = pickle.load(
-        open(
-            os.path.expanduser(
-                "~/discriminative_embeddings/goal_inf_dset/sem_class_transfer_dset_more.pkl"
-            ),
-            "rb",
-        )
-    )
+    full_sem_dset = pickle.load(open(SEM_CLASS_DSET_PATH, "rb"))
     object_dict_meta = pickle.load(
-        open(
-            os.path.expanduser(
-                f"~/discriminative_embeddings/goal_inf_dset/{objcat}_block_dset_multi.pkl"
-            ),
-            "rb",
-        )
+        open(f"{GOAL_INF_DSET_PATH}/{objcat}_block_dset_multi.pkl", "rb")
     )
 
     # Get goal inference model
