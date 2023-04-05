@@ -20,6 +20,9 @@ from taxpose.datasets.pm_placement import (
     render_input,
     subsample_pcd,
 )
+from taxpose.training.pm_baselines.dataloader_ff_interp_bc import (
+    articulate_specific_joints,
+)
 from taxpose.training.pm_baselines.train_bc import BCNet
 
 """
@@ -135,13 +138,22 @@ def create_test_env(
                     move_joints = full_sem_dset[mode][partsem][obj_id.split("_")[0]]
 
         obj_link_id = object_dict[obj_id.split("_")[0] + f"_{which_goal}"]["ind"]
-        obj_id_links_tomove = move_joints[obj_link_id]
+        try:
+            obj_id_links_tomove = move_joints[obj_link_id]
+        except:
+            obj_id_links_tomove = "link_0"
 
         # Open the joints.
-        obs_env.articulate_specific_joints(obj_id_links_tomove, 0.9)
+        articulate_specific_joints(obs_env, obj_id_links_tomove, 0.9)
 
     randomize_start_pose(obs_block_id, obs_env)
-    return obs_env, obs_block_id
+    freefloat_dset = os.path.expanduser(
+        f"~/discriminative_embeddings/part_embedding/goal_inference/baselines/free_floating_traj_interp_multigoals"
+    )
+    traj_name = f"{'_'.join(obj_id.split('_')[:-1])}_{which_goal}_traj_0.npy"
+    traj = np.load(os.path.join(freefloat_dset, traj_name))
+    gt_goal_xyz = traj[-1]
+    return obs_env, obs_block_id, gt_goal_xyz
 
 
 def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
@@ -161,8 +173,11 @@ def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
                 if goal_id.split("_")[0] in full_sem_dset[mode][partsem]:
                     move_joints = full_sem_dset[mode][partsem][goal_id.split("_")[0]]
         goal_link_id = object_dict[goal_id]["ind"]
-        goal_id_links_tomove = move_joints[goal_link_id]
-        goal_env.articulate_specific_joints(goal_id_links_tomove, 0.9)
+        try:
+            goal_id_links_tomove = move_joints[goal_link_id]
+        except:
+            goal_id_links_tomove = "link_0"
+        articulate_specific_joints(goal_env, goal_id_links_tomove, 0.9)
 
     goal_block = os.path.expanduser(
         "~/discriminative_embeddings/third_party/ravens/ravens/environments/assets/block/block.urdf"
@@ -230,17 +245,14 @@ if __name__ == "__main__":
     parser.add_argument("--cat", type=str)
     parser.add_argument("--method", type=str, default="gc_bc")
     parser.add_argument("--model", type=str)
-    parser.add_argument("--postfix", type=str)
     parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--indist", type=bool, default=True)
-    parser.add_argument("--postfix", type=str)
     args = parser.parse_args()
     objcat = args.cat
     method = args.method
     expname = args.model
     start_ind = args.start
     in_dist = args.indist
-    postfix = args.postfix
 
     # Get which joint to open
     full_sem_dset = pickle.load(
@@ -264,7 +276,7 @@ if __name__ == "__main__":
     bc_model = load_model(method, expname)
 
     # Create result directory
-    result_dir = f"part_embedding/goal_inference/baselines/rollouts/{objcat}_{method}_{expname}_{postfix}"
+    result_dir = f"rollouts/{objcat}_{method}_{expname}"
     if not os.path.exists(result_dir):
         print("Creating result directory for rollouts")
         os.makedirs(result_dir, exist_ok=True)
@@ -298,7 +310,7 @@ if __name__ == "__main__":
                 continue
 
             # Create obs env
-            obs_env, obs_block_id, gt_goal_xyz, _, _ = create_test_env(
+            obs_env, obs_block_id, gt_goal_xyz = create_test_env(
                 obj_id,
                 full_sem_dset,
                 object_dict,

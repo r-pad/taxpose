@@ -188,8 +188,8 @@ def train(
         f"~/discriminative_embeddings/part_embedding/goal_inference/baselines/free_floating_traj_interp_multigoals"
     )
     train_ids, val_ids, unseen_ids = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
-    train_envs = get_ids(freefloat_dset, train_ids)
-    val_envs = get_ids(freefloat_dset, val_ids)
+    train_envs = get_ids(freefloat_dset, train_ids)[::10]
+    val_envs = get_ids(freefloat_dset, val_ids)[::10]
     unseen_envs = None
 
     model: pl.LightningModule
