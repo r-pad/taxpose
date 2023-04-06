@@ -10,5 +10,6 @@
     },
     "files.exclude": {
         "data/*": true,
-    }
+    },
+    "python.linting.enabled": false
 }

@@ -4,7 +4,7 @@ i.e. Placing a box into the oven
 """
 import os
 import pickle
-from typing import Callable, Dict, List, Optional, Protocol
+from typing import Callable, Dict, Optional
 
 import numpy as np
 import pybullet as p
@@ -45,14 +45,6 @@ def randomize_dagger(src_pose, dst_pose, seed: NPSeed = None):
         v = -v
     v = v * r
     return src_pose + v
-
-
-class PCData(Protocol):
-    id: str  # Object ID.
-
-    pos: torch.Tensor
-
-    x: Optional[torch.Tensor] = None
 
 
 class GCDaggerDataset(tgd.Dataset):
@@ -100,10 +92,6 @@ class GCDaggerDataset(tgd.Dataset):
         if even_sampling:
             chunk += "_even"
         return f"goal_cond_dagger_traj" + chunk
-
-    @property
-    def processed_file_names(self) -> List[str]:
-        return [f"{env}_{self.nrepeat}.pt" for env in self.env_names]
 
     def len(self) -> int:
         return len(self.env_names)
