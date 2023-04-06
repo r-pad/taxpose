@@ -16,7 +16,7 @@ class SaverCallbackModel(Callback):
         self.prev_path = None
 
     def on_train_batch_end(
-        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
+        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=None
     ):
         """Check if we should save a checkpoint after every train batch"""
         epoch = trainer.current_epoch
@@ -45,7 +45,7 @@ class SaverCallbackEmbnn(Callback):
         self.prev_path = None
 
     def on_train_batch_end(
-        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
+        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=None
     ):
         """Check if we should save a checkpoint after every train batch"""
         epoch = trainer.current_epoch
@@ -77,7 +77,7 @@ class SaverCallbackEmbnnActionAnchor(Callback):
         self.prev_path = None
 
     def on_train_batch_end(
-        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
+        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=None
     ):
         """Check if we should save a checkpoint after every train batch"""
         epoch = trainer.current_epoch
@@ -112,7 +112,7 @@ class SaverCallbackRefinement(Callback):
         self.prev_path = None
 
     def on_train_batch_end(
-        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
+        self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=None
     ):
         """Check if we should save a checkpoint after every train batch"""
         epoch = trainer.current_epoch
