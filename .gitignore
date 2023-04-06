@@ -368,6 +368,7 @@ cython_debug/
 
 .idea/
 checkpoints/
+data/
 wandb/
 results/
 logs/

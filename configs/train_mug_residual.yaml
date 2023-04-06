@@ -9,10 +9,13 @@ hydra:
 log_dir: logs
 experiment: residual_flow_occlusion
 image_logging_period: 100
+# $task \in {mug_place, mug_grasp}
+task: mug_place
 
 # Dataset Settings
-dataset_root: data/train_data/renders
-test_dataset_root: data/test_data/renders
+dataset_root: ./data
+train_data_dir: ${dataset_root}/${task}/train_data/renders
+test_data_dir: ${dataset_root}/${task}/test_data/renders
 num_workers: 52
 batch_size: 8
 num_points: 1024
@@ -62,7 +65,8 @@ smoothness_weight: 0.1
 
 # Training Settings
 checkpoint_file: Null
-checkpoint_file_action: trained_models/pretraining_mug_embnn_weights.ckpt
-checkpoint_file_anchor: trained_models/pretraining_rack_embnn_weights.ckpt
+checkpoint_dir: ./trained_models
+checkpoint_file_action: ${checkpoint_dir}/pretraining_mug_embnn_weights.ckpt
+checkpoint_file_anchor: ${checkpoint_dir}/pretraining_rack_embnn_weights.ckpt
 freeze_embnn: False
 lr: 1e-4

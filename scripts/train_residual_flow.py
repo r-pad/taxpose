@@ -17,7 +17,7 @@ from taxpose.utils.callbacks import SaverCallbackEmbnnActionAnchor, SaverCallbac
 @hydra.main(config_path="../configs", config_name="train_mug_residual")
 def main(cfg):
     pl.seed_everything(cfg.seed)
-    logger = WandbLogger(project=cfg.experiment, entity="r-pad")
+    logger = WandbLogger(project=cfg.experiment)
     logger.log_hyperparams(cfg)
     logger.log_hyperparams({"working_dir": os.getcwd()})
     trainer = pl.Trainer(
@@ -28,8 +28,8 @@ def main(cfg):
     )
 
     dm = MultiviewDataModule(
-        dataset_root=cfg.dataset_root,
-        test_dataset_root=cfg.test_dataset_root,
+        dataset_root=cfg.train_data_dir,
+        test_dataset_root=cfg.test_data_dir,
         dataset_index=cfg.dataset_index,
         action_class=cfg.action_class,
         anchor_class=cfg.anchor_class,
