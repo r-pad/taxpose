@@ -24,6 +24,7 @@ GCOND_DSET_PATH = str(GOAL_DATA_PATH / "goalcond-pm-objs-split.json")
 GOAL_INF_DSET_PATH = GOAL_DATA_PATH / "goal_inf_dset"
 RAVENS_ASSETS = TAXPOSE_ROOT / "third_party/ravens/ravens/environments/assets"
 SNAPPED_GOAL_FILE = GOAL_DATA_PATH / "snapped_goals.pkl"
+UMPNET_SPLIT_FULL_FILE = GOAL_DATA_PATH / "split-full.json"
 SEM_CLASS_DSET_PATH = GOAL_INF_DSET_PATH / "sem_class_transfer_dset_more.pkl"
 ALL_BLOCK_DSET_PATH = GOAL_INF_DSET_PATH / "all_block_dset_multi.pkl"
 ACTION_CLOUD_DIR = (

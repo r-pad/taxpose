@@ -1,4 +1,3 @@
-import json
 import math
 import os
 from typing import List, Literal, Optional
@@ -19,7 +18,12 @@ from plotly.subplots import make_subplots
 from torch_geometric.data.batch import Batch
 from torch_geometric.data.data import Data
 
-from taxpose.datasets.pm_placement import CATEGORIES
+from taxpose.datasets.pm_placement import (
+    CATEGORIES,
+    SEEN_CATS,
+    UNSEEN_CATS,
+    get_dataset_ids_all,
+)
 from taxpose.training.pm_baselines.dataloader_goal_flow import create_gf_dataset
 from taxpose.training.pm_baselines.naive_nets import (
     FRNetCLIPortProjection,
@@ -47,19 +51,20 @@ def create_dataset_handles(dset, mode, nrep=1):
         return envs_all
 
 
-def get_dataset_ids(cat: str):
-    cat = cat.capitalize()
-    split_file = json.load(
-        open(os.path.expanduser("~/umpnet/mobility_dataset/split-full.json"))
-    )
-    res = []
-    for mode in split_file:
-        if cat in split_file[mode]:
-            res += split_file[mode][cat]["train"]
-            res += split_file[mode][cat]["test"]
-    if "7292" in res:
-        res.remove("7292")
-    return res
+def create_dataset_handles_all(dset, nrep=1, random=False):
+    envs_all = []
+    if not random:
+        for e in dset:
+            for i in range(nrep):
+                envs_all.append(f"{e}_{i}")
+        return envs_all
+    else:
+        a = np.arange(20 * 21 * 17)
+        rand_idx = np.random.choice(a, size=nrep)
+        for e in dset:
+            for i in rand_idx:
+                envs_all.append(f"{e}_{i}")
+        return envs_all
 
 
 class GoalInfFlowNet(pl.LightningModule):
@@ -225,7 +230,7 @@ def maniskill_plot(
     fig.update_layout(scene3=pvp._3d_scene(pos + f_pred))
 
     fig.update_layout(
-        title=f"Goal {goal_id} Category {CATEGORIES(goal_id[0].split('_')[0])}, Object {obj_id} Category {CATEGORIES(obj_id[0].split('_')[0])}"
+        title=f"Goal {goal_id} Category {CATEGORIES[goal_id[0].split('_')[0]]}, Object {obj_id} Category {CATEGORIES[obj_id[0].split('_')[0]]}"
     )
 
     return fig
@@ -283,18 +288,17 @@ class WandBCallback(plc.Callback):
 
 
 def train(
-    root: str = os.path.expanduser("~/partnet-mobility"),
+    root: str = os.path.expanduser("~/datasets/partnet-mobility"),
     wandb: bool = True,
     epochs: int = 100,
-    process: bool = True,
     even_sampling: bool = False,
     randomize_camera: bool = False,
 ):
     nrep = 200
 
-    freefloat_dset = get_dataset_ids("all")
-    train_envs = create_dataset_handles(freefloat_dset, "train", nrep)
-    val_envs = create_dataset_handles(freefloat_dset, "val", 100)
+    train_ids, val_ids, unseen_ids = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
+    train_envs = create_dataset_handles_all(train_ids, nrep, random=False)
+    val_envs = create_dataset_handles_all(val_ids, 100, random=False)
 
     model: pl.LightningModule
     model = GoalInfFlowNet()
@@ -307,6 +311,9 @@ def train(
         even_sampling=even_sampling,
         randomize_camera=randomize_camera,
         n_repeat=n_repeat,
+        n_workers=60,
+        n_proc_per_worker=1,
+        seed=123456,
     )
 
     test_dset = create_gf_dataset(
@@ -315,6 +322,7 @@ def train(
         even_sampling=even_sampling,
         randomize_camera=randomize_camera,
         n_repeat=1,
+        seed=654321,
     )
 
     train_loader = tgl.DataLoader(

@@ -27,6 +27,9 @@ from taxpose.datasets.pm_placement import (
     render_input,
     subsample_pcd,
 )
+from taxpose.training.pm_baselines.dataloader_ff_interp_bc import (
+    articulate_specific_joints,
+)
 
 
 def get_random_action_obj(seed: NPSeed = None):
@@ -95,6 +98,7 @@ class GoalInfFlowNaiveDataset(tgd.Dataset):
         obs_env = PMRenderEnv(
             obj_id.split("_")[0], self.raw_dir, camera_pos=[-3, 0, 1.2], gui=False
         )
+
         action_obj = ACTION_OBJS["block"]
         block, rand_scale = action_obj.urdf, action_obj.random_scale(rng)
         obs_block_id = p.loadURDF(
@@ -138,8 +142,8 @@ class GoalInfFlowNaiveDataset(tgd.Dataset):
 
         # Open the joints.
         if partsem != "none":
-            obs_env.articulate_specific_joints(obj_id_links_tomove, 0.9)
-            goal_env.articulate_specific_joints(goal_id_links_tomove, 0.9)
+            articulate_specific_joints(obs_env, obj_id_links_tomove, 0.9)
+            articulate_specific_joints(goal_env, goal_id_links_tomove, 0.9)
         goal_block, goal_rand_scale = get_random_action_obj()
         goal_block_id = p.loadURDF(
             goal_block,

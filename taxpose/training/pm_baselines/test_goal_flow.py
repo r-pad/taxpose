@@ -27,6 +27,7 @@ from tqdm import tqdm
 from taxpose.datasets.pm_placement import (
     SEEN_CATS,
     TAXPOSE_ROOT,
+    UMPNET_SPLIT_FULL_FILE,
     UNSEEN_CATS,
     get_category,
     get_dataset_ids_all,
@@ -58,9 +59,8 @@ def augent_with_more_views(
 
 def get_ids(cat):
     if cat != "All":
-        split_file = json.load(
-            open(os.path.expanduser("~/umpnet/mobility_dataset/split-full.json"))
-        )
+        with open(UMPNET_SPLIT_FULL_FILE, "r") as f:
+            split_file = json.load(f)
         res = []
         for mode in split_file:
             if cat in split_file[mode]:
