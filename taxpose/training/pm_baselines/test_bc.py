@@ -71,16 +71,10 @@ def randomize_block_pose(seed):
     return randomized_pose
 
 
-def load_model(method: str, exp_name: str) -> BCNet:
-    d = os.path.join(
-        os.getcwd(),
-        f"checkpoints/{method}/{exp_name}/",
-    )
+def get_checkpoint_path(method: str, ckpt_dir: str, exp_name: str) -> str:
+    d = os.path.join(ckpt_dir, method, exp_name)
     ckpt = os.listdir(d)[0]
-    net: BCNet = BCNet.load_from_checkpoint(
-        f"{d}/{ckpt}",
-    )
-    return net
+    return os.path.join(d, ckpt)
 
 
 def is_obs_valid(block_id, sim: PMRenderEnv):
@@ -116,15 +110,17 @@ def randomize_start_pose(block_id, sim: PMRenderEnv):
 
 
 def create_test_env(
+    root: str,
     obj_id: str,
     full_sem_dset: dict,
     object_dict: dict,
     which_goal: str,
+    freefloat_dset: str,
 ):
     # This creates the test env for observation.
     obs_env = PMRenderEnv(
         obj_id.split("_")[0],
-        os.path.expanduser("~/partnet-mobility/raw"),
+        os.path.join(root, "raw"),
         camera_pos=[-3, 0, 1.2],
         gui=False,
     )
@@ -149,21 +145,18 @@ def create_test_env(
         articulate_specific_joints(obs_env, obj_id_links_tomove, 0.9)
 
     randomize_start_pose(obs_block_id, obs_env)
-    freefloat_dset = os.path.expanduser(
-        f"~/discriminative_embeddings/part_embedding/goal_inference/baselines/free_floating_traj_interp_multigoals"
-    )
     traj_name = f"{'_'.join(obj_id.split('_')[:-1])}_{which_goal}_traj_0.npy"
     traj = np.load(os.path.join(freefloat_dset, traj_name))
     gt_goal_xyz = traj[-1]
     return obs_env, obs_block_id, gt_goal_xyz
 
 
-def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
+def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict, pm_root: str):
     # This creates the test env for demonstration.
 
     goal_env = PMRenderEnv(
         goal_id.split("_")[0],
-        os.path.expanduser("~/partnet-mobility/raw"),
+        os.path.join(pm_root, "raw"),
         camera_pos=[-3, 0, 1.2],
         gui=False,
     )
@@ -203,6 +196,7 @@ def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
     P_world_goal, pc_seg_obj_goal = subsample_pcd(
         P_world_goal_full, pc_seg_obj_goal_full
     )
+    goal_env.close()
     return (
         P_world_goal,
         pc_seg_obj_goal,
@@ -223,6 +217,7 @@ def calculate_chamfer_dist(inferred_goal, gt_goal):
     return dist
 
 
+@torch.no_grad()
 def predict_next_step(
     goalinf_model, P_world, obj_mask, P_world_goal, goal_mask, curr_xyz
 ) -> np.ndarray:
@@ -243,17 +238,30 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cat", type=str)
+    parser.add_argument("--cat", type=str, required=True)
+    parser.add_argument("--model", type=str, required=True)
     parser.add_argument("--method", type=str, default="gc_bc")
-    parser.add_argument("--model", type=str)
     parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--indist", type=bool, default=True)
+    parser.add_argument(
+        "--pm-root", type=str, default=os.path.expanduser("~/datasets/partnet-mobility")
+    )
+    parser.add_argument("--ckpt-dir", type=str, default="./checkpoints")
+    parser.add_argument("--results-dir", type=str, default="./results")
+    parser.add_argument(
+        "--freefloat-dset",
+        type=str,
+        default="./data/free_floating_traj_interp_multigoals",
+    )
     args = parser.parse_args()
     objcat = args.cat
     method = args.method
     expname = args.model
     start_ind = args.start
     in_dist = args.indist
+    pm_root = args.pm_root
+    ckpt_dir = args.ckpt_dir
+    freefloat_dset = args.freefloat_dset
 
     # Get which joint to open
     full_sem_dset = pickle.load(open(SEM_CLASS_DSET_PATH, "rb"))
@@ -262,7 +270,9 @@ if __name__ == "__main__":
     )
 
     # Get goal inference model
-    bc_model = load_model(method, expname)
+    ckpt_path = get_checkpoint_path(method, ckpt_dir, expname)
+    bc_model = BCNet.load_from_checkpoint(ckpt_path)
+    bc_model.eval()
 
     # Create result directory
     result_dir = f"rollouts/{objcat}_{method}_{expname}"
@@ -300,10 +310,12 @@ if __name__ == "__main__":
 
             # Create obs env
             obs_env, obs_block_id, gt_goal_xyz = create_test_env(
+                pm_root,
                 obj_id,
                 full_sem_dset,
                 object_dict,
                 which_goal,
+                freefloat_dset,
             )
 
             # Log starting position
@@ -326,7 +338,7 @@ if __name__ == "__main__":
                 P_demo_full,
                 pc_demo_full,
                 rgb_goal,
-            ) = get_demo(demo_id, full_sem_dset, object_dict)
+            ) = get_demo(demo_id, full_sem_dset, object_dict, pm_root)
             P_world_full, pc_seg_obj_full, _ = render_input(obs_block_id, obs_env)
             P_world_og, pc_seg_obj_og = subsample_pcd(P_world_full, pc_seg_obj_full)
 
@@ -407,7 +419,7 @@ if __name__ == "__main__":
             # key is [SUCC, NORM_DIST]
             imageio.mimsave(f"{result_dir}/vids/test_{obj_id}.gif", exec_gifs, fps=25)
             imageio.imsave(f"{result_dir}/vids/test_{obj_id}_goal.png", rgb_goal)
-            p.disconnect()
+
             mp_result_dict[obj_id].append(
                 min(
                     1,
@@ -425,6 +437,8 @@ if __name__ == "__main__":
             print(f"{obj_id}: {mp_result_dict[obj_id]}", file=mp_res_file)
             goalinf_res_file.close()
             mp_res_file.close()
+
+            obs_env.close()
         trial_start = 0
 
     print("Result: \n")

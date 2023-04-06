@@ -181,8 +181,8 @@ def train(
     os.environ["NUMEXPR_MAX_THREADS"] = "1"
 
     train_ids, val_ids, unseen_ids = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
-    train_envs = get_ids(freefloat_dset, train_ids)[::10]
-    val_envs = get_ids(freefloat_dset, val_ids)[::10]
+    train_envs = get_ids(freefloat_dset, train_ids)
+    val_envs = get_ids(freefloat_dset, val_ids)
     unseen_envs = None
 
     model: pl.LightningModule
