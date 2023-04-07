@@ -1,6 +1,6 @@
 import abc
 import os
-from typing import List, Literal, Optional, Protocol
+from typing import Literal, Protocol
 
 import numpy as np
 import pytorch_lightning as pl
@@ -14,6 +14,11 @@ import typer
 from taxpose.datasets.pm_placement import get_dataset_ids_all
 from taxpose.training.pm_baselines.bc_model import BCNet
 from taxpose.training.pm_baselines.dataloader_ff_interp_bc import create_gcbc_dataset
+from taxpose.training.pm_baselines.dataloader_ff_interp_dagger import (
+    create_gcdagger_dataset,
+)
+from taxpose.training.pm_baselines.dataloader_goal_flow import create_gf_dataset
+from taxpose.training.pm_baselines.flow_model import FlowNet
 
 SEEN_CATS = [
     "microwave",
@@ -96,33 +101,116 @@ def get_ids(dset, ids, nrep=1):
     return list(envs_all)
 
 
+def create_dataset_handles_all(dset, nrep=1, random=False):
+    envs_all = []
+    if not random:
+        for e in dset:
+            for i in range(nrep):
+                envs_all.append(f"{e}_{i}")
+        return envs_all
+    else:
+        a = np.arange(20 * 21 * 17)
+        rand_idx = np.random.choice(a, size=nrep)
+        for e in dset:
+            for i in rand_idx:
+                envs_all.append(f"{e}_{i}")
+        return envs_all
+
+
+def create_dataset(
+    model_type: str,
+    root,
+    freefloat_dset_path,
+    obj_ids,
+    n_repeat,
+    even_sampling,
+    randomize_camera,
+    n_workers,
+    n_proc_per_worker,
+    seed,
+    n_points=1200,
+):
+    if model_type == "bc":
+        return create_gcbc_dataset(
+            root=root,
+            freefloat_dset_path=freefloat_dset_path,
+            obj_ids=obj_ids,
+            even_sampling=even_sampling,
+            randomize_camera=randomize_camera,
+            n_points=n_points,
+            n_repeat=n_repeat,
+            n_workers=n_workers,
+            n_proc_per_worker=n_proc_per_worker,
+            seed=seed,
+        )
+    elif model_type == "dagger" or model_type == "traj_flow":
+        return create_gcdagger_dataset(
+            root=root,
+            freefloat_dset_path=freefloat_dset_path,
+            obj_ids=obj_ids,
+            even_sampling=even_sampling,
+            randomize_camera=randomize_camera,
+            n_points=n_points,
+            n_repeat=n_repeat,
+            n_workers=n_workers,
+            n_proc_per_worker=n_proc_per_worker,
+            seed=seed,
+        )
+    elif model_type == "goal_flow":
+        return create_gf_dataset(
+            root=root,
+            obj_ids=obj_ids,
+            even_sampling=even_sampling,
+            randomize_camera=randomize_camera,
+            n_points=n_points,
+            n_repeat=n_repeat,
+            n_workers=n_workers,
+            n_proc_per_worker=n_proc_per_worker,
+            seed=seed,
+        )
+    else:
+        raise ValueError(f"Unknown model type {model_type}")
+
+
 def train(
     root: str = os.path.expanduser("~/datasets/partnet-mobility"),
     freefloat_dset: str = "./data/free_floating_traj_interp_multigoals",
-    wandb: bool = True,
-    mask_flow: bool = False,
     epochs: int = 100,
-    model_type: str = "flownet",
+    model_type: str = "bc",
     even_sampling: bool = False,
     randomize_camera: bool = False,
     n_workers: int = 60,
     n_proc_per_worker: int = 1,
+    batch_size: int = 32,
 ):
+    assert model_type in ["bc", "dagger", "goal_flow", "traj_flow"]
+
     # We're doing batch training so don't do too much.
     os.environ["OPENBLAS_NUM_THREADS"] = "1"
     os.environ["NUMEXPR_MAX_THREADS"] = "1"
 
     train_ids, val_ids, unseen_ids = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
-    train_envs = get_ids(freefloat_dset, train_ids)
-    val_envs = get_ids(freefloat_dset, val_ids)
-    unseen_envs = None
+
+    if model_type in {"bc", "dagger", "traj_flow"}:
+        train_envs = get_ids(freefloat_dset, train_ids)
+        val_envs = get_ids(freefloat_dset, val_ids)
+    elif model_type == "goal_flow":
+        nrep = 200
+        train_envs = create_dataset_handles_all(train_ids, nrep, random=False)
+        val_envs = create_dataset_handles_all(val_ids, 100, random=False)
 
     model: pl.LightningModule
-    model = BCNet()
+    if model_type == "bc" or model_type == "dagger":
+        model = BCNet()
+    elif model_type == "goal_flow" or model_type == "traj_flow":
+        model = FlowNet()
+    else:
+        raise ValueError(f"Unknown model type {model_type}")
 
     n_repeat = 1
 
-    train_dset = create_gcbc_dataset(
+    train_dset = create_dataset(
+        model_type,
         root=root,
         freefloat_dset_path=freefloat_dset,
         obj_ids=train_envs,
@@ -133,21 +221,25 @@ def train(
         n_proc_per_worker=n_proc_per_worker,
         seed=123456,
     )
-    test_dset = create_gcbc_dataset(
+    print("Created train dataset")
+
+    test_dset = create_dataset(
+        model_type,
         root=root,
         freefloat_dset_path=freefloat_dset,
         obj_ids=val_envs,
-        n_repeat=1,
+        n_repeat=n_repeat,
         even_sampling=even_sampling,
         randomize_camera=randomize_camera,
         n_workers=n_workers,
         n_proc_per_worker=n_proc_per_worker,
         seed=654321,
     )
+    print("Created test dataset")
 
     train_loader = tgl.DataLoader(
         train_dset,
-        batch_size=8,
+        batch_size=batch_size,
         shuffle=True,
         num_workers=0,
     )
@@ -155,29 +247,19 @@ def train(
         test_dset, batch_size=min(len(test_dset), 4), shuffle=False, num_workers=0
     )
 
-    logger: Optional[plog.WandbLogger]
-    cbs: Optional[List[plc.Callback]]
-    if wandb:
-        if model_type == "flownet":
-            logger = plog.WandbLogger(
-                project=f"taxpose_goal_conditioned_bc",
-                config={
-                    "train_ids": train_envs,
-                    "test_ids": val_envs,
-                    "unseen_ids": unseen_envs,
-                },
-            )
-            model_dir = f"checkpoints/gc_bc/{logger.experiment.name}"
-            cbs = [
-                WandBCallback(train_dset, test_dset),
-                plc.ModelCheckpoint(dirpath=model_dir, every_n_epochs=1),
-            ]
-        else:
-            raise ValueError("bad modeltype")
-
-    else:
-        logger = None
-        cbs = None
+    logger = plog.WandbLogger(
+        project="taxpose_pm_baselines",
+        config={
+            "model_type": model_type,
+            "train_ids": train_envs,
+            "test_ids": val_envs,
+        },
+    )
+    model_dir = f"checkpoints/{model_type}/{logger.experiment.name}"
+    cbs = [
+        WandBCallback(train_dset, test_dset),
+        plc.ModelCheckpoint(dirpath=model_dir, every_n_epochs=1),
+    ]
 
     trainer = pl.Trainer(
         gpus=1,
@@ -189,8 +271,7 @@ def train(
 
     trainer.fit(model, train_loader, val_dataloaders=test_loader)
 
-    if wandb and logger is not None:
-        logger.experiment.finish()
+    logger.experiment.finish()
 
 
 if __name__ == "__main__":

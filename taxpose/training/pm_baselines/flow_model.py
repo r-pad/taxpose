@@ -13,7 +13,6 @@ from torch_geometric.data.data import Data
 
 from taxpose.datasets.pm_placement import CATEGORIES
 from taxpose.training.pm_baselines.naive_nets import FRNetCLIPort, GoalInfFlowNetParams
-from taxpose.training.pm_baselines.train_gc_traj_flow import artflownet_loss
 
 
 def artflownet_loss(
