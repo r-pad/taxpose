@@ -32,10 +32,8 @@ from taxpose.datasets.pm_placement import (
     get_category,
     get_dataset_ids_all,
 )
-from taxpose.training.pm_baselines.train_goal_flow import (
-    GoalInfFlowNet,
-    GoalInfFlowNetParams,
-)
+from taxpose.training.pm_baselines.goal_flow import GoalInfFlowNet
+from taxpose.training.pm_baselines.train_goal_flow import GoalInfFlowNetParams
 
 """
 This file loads a trained goal inference model and tests the rollout using motion planning in simulation.

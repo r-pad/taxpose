@@ -24,10 +24,10 @@ from taxpose.datasets.pm_placement import (
     render_input,
     subsample_pcd,
 )
+from taxpose.training.pm_baselines.bc import BCNet
 from taxpose.training.pm_baselines.dataloader_ff_interp_bc import (
     articulate_specific_joints,
 )
-from taxpose.training.pm_baselines.train_bc import BCNet
 
 """
 This file loads a trained BC model and tests the rollout in simulation.
@@ -125,7 +125,6 @@ def create_test_env(
         gui=False,
     )
     block = f"{RAVENS_ASSETS}/block/block.urdf"
-
     obs_block_id = p.loadURDF(block, physicsClientId=obs_env.client_id, globalScaling=4)
 
     partsem = object_dict[obj_id.split("_")[0] + f"_{which_goal}"]["partsem"]
@@ -175,7 +174,6 @@ def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict, pm_root: str)
         articulate_specific_joints(goal_env, goal_id_links_tomove, 0.9)
 
     goal_block = f"{RAVENS_ASSETS}/block/block.urdf"
-
     goal_block_id = p.loadURDF(
         goal_block, physicsClientId=goal_env.client_id, globalScaling=4
     )

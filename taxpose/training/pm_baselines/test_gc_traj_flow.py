@@ -1,13 +1,10 @@
-import json
 import os
 import pickle
-import time
 
 import imageio
 import numpy as np
 import pybullet as p
 import torch
-from chamferdist import ChamferDistance
 from rpad.partnet_mobility_utils.render.pybullet import PMRenderEnv
 from scipy.spatial.transform import Rotation as R
 from tqdm import tqdm
@@ -15,57 +12,24 @@ from tqdm import tqdm
 from taxpose.datasets.pm_placement import (
     GOAL_INF_DSET_PATH,
     RAVENS_ASSETS,
-    SEEN_CATS,
     SEM_CLASS_DSET_PATH,
-    UMPNET_SPLIT_FULL_FILE,
-    UNSEEN_CATS,
     get_category,
-    get_dataset_ids_all,
     render_input,
     subsample_pcd,
 )
-from taxpose.training.pm_baselines.train_gc_traj_flow import TrajFlowNet
+from taxpose.training.pm_baselines.dataloader_ff_interp_bc import (
+    articulate_specific_joints,
+)
+from taxpose.training.pm_baselines.test_bc import (
+    calculate_chamfer_dist,
+    get_ids,
+    randomize_start_pose,
+)
+from taxpose.training.pm_baselines.traj_flow import TrajFlowNet
 
 """
 This file loads a trained goal inference model and tests the rollout using motion planning in simulation.
 """
-
-
-def get_ids(cat):
-    if cat != "All":
-        with open(UMPNET_SPLIT_FULL_FILE, "r") as f:
-            split_file = json.load(f)
-        res = []
-        for mode in split_file:
-            if cat in split_file[mode]:
-                res += split_file[mode][cat]["train"]
-                res += split_file[mode][cat]["test"]
-        return res
-    else:
-        _, val_res, unseen_res = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
-        return val_res + unseen_res
-
-
-def randomize_block_pose(seed):
-    np.random.seed(seed)
-    # randomized_pose = np.array(
-    #     [
-    #         np.random.uniform(low=-1, high=0.5),
-    #         np.random.uniform(low=-0.7, high=1.4),
-    #         np.random.uniform(low=0.1, high=0.2),
-    #     ]
-    # )
-
-    # Far from training distribution.
-    randomized_pose = np.array(
-        [
-            np.random.uniform(low=1.5, high=2),
-            np.random.uniform(low=-3, high=3),
-            np.random.uniform(low=1.5, high=2),
-        ]
-    )
-    print(randomized_pose)
-    return randomized_pose
 
 
 def load_model(method: str, exp_name: str) -> TrajFlowNet:
@@ -80,52 +44,21 @@ def load_model(method: str, exp_name: str) -> TrajFlowNet:
     return net
 
 
-def is_obs_valid(block_id, sim: PMRenderEnv):
-    # Valid only if the block is visible in the rendered image AND there's no collision.
-    collision_counter = len(
-        p.getClosestPoints(
-            bodyA=block_id,
-            bodyB=sim.obj_id,
-            distance=0,
-            physicsClientId=sim.client_id,
-        )
-    )
-    _, pc_seg_obj, _ = render_input(block_id, sim)
-    mask = pc_seg_obj == 99
-    return sum(mask) >= 0 and collision_counter == 0
-
-
-def randomize_start_pose(block_id, sim: PMRenderEnv):
-    # This randomizes the starting pose
-    valid_start = False
-    while not valid_start:
-        obs_curr_xyz = randomize_block_pose(
-            (os.getpid() * int(time.time())) % 123456789
-        )
-        p.resetBasePositionAndOrientation(
-            block_id,
-            posObj=obs_curr_xyz,
-            ornObj=[0, 0, 0, 1],
-            physicsClientId=sim.client_id,
-        )
-        valid_start = is_obs_valid(block_id, sim)
-    return obs_curr_xyz
-
-
 def create_test_env(
+    root: str,
     obj_id: str,
     full_sem_dset: dict,
     object_dict: dict,
     which_goal: str,
+    freefloat_dset: str,
 ):
     # This creates the test env for observation.
     obs_env = PMRenderEnv(
         obj_id.split("_")[0],
-        os.path.expanduser("~/partnet-mobility/raw"),
+        os.path.join(root, "raw"),
         camera_pos=[-3, 0, 1.2],
         gui=False,
     )
-
     block = f"{RAVENS_ASSETS}/block/block.urdf"
     obs_block_id = p.loadURDF(block, physicsClientId=obs_env.client_id, globalScaling=4)
 
@@ -140,18 +73,18 @@ def create_test_env(
         obj_id_links_tomove = move_joints[obj_link_id]
 
         # Open the joints.
-        obs_env.articulate_specific_joints(obj_id_links_tomove, 0.9)
+        articulate_specific_joints(obs_env, obj_id_links_tomove, 0.9)
 
     randomize_start_pose(obs_block_id, obs_env)
     return obs_env, obs_block_id
 
 
-def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
+def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict, pm_root: str):
     # This creates the test env for demonstration.
 
     goal_env = PMRenderEnv(
         goal_id.split("_")[0],
-        os.path.expanduser("~/partnet-mobility/raw"),
+        os.path.join(pm_root, "raw"),
         camera_pos=[-3, 0, 1.2],
         gui=False,
     )
@@ -187,6 +120,7 @@ def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
     P_world_goal, pc_seg_obj_goal = subsample_pcd(
         P_world_goal_full, pc_seg_obj_goal_full
     )
+    goal_env.close()
     return (
         P_world_goal,
         pc_seg_obj_goal,
@@ -194,17 +128,6 @@ def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
         pc_seg_obj_goal_full,
         rgb_goal,
     )
-
-
-def calculate_chamfer_dist(inferred_goal, gt_goal):
-    # This calculates the chamfer distance between inferred and GT goal.
-    chamferDist = ChamferDistance()
-    source_pcd = torch.from_numpy(inferred_goal[np.newaxis, :]).cuda()
-    target_pcd = torch.from_numpy(gt_goal[np.newaxis, :]).cuda()
-    assert len(source_pcd.shape) == 3
-    assert len(target_pcd.shape) == 3
-    dist = chamferDist(source_pcd, target_pcd).cpu().item()
-    return dist
 
 
 def predict_next_step(
