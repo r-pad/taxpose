@@ -106,8 +106,7 @@ def train(
         max_epochs=epochs,
     )
 
-    val_loaders = test_loader
-    trainer.fit(model, train_loader, val_dataloaders=val_loaders)
+    trainer.fit(model, train_loader, val_dataloaders=test_loader)
 
     if wandb and logger is not None:
         logger.experiment.finish()

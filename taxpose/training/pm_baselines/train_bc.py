@@ -1,5 +1,6 @@
+import abc
 import os
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Protocol
 
 import numpy as np
 import pytorch_lightning as pl
@@ -26,19 +27,27 @@ SEEN_CATS = [
 UNSEEN_CATS = ["drawer", "washingmachine"]
 
 
+class CanMakePlots(Protocol):
+    @staticmethod
+    @abc.abstractmethod
+    def make_plots(preds, obs_batch: tgd.Batch, goal_batch: tgd.Batch):
+        pass
+
+
+class LightningModuleWithPlots(pl.LightningModule, CanMakePlots):
+    pass
+
+
 class WandBCallback(plc.Callback):
-    def __init__(
-        self, train_dset, val_dset, unseen_dset=None, eval_per_n_epoch: int = 1
-    ):
+    def __init__(self, train_dset, val_dset, eval_per_n_epoch: int = 1):
         self.train_dset = train_dset
         self.val_dset = val_dset
-        self.unseen_dset = unseen_dset
         self.eval_per_n_epoch = eval_per_n_epoch
 
     @staticmethod
     def eval_log_random_sample(
         trainer: pl.Trainer,
-        pl_module: pl.LightningModule,
+        pl_module: LightningModuleWithPlots,
         dset,
         prefix: Literal["train", "val", "unseen"],
     ):
@@ -54,11 +63,16 @@ class WandBCallback(plc.Callback):
             pl_module.eval()
             f_pred = pl_module(goal_data, obs_data)
 
-        assert trainer.logger is not None
-        trainer.logger.experiment.log(
+        plots = pl_module.make_plots(f_pred, obs_data, goal_data)
+
+        logger = trainer.logger
+        assert logger is not None and isinstance(logger, plog.WandbLogger)
+        logger.experiment.log(
             {
+                **{f"{prefix}/{plot_name}": plot for plot_name, plot in plots.items()},
                 "global_step": trainer.global_step,
             },
+            step=trainer.global_step,
         )
 
     def on_train_epoch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"):  # type: ignore
@@ -68,10 +82,6 @@ class WandBCallback(plc.Callback):
     def on_validation_epoch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"):  # type: ignore
         if pl_module.current_epoch % self.eval_per_n_epoch == 0:
             self.eval_log_random_sample(trainer, pl_module, self.val_dset, "val")
-            if self.unseen_dset is not None:
-                self.eval_log_random_sample(
-                    trainer, pl_module, self.unseen_dset, "unseen"
-                )
 
 
 def get_ids(dset, ids, nrep=1):
@@ -177,8 +187,7 @@ def train(
         max_epochs=epochs,
     )
 
-    val_loaders = test_loader
-    trainer.fit(model, train_loader, val_dataloaders=val_loaders)
+    trainer.fit(model, train_loader, val_dataloaders=test_loader)
 
     if wandb and logger is not None:
         logger.experiment.finish()

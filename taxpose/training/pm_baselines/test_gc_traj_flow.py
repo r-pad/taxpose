@@ -20,25 +20,25 @@ from taxpose.datasets.pm_placement import (
 from taxpose.training.pm_baselines.dataloader_ff_interp_bc import (
     articulate_specific_joints,
 )
+from taxpose.training.pm_baselines.flow import FlowNet
 from taxpose.training.pm_baselines.test_bc import (
     calculate_chamfer_dist,
     get_ids,
     randomize_start_pose,
 )
-from taxpose.training.pm_baselines.traj_flow import TrajFlowNet
 
 """
 This file loads a trained goal inference model and tests the rollout using motion planning in simulation.
 """
 
 
-def load_model(method: str, exp_name: str) -> TrajFlowNet:
+def load_model(method: str, exp_name: str) -> FlowNet:
     d = os.path.join(
         os.getcwd(),
         f"checkpoints/{method}/{exp_name}/",
     )
     ckpt = os.listdir(d)[0]
-    net: TrajFlowNet = TrajFlowNet.load_from_checkpoint(
+    net: FlowNet = FlowNet.load_from_checkpoint(
         f"{d}/{ckpt}",
     )
     return net

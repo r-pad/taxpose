@@ -32,7 +32,7 @@ from taxpose.datasets.pm_placement import (
     get_category,
     get_dataset_ids_all,
 )
-from taxpose.training.pm_baselines.goal_flow import GoalInfFlowNet
+from taxpose.training.pm_baselines.flow import FlowNet as GoalInfFlowNet
 from taxpose.training.pm_baselines.train_goal_flow import GoalInfFlowNetParams
 
 """

@@ -1,19 +1,18 @@
 import math
 import os
-from typing import List, Literal, Optional
+from typing import List, Optional
 
 import numpy as np
 import pytorch_lightning as pl
 import pytorch_lightning.callbacks as plc
 import pytorch_lightning.loggers as plog
-import torch
-import torch_geometric.data as tgd
 import torch_geometric.loader as tgl
 import typer
 
 from taxpose.datasets.pm_placement import SEEN_CATS, UNSEEN_CATS, get_dataset_ids_all
 from taxpose.training.pm_baselines.dataloader_goal_flow import create_gf_dataset
-from taxpose.training.pm_baselines.goal_flow import GoalInfFlowNet, maniskill_plot
+from taxpose.training.pm_baselines.flow import FlowNet as GoalInfFlowNet
+from taxpose.training.pm_baselines.train_bc import WandBCallback
 
 """
 This file contains training code for the naive goal inference module.
@@ -51,63 +50,14 @@ def create_dataset_handles_all(dset, nrep=1, random=False):
         return envs_all
 
 
-class WandBCallback(plc.Callback):
-    def __init__(self, train_dset, val_dset, eval_per_n_epoch: int = 1):
-        self.train_dset = train_dset
-        self.val_dset = val_dset
-        self.eval_per_n_epoch = eval_per_n_epoch
-
-    @staticmethod
-    def eval_log_random_sample(
-        trainer: pl.Trainer,
-        pl_module: pl.LightningModule,
-        dset,
-        prefix: Literal["train", "val", "unseen"],
-    ):
-        randid = np.random.randint(0, len(dset))
-        data = dset[randid][1]
-        # data.x = data.mask.reshape((-1, 1))
-        obs_data = tgd.Batch.from_data_list([data]).to(pl_module.device)
-        gdata = dset[randid][0]
-        # gdata.x = gdata.mask.reshape((-1, 1))
-        goal_data = tgd.Batch.from_data_list([gdata]).to(pl_module.device)
-
-        with torch.no_grad():
-            pl_module.eval()
-            f_pred = pl_module(goal_data, obs_data)
-
-        assert trainer.logger is not None
-        trainer.logger.experiment.log(
-            {
-                f"{prefix}/goal_cond_flow_plot": maniskill_plot(
-                    obs_data.id,
-                    goal_data.id,
-                    obs_data.pos.cpu(),
-                    goal_data.pos.cpu(),
-                    goal_data.mask.cpu(),
-                    obs_data.mask.cpu(),
-                    f_pred.cpu(),
-                    obs_data.flow.cpu(),
-                ),
-                "global_step": trainer.global_step,
-            },
-        )
-
-    def on_train_epoch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"):  # type: ignore
-        if pl_module.current_epoch % self.eval_per_n_epoch == 0:
-            self.eval_log_random_sample(trainer, pl_module, self.train_dset, "train")
-
-    def on_validation_epoch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule"):  # type: ignore
-        if pl_module.current_epoch % self.eval_per_n_epoch == 0:
-            self.eval_log_random_sample(trainer, pl_module, self.val_dset, "val")
-
-
 def train(
     root: str = os.path.expanduser("~/datasets/partnet-mobility"),
     wandb: bool = True,
     epochs: int = 100,
     even_sampling: bool = False,
     randomize_camera: bool = False,
+    n_workers: int = 60,
+    n_proc_per_worker: int = 1,
 ):
     nrep = 200
 
@@ -123,20 +73,22 @@ def train(
     train_dset = create_gf_dataset(
         root=root,
         obj_ids=train_envs,
+        n_repeat=n_repeat,
         even_sampling=even_sampling,
         randomize_camera=randomize_camera,
-        n_repeat=n_repeat,
-        n_workers=60,
-        n_proc_per_worker=1,
+        n_workers=n_workers,
+        n_proc_per_worker=n_proc_per_worker,
         seed=123456,
     )
 
     test_dset = create_gf_dataset(
         root=root,
         obj_ids=val_envs,
+        n_repeat=1,
         even_sampling=even_sampling,
         randomize_camera=randomize_camera,
-        n_repeat=1,
+        n_workers=n_workers,
+        n_proc_per_worker=n_proc_per_worker,
         seed=654321,
     )
 

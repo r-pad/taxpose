@@ -87,6 +87,8 @@ class BCNet(pl.LightningModule):
         return opt.Adam(params=self.parameters(), lr=0.0001)
 
     @staticmethod
-    def make_plots(preds, batch: tgd.Batch) -> Dict[str, go.Figure]:
+    def make_plots(
+        preds, obs_batch: tgd.Batch, goal_batch: tgd.Batch
+    ) -> Dict[str, go.Figure]:
         # No plots, this is behavior cloning.
         return {}

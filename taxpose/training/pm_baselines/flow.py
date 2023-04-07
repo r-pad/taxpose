@@ -1,3 +1,5 @@
+from typing import Dict
+
 import plotly.graph_objects as go
 import pytorch_lightning as pl
 import rpad.pyg.nets.pointnet2 as pnp
@@ -10,14 +12,46 @@ from torch_geometric.data.batch import Batch
 from torch_geometric.data.data import Data
 
 from taxpose.datasets.pm_placement import CATEGORIES
-from taxpose.training.pm_baselines.naive_nets import (
-    FRNetCLIPortProjection,
-    GoalInfFlowNetParams,
-)
-from taxpose.training.pm_baselines.traj_flow import artflownet_loss
+from taxpose.training.pm_baselines.naive_nets import FRNetCLIPort, GoalInfFlowNetParams
+from taxpose.training.pm_baselines.train_gc_traj_flow import artflownet_loss
 
 
-def maniskill_plot(
+def artflownet_loss(
+    f_pred: torch.Tensor,
+    f_target: torch.Tensor,
+    mask: torch.Tensor,
+    n_nodes: torch.Tensor,
+    use_mask=False,
+) -> torch.Tensor:
+    """Maniskill loss.
+    Args:
+        f_pred (torch.Tensor): Predicted flow.
+        f_target (torch.Tensor): Target flow.
+        mask (torch.Tensor): only mask
+        n_nodes (torch.Tensor): A list describing the number of nodes
+        use_mask: Whether or not to compute loss over all points, or just some.
+    Returns:
+        Loss
+    """
+    weights = (1 / n_nodes).repeat_interleave(n_nodes)
+
+    if use_mask:
+        f_pred = f_pred[mask]
+        f_target = f_target[mask]
+        weights = weights[mask]
+
+    # Flow loss, per-point.
+    raw_se = ((f_pred - f_target) ** 2).sum(dim=1)
+    # weight each PC equally in the sum.
+    l_se = (raw_se * weights).sum()
+
+    # Full loss.
+    loss: torch.Tensor = l_se / len(n_nodes)
+
+    return loss
+
+
+def flow_plot(
     obj_id, goal_id, pos, goal_pos, goal_mask, mask, f_pred, f_target
 ) -> go.Figure:
     fig = make_subplots(
@@ -74,21 +108,15 @@ def maniskill_plot(
     fig.update_layout(
         title=f"Goal {goal_id} Category {CATEGORIES[goal_id[0].split('_')[0]]}, Object {obj_id} Category {CATEGORIES[obj_id[0].split('_')[0]]}"
     )
-
     return fig
 
 
-class GoalInfFlowNet(pl.LightningModule):
+class FlowNet(pl.LightningModule):
     def __init__(self, p: GoalInfFlowNetParams = GoalInfFlowNetParams()):
         super().__init__()
-        p.in_dim = 1
 
-        self.gfe_net = pnp.PN2Encoder(
-            in_dim=p.in_dim, out_dim=p.flow_embed_dim, p=p.gfe_net
-        )
-        self.mask = p.in_dim
-        p.fr_net.in_dim = p.in_dim
-        self.fr_net = FRNetCLIPortProjection(p.fr_net)
+        self.gfe_net = pnp.PN2Encoder(in_dim=1, out_dim=p.flow_embed_dim, p=p.gfe_net)
+        self.fr_net = FRNetCLIPort(p.fr_net)
 
     @staticmethod
     def flow_metrics(pred_flow, gt_flow):
@@ -126,14 +154,10 @@ class GoalInfFlowNet(pl.LightningModule):
         assert len(xyz.shape) == 2
         assert len(mask.shape) == 1
 
-        if self.mask:
-            data = Data(pos=xyz, mask=mask, x=mask.reshape(-1, 1))
-            data_goal = Data(pos=xyz_goal, mask=mask_goal, x=mask_goal.reshape(-1, 1))
-        else:
-            data = Data(pos=xyz, mask=mask)
-            data_goal = Data(pos=xyz_goal, mask=mask_goal)
+        data = Data(pos=xyz, mask=mask, x=mask.reshape(-1, 1))
         batch = Batch.from_data_list([data])
         batch = batch.to(self.device)
+        data_goal = Data(pos=xyz_goal, mask=mask_goal, x=mask_goal.reshape(-1, 1))
         batch_goal = Batch.from_data_list([data_goal])
         batch_goal = batch_goal.to(self.device)
         self.eval()
@@ -148,11 +172,8 @@ class GoalInfFlowNet(pl.LightningModule):
         # dst_data: object of interest
         # src_data: transferred object
         src_data, dst_data = batch
-        if self.mask:
-            src_data.x = src_data.mask.reshape((-1, 1))
-            dst_data.x = dst_data.mask.reshape((-1, 1))
-        else:
-            src_data.x, dst_data.x = None, None
+        src_data.x = src_data.mask.reshape((-1, 1))
+        dst_data.x = dst_data.mask.reshape((-1, 1))
         src_data, dst_data = src_data.to(self.device), dst_data.to(self.device)
         f_pred = self(src_data, dst_data)
         f_ix = dst_data.mask.bool()
@@ -184,3 +205,21 @@ class GoalInfFlowNet(pl.LightningModule):
 
     def configure_optimizers(self):
         return opt.Adam(params=self.parameters(), lr=0.0001)
+
+    @staticmethod
+    def make_plots(
+        preds, obs_batch: tgd.Batch, goal_batch: tgd.Batch
+    ) -> Dict[str, go.Figure]:
+        # No plots, this is behavior cloning.
+        return {
+            "flow": flow_plot(
+                obs_batch.id,
+                goal_batch.id,
+                obs_batch.pos.cpu(),
+                goal_batch.pos.cpu(),
+                goal_batch.mask.cpu(),
+                obs_batch.mask.cpu(),
+                preds.cpu(),
+                obs_batch.flow.cpu(),
+            )
+        }
