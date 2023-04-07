@@ -11,7 +11,7 @@ import typer
 
 from taxpose.datasets.pm_placement import SEEN_CATS, UNSEEN_CATS, get_dataset_ids_all
 from taxpose.training.pm_baselines.dataloader_goal_flow import create_gf_dataset
-from taxpose.training.pm_baselines.flow import FlowNet as GoalInfFlowNet
+from taxpose.training.pm_baselines.flow_model import FlowNet as GoalInfFlowNet
 from taxpose.training.pm_baselines.train_bc import WandBCallback
 
 """

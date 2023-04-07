@@ -8,7 +8,7 @@ import torch_geometric.loader as tgl
 import typer
 
 from taxpose.datasets.pm_placement import SEEN_CATS, UNSEEN_CATS, get_dataset_ids_all
-from taxpose.training.pm_baselines.bc import BCNet as DaggerNet
+from taxpose.training.pm_baselines.bc_model import BCNet as DaggerNet
 from taxpose.training.pm_baselines.dataloader_ff_interp_dagger import (
     create_gcdagger_dataset,
 )

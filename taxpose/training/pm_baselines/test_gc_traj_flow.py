@@ -20,7 +20,7 @@ from taxpose.datasets.pm_placement import (
 from taxpose.training.pm_baselines.dataloader_ff_interp_bc import (
     articulate_specific_joints,
 )
-from taxpose.training.pm_baselines.flow import FlowNet
+from taxpose.training.pm_baselines.flow_model import FlowNet
 from taxpose.training.pm_baselines.test_bc import (
     calculate_chamfer_dist,
     get_ids,

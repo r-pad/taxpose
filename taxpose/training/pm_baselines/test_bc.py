@@ -24,7 +24,7 @@ from taxpose.datasets.pm_placement import (
     render_input,
     subsample_pcd,
 )
-from taxpose.training.pm_baselines.bc import BCNet
+from taxpose.training.pm_baselines.bc_model import BCNet
 from taxpose.training.pm_baselines.dataloader_ff_interp_bc import (
     articulate_specific_joints,
 )

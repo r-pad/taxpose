@@ -11,7 +11,7 @@ from taxpose.datasets.pm_placement import SEEN_CATS, UNSEEN_CATS, get_dataset_id
 from taxpose.training.pm_baselines.dataloader_ff_interp_dagger import (
     create_gcdagger_dataset,
 )
-from taxpose.training.pm_baselines.flow import FlowNet
+from taxpose.training.pm_baselines.flow_model import FlowNet
 from taxpose.training.pm_baselines.train_bc import WandBCallback, get_ids
 
 
