@@ -107,6 +107,7 @@ pip install -e .
 For some reason, we need to install this in editable mode (can't just pip install it from github).
 
 ```
+git submodule update --init --recursive
 pip install -e third_party/ndf_robot
 ```
 
