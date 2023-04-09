@@ -3,7 +3,7 @@ name = "taxpose"
 version = "0.1.0"
 description = "TAX-Pose: Task-Specific Cross-Pose Estimation for Robot Manipulation"
 readme = "README.md"
-requires-python = ">=3.6"
+requires-python = ">=3.6, <3.10" # ndf_robot requires < 3.10 :(
 license = {file = "LICENSE.txt"}
 authors = [
   {email = "chuerp@andrew.cmu.edu", name = "Chuer Pan"},

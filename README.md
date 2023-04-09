@@ -46,7 +46,7 @@ You can follow instructions [here](https://pytorch.org/get-started/locally/).
 For our experiments, we installed torch 1.11 with cuda 11.3:
 
 ```
-pip install torch==1.11.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
+pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
 ```
 
 ### `pytorch-geometric`
@@ -56,7 +56,7 @@ You can follow instructions [here](https://pytorch-geometric.readthedocs.io/en/l
 For our experiments, we installed with the following command:
 
 ```
-pip install torch-scatter==2.0.9 torch-sparse==0.6.15 torch-cluster==1.6.0 torch-spline-conv==1.2.1 pyg_lib==0.1.0 -f https://data.pyg.org/whl/torch-1.11.0+cu113.html```
+pip install torch-scatter==2.0.9 torch-sparse==0.6.15 torch-cluster==1.6.0 torch-spline-conv==1.2.1 pyg_lib==0.1.0 -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
 ```
 
 ### `pytorch3d`
@@ -67,7 +67,7 @@ We ran the following:
 
 ```
 pip install fvcore iopath
-pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py310_cu113_pyt1110/download.html
+pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py39_cu113_pyt1110/download.html
 ```
 
 ### `dgl`
@@ -100,6 +100,14 @@ If you want to make changes, you can install in editable mode.
 git clone https://github.com/r-pad/taxpose.git
 cd taxpose
 pip install -e .
+```
+
+## Install ndf_robot.
+
+For some reason, we need to install this in editable mode (can't just pip install it from github).
+
+```
+pip install -e third_party/ndf_robot
 ```
 
 # Code Structure
