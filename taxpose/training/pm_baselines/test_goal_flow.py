@@ -1,43 +1,245 @@
-import json
 import os
 import pickle
-from copy import deepcopy
+import time
+from typing import List
 
 import imageio
 import numpy as np
 import pybullet as p
 import torch
-from chamferdist import ChamferDistance
-from part_embedding.goal_inference.dataloader_goal_inference_naive import render_input
-from part_embedding.goal_inference.dcp_utils import (
-    create_plot,
-    create_test_env,
-    dcp_correspondence_plot,
-    get_demo_from_list,
-    get_obs_data_from_env,
-)
-from part_embedding.goal_inference.motion_planning import motion_planning_fcl
-from part_embedding.goal_inference.plots import create_plot, dcp_correspondence_plot
-from part_embedding.goal_inference.train_collision_net import CollisionNet, GFENetParams
 from rpad.partnet_mobility_utils.render.pybullet import PMRenderEnv
 from scipy.spatial.transform import Rotation as R
-from torch import nn
 from tqdm import tqdm
 
 from taxpose.datasets.pm_placement import (
-    SEEN_CATS,
-    TAXPOSE_ROOT,
-    UMPNET_SPLIT_FULL_FILE,
-    UNSEEN_CATS,
+    ACTION_CLOUD_DIR,
+    ACTION_OBJS,
+    CATEGORIES,
+    GOAL_INF_DSET_PATH,
+    SEM_CLASS_DSET_PATH,
+    SNAPPED_GOAL_FILE,
+    base_from_bottom,
+    downsample_pcd_fps,
+    find_link_index_to_open,
     get_category,
-    get_dataset_ids_all,
+    load_action_obj_with_valid_scale,
+    randomize_block_pose,
+    render_input,
+    render_input_simple,
 )
-from taxpose.training.pm_baselines.flow_model import FlowNet as GoalInfFlowNet
-from taxpose.training.pm_baselines.train_goal_flow import GoalInfFlowNetParams
+from taxpose.training.pm_baselines.dataloader_ff_interp_bc import (
+    articulate_specific_joints,
+)
+from taxpose.training.pm_baselines.flow_model import FlowNet
+from taxpose.training.pm_baselines.motion_planning import motion_planning_fcl
+from taxpose.training.pm_baselines.test_bc import (
+    calculate_chamfer_dist,
+    get_checkpoint_path,
+    get_demo,
+)
+from taxpose.training.pm_baselines.train import get_ids
 
 """
 This file loads a trained goal inference model and tests the rollout using motion planning in simulation.
 """
+
+
+def get_obs_data_from_env(
+    action_body_id, env, scale, action_id, full_obj=True, even_downsample=True
+):
+    """
+    Create demonstration
+    """
+
+    P_world, pc_seg, rgb, action_mask = render_input_simple(action_body_id, env)
+    action_pos, _ = p.getBasePositionAndOrientation(
+        action_body_id, physicsClientId=env.client_id
+    )
+
+    # We need enough visible points.
+    if sum(action_mask) < 1:
+        # If we don't find them in obs mode, it's because the random object position has been occluded.
+        # In this case, we just need to resample.
+        p.removeBody(action_body_id, physicsClientId=env.client_id)
+
+        raise ValueError("the goal we sampled isn't visible! ")
+
+    # Separate out the action and anchor points.
+    P_action_world = P_world[action_mask]
+    P_anchor_world = P_world[~action_mask]
+
+    # Decide if we want to swap out the action points for the full point cloud.
+    if full_obj:
+        P_action_world = np.load(ACTION_CLOUD_DIR / f"{action_id}.npy")
+        P_action_world *= scale
+        P_action_world += action_pos
+
+    P_action_world_full = torch.from_numpy(P_action_world).float()
+    P_anchor_world_full = torch.from_numpy(P_anchor_world).float()
+
+    # Now, downsample
+    if even_downsample:
+        action_ixs = downsample_pcd_fps(P_action_world_full, n=200)
+        anchor_ixs = downsample_pcd_fps(P_anchor_world_full, n=1800)
+    else:
+        action_ixs = torch.randperm(len(P_action_world_full))[:200]
+        anchor_ixs = torch.randperm(len(P_anchor_world_full))[:1800]
+
+    # Rebuild the world
+    P_action_world = P_action_world_full[action_ixs]
+    P_anchor_world = P_anchor_world_full[anchor_ixs]
+    P_world_full = np.concatenate([P_action_world_full, P_anchor_world_full], axis=0)
+    P_world = np.concatenate([P_action_world, P_anchor_world], axis=0)
+
+    # Regenerate a mask.
+    mask_act_full = 99 * torch.ones(len(P_action_world_full)).int()
+    mask_anc_full = torch.zeros(len(P_anchor_world_full)).int()
+    mask_full = torch.cat([mask_act_full, mask_anc_full])
+    mask_act = 99 * torch.ones(len(P_action_world)).int()
+    mask_anc = torch.zeros(len(P_anchor_world)).int()
+    mask = torch.cat([mask_act, mask_anc])
+
+    # Unload the object from the scene.
+    # p.removeBody(action_body_id, physicsClientId=env.client_id)
+
+    return (
+        P_world,
+        mask.cpu().numpy(),
+        P_world_full,
+        mask_full.cpu().numpy(),
+    )
+
+
+def get_demo_from_list(
+    root: str,
+    goal_id_list: list,
+    full_sem_dset: dict,
+    object_dict: dict,
+    snap_to_surface=True,
+    full_obj=True,
+    even_downsample=True,
+    WHICH=None,
+):
+    """
+    Create demonstration
+    """
+    # First, create an environment which will generate our source observations.
+    visible = False
+    while not visible:
+        demo_id: str = np.random.choice(goal_id_list)
+        if WHICH is not None:
+            demo_id = f"{demo_id.split('_')[0]}_{WHICH}"
+            if demo_id not in goal_id_list:
+                return None
+        obj_id = demo_id.split("_")[0]
+        goal_id = demo_id.split("_")[1]
+
+        # Next, check to see if the object needs to be opened in any way.
+        partsem = object_dict[f"{obj_id}_{goal_id}"]["partsem"]
+        env = PMRenderEnv(
+            obj_id.split("_")[0],
+            os.path.join(root, "raw"),
+            camera_pos=[-3, 0, 1.2],
+            gui=False,
+        )
+        if partsem != "none":
+            links_tomove = find_link_index_to_open(
+                full_sem_dset, partsem, obj_id, object_dict, goal_id
+            )
+            articulate_specific_joints(env, links_tomove, 0.9)
+
+        # Select the action object.
+        action_id = np.random.choice(list(ACTION_OBJS.keys()))
+        action_obj = ACTION_OBJS[action_id]
+
+        # Load the object at the original floating goal, with a size that is valid there.
+        info = object_dict[f"{obj_id}_{goal_id}"]
+        floating_goal = np.array([info["x"], info["y"], info["z"]])
+        load_demo_res = load_action_obj_with_valid_scale(action_obj, floating_goal, env)
+        if load_demo_res == None:
+            continue
+        action_body_id, scale = load_demo_res
+
+        # Find the actual desired goal position. In the case where we snap to the
+        # goal surface, we need to calculate the position in which to reset (base_pos).
+        with open(SNAPPED_GOAL_FILE, "rb") as f:
+            snapped_goal_dict = pickle.load(f)
+        if snap_to_surface:
+            action_goal_pos_pre = snapped_goal_dict[CATEGORIES[obj_id].lower()][
+                f"{obj_id}_{goal_id}"
+            ]
+            action_goal_pos = base_from_bottom(action_body_id, env, action_goal_pos_pre)
+        else:
+            action_goal_pos = floating_goal
+
+        action_pos = action_goal_pos
+
+        # Place the object at the desired start position.
+        p.resetBasePositionAndOrientation(
+            action_body_id,
+            posObj=action_pos,
+            ornObj=[0, 0, 0, 1],
+            physicsClientId=env.client_id,
+        )
+
+        P_world, pc_seg, rgb, action_mask = render_input_simple(action_body_id, env)
+
+        # We need enough visible points.
+        if sum(action_mask) < 1:
+            # If we don't find them in obs mode, it's because the random object position has been occluded.
+            # In this case, we just need to resample.
+            p.removeBody(action_body_id, physicsClientId=env.client_id)
+
+        else:
+            visible = True
+
+    # Separate out the action and anchor points.
+    P_action_world = P_world[action_mask]
+    P_anchor_world = P_world[~action_mask]
+
+    # Decide if we want to swap out the action points for the full point cloud.
+    if full_obj:
+        P_action_world = np.load(ACTION_CLOUD_DIR / f"{action_id}.npy")
+        P_action_world *= scale
+        P_action_world += action_pos
+
+    P_action_world_full = torch.from_numpy(P_action_world).float()
+    P_anchor_world_full = torch.from_numpy(P_anchor_world).float()
+
+    # Now, downsample
+    if even_downsample:
+        action_ixs = downsample_pcd_fps(P_action_world_full, n=200)
+        anchor_ixs = downsample_pcd_fps(P_anchor_world_full, n=1800)
+    else:
+        action_ixs = torch.randperm(len(P_action_world_full))[:200]
+        anchor_ixs = torch.randperm(len(P_anchor_world_full))[:1800]
+
+    # Rebuild the world
+    P_action_world = P_action_world_full[action_ixs]
+    P_anchor_world = P_anchor_world_full[anchor_ixs]
+    P_world_full = np.concatenate([P_action_world_full, P_anchor_world_full], axis=0)
+    P_world = np.concatenate([P_action_world, P_anchor_world], axis=0)
+
+    # Regenerate a mask.
+    mask_act_full = 99 * torch.ones(len(P_action_world_full)).int()
+    mask_anc_full = torch.zeros(len(P_anchor_world_full)).int()
+    mask_full = torch.cat([mask_act_full, mask_anc_full])
+    mask_act = 99 * torch.ones(len(P_action_world)).int()
+    mask_anc = torch.zeros(len(P_anchor_world)).int()
+    mask = torch.cat([mask_act, mask_anc])
+
+    # Unload the object from the scene.
+    p.removeBody(action_body_id, physicsClientId=env.client_id)
+
+    return (
+        P_world,
+        mask.cpu().numpy(),
+        P_world_full,
+        mask_full.cpu().numpy(),
+        rgb,
+        demo_id,
+        goal_id,
+    )
 
 
 def augent_with_more_views(
@@ -49,82 +251,9 @@ def augent_with_more_views(
         P_world, pc_seg_obj, rgb = render_input(obs_block_id, obs_env)
         P_world_full = np.concatenate([P_world_full, P_world])
         pc_seg_obj_full = np.concatenate([pc_seg_obj_full, pc_seg_obj])
-
     # Restore the original pose
     obs_env.camera.set_camera_position(original_cam_pos)
     return P_world_full, pc_seg_obj_full
-
-
-def get_ids(cat):
-    if cat != "All":
-        with open(UMPNET_SPLIT_FULL_FILE, "r") as f:
-            split_file = json.load(f)
-        res = []
-        for mode in split_file:
-            if cat in split_file[mode]:
-                res += split_file[mode][cat]["train"]
-                res += split_file[mode][cat]["test"]
-        return res
-    else:
-        _, val_res, unseen_res = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
-        return val_res + unseen_res
-
-
-def randomize_block_pose(seed):
-    np.random.seed(seed)
-    # randomized_pose = np.array(
-    #     [
-    #         np.random.uniform(low=-1, high=0.5),
-    #         np.random.uniform(low=-0.7, high=1.4),
-    #         np.random.uniform(low=0.1, high=0.2),
-    #     ]
-    # )
-
-    # Far from training distribution.
-    randomized_pose = np.array(
-        [
-            np.random.uniform(low=1.5, high=2),
-            np.random.uniform(low=-3, high=3),
-            np.random.uniform(low=1.5, high=2),
-        ]
-    )
-    print(randomized_pose)
-    return randomized_pose
-
-
-def load_model(method: str, exp_name: str, in_dim: int):
-    d = os.path.join(
-        os.getcwd(),
-        f"checkpoints/{method}/{exp_name}/",
-    )
-    ckpt = os.listdir(d)[0]
-    param = GoalInfFlowNetParams()
-    net: nn.Module
-    if not "dcp" in method:
-        param.in_dim = in_dim
-        net = GoalInfFlowNet.load_from_checkpoint(
-            f"{d}/{ckpt}",
-            p=param,
-        )
-    else:
-        param.in_dim = 1
-        param.inference = True
-        net: DCP_Residual = DCP_Residual.load_from_checkpoint(f"{d}/{ckpt}", p=param)
-    return net
-
-
-def load_collision_model(exp_name: str) -> nn.Module:
-    d = os.path.join(
-        os.getcwd(),
-        f"checkpoints/goal_inference_collision_net/{exp_name}/",
-    )
-    ckpt = os.listdir(d)[0]
-    param = GFENetParams()
-    net: CollisionNet = CollisionNet.load_from_checkpoint(
-        f"{d}/{ckpt}",
-        params=param,
-    )
-    return net
 
 
 def is_obs_valid(block_id, sim: PMRenderEnv):
@@ -163,6 +292,7 @@ def randomize_start_pose(block_id, goal_pos, sim: PMRenderEnv):
 
 
 def create_test_env(
+    root: str,
     goal_id_list: List[str],
     full_sem_dset: dict,
     object_dict: dict,
@@ -172,6 +302,7 @@ def create_test_env(
 ):
     # This creates the test env for demonstration.
     return get_demo_from_list(
+        root,
         goal_id_list,
         full_sem_dset,
         object_dict,
@@ -181,156 +312,78 @@ def create_test_env(
     )
 
 
-def infer_goal(goalinf_model, P_world, obj_mask, P_world_goal, goal_mask, isflow=True):
+def infer_goal(goalinf_model, P_world, obj_mask, P_world_goal, goal_mask):
     # This infers the goal using the goalinf_modem obs PCD (P_world), and demo PCD (P_world_goal)
 
     # IS_FLOW: Boolean value indicating if the model is flow-based or not. If TRUE: add pred flow.
     # Otherwise, output goal directly.
-    pred_ = goalinf_model.predict(
+    pred = goalinf_model.predict(
         torch.from_numpy(P_world).float(),
         torch.from_numpy(obj_mask).float(),
         torch.from_numpy(P_world_goal).float(),
         torch.from_numpy(goal_mask).float(),
-        no_dcp=False,
-        # ISOLATING DCP
-        # no_dcp=True,
     )
-    # import trimesh
-
-    # scene = trimesh.Scene(
-    #     [
-    #         trimesh.points.PointCloud(P_world[obj_mask], colors=(255, 0, 0)),
-    #         trimesh.points.PointCloud(P_world[~obj_mask]),
-    #     ]
-    # )
-    # scene.show()
-    # scene = trimesh.Scene(
-    #     [
-    #         trimesh.points.PointCloud(P_world_goal[goal_mask], colors=(255, 0, 0)),
-    #         trimesh.points.PointCloud(P_world_goal[~goal_mask]),
-    #     ]
-    # )
-    # scene.show()
-    if isflow:
-        pred_: np.ndarray = pred_.cpu().numpy()
-        # Mask out the pred_flow, not necessary if flow model is good
-        pred_[~obj_mask] = 0
-        inferred_goal: np.ndarray = P_world + pred_
-        return inferred_goal
-    else:
-        pred_after_ref = pred_[0].cpu().numpy()
-        pred_before_ref = pred_[1].cpu().numpy()
-        inferred_goal_after_refinement, action_before_refinement = (
-            pred_after_ref.astype(np.float64),
-            pred_before_ref.astype(np.float64),
-        )
-        inferred_goal_before_refinement = deepcopy(inferred_goal_after_refinement)
-        inferred_goal_before_refinement[:200] = action_before_refinement
-        if len(pred_) > 2:
-            src_corr = pred_[2]
-            corr_weights = pred_[3]
-            return (
-                inferred_goal_after_refinement,
-                inferred_goal_before_refinement,
-                src_corr,
-                corr_weights,
-            )
-        return inferred_goal_after_refinement, inferred_goal_before_refinement
-
-
-def calculate_metric(inferred_goal, gt_goal):
-    # This calculates the distance between inferred_goal PCD and gt_goal PCD
-    # TODO: What metric should we use? Chamfer distance? Normalized distance?
-    # Note that the metric is calculated in point cloud space.
-    pass
-
-
-def calculate_chamfer_dist(inferred_goal, gt_goal):
-    # This calculates the chamfer distance between inferred and GT goal.
-    chamferDist = ChamferDistance()
-    source_pcd = torch.from_numpy(inferred_goal[np.newaxis, :]).cuda().float()
-    target_pcd = torch.from_numpy(gt_goal[np.newaxis, :]).cuda().float()
-    assert len(source_pcd.shape) == 3
-    assert len(target_pcd.shape) == 3
-    dist = chamferDist(source_pcd, target_pcd).cpu().item()
-    return dist
+    pred: np.ndarray = pred.cpu().numpy()
+    # Mask out the pred_flow, not necessary if flow model is good
+    pred[~obj_mask] = 0
+    inferred_goal: np.ndarray = P_world + pred
+    return inferred_goal
 
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cat", type=str)
-    parser.add_argument("--method", type=str, default="goal_inference_naive")
-    parser.add_argument("--model", type=str)
-    parser.add_argument("--coll_model", type=str)
-    parser.add_argument("--postfix", type=str)
-    parser.add_argument("--mask", action="store_true")
-    parser.add_argument("--mp", action="store_true")
+    parser.add_argument("--cat", type=str, required=True)
+    parser.add_argument("--model", type=str, required=True)
+    parser.add_argument("--method", type=str, default="goal_flow")
     parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--indist", type=bool, default=True)
-    parser.add_argument("--postfix", type=str)
+    parser.add_argument("--rollout_dir", type=str, default="./baselines/rollouts")
+    parser.add_argument(
+        "--pm-root", type=str, default=os.path.expanduser("~/datasets/partnet-mobility")
+    )
+    parser.add_argument("--ckpt-dir", type=str, default="./checkpoints")
+    parser.add_argument("--results-dir", type=str, default="./results")
+    parser.add_argument(
+        "--freefloat-dset",
+        type=str,
+        default="./data/free_floating_traj_interp_multigoals",
+    )
+    parser.add_argument("--rollout-len", type=int, default=20)
     parser.add_argument("--snap", action="store_true")
     args = parser.parse_args()
     objcat = args.cat
     method = args.method
-    postfix = args.postfix
-    snap_to_surface = args.snap
-    isflow = True
-    if "dcp" in method:
-        isflow = False
     expname = args.model
-    # coll_model = args.coll_model
-    mask = args.mask
     start_ind = args.start
-    mp = args.mp
     in_dist = args.indist
+    rollout_dir = args.rollout_dir
+    pm_root = args.pm_root
+    ckpt_dir = args.ckpt_dir
+    freefloat_dset = args.freefloat_dset
+    rollout_len = args.rollout_len
+    snap_to_surface = args.snap
+    trial_len = 20
 
-    if mask:
-        in_dim = 1
-    else:
-        in_dim = 0
-
-    # Decide what collision model to use:
-    # if coll_model == "learned":
-    #     motion_planning = motion_planning_learned
-    # elif coll_model == "fcl":
-    #     motion_planning = motion_planning_fcl
-    # Get which joint to open
-    full_sem_dset = pickle.load(
-        open(
-            os.path.expanduser(
-                "~/discriminative_embeddings/goal_inf_dset/sem_class_transfer_dset_more.pkl"
-            ),
-            "rb",
-        )
-    )
-    object_dict_meta = pickle.load(
-        open(
-            os.path.expanduser(
-                f"~/discriminative_embeddings/goal_inf_dset/{objcat}_block_dset_multi.pkl"
-            ),
-            "rb",
-        )
-    )
+    with open(SEM_CLASS_DSET_PATH, "rb") as f:
+        full_sem_dset = pickle.load(f)
+    with open(
+        os.path.join(GOAL_INF_DSET_PATH, f"{objcat}_block_dset_multi.pkl"), "rb"
+    ) as f:
+        object_dict_meta = pickle.load(f)
 
     # Get goal inference model
-    goalinf_model = load_model(method, expname, in_dim).cuda()
-
-    # Get collision model
-    coll_net = load_collision_model("tough-water-14")
+    ckpt_path = get_checkpoint_path(method, ckpt_dir, expname)
+    goalinf_model = FlowNet.load_from_checkpoint(ckpt_path)
+    goalinf_model.eval()
 
     # Create result directory
-    result_dir_fcl = (
-        TAXPOSE_ROOT
-        / f"part_embedding/goal_inference/rollouts/{method}_{objcat}_fcl_coll_{expname}{postfix}"
-    )
-    if not os.path.exists(result_dir_fcl):
+    result_dir = f"{rollout_dir}/{objcat}_{method}_{expname}"
+    if not os.path.exists(result_dir):
         print("Creating result directory for rollouts")
-        os.makedirs(result_dir_fcl, exist_ok=True)
-        os.makedirs(f"{result_dir_fcl}/vids", exist_ok=True)
-
-    obj_ids_list = []
+        os.makedirs(result_dir, exist_ok=True)
+        os.makedirs(f"{result_dir}/vids", exist_ok=True)
 
     # If we are doing "test" then we sample 10 times per object
     objs = get_ids(objcat.capitalize())
@@ -338,24 +391,16 @@ if __name__ == "__main__":
         objs.remove("7292")
 
     result_dict = {}
-    if not isflow:
-        result_dict_intermediate = {}
     mp_result_dict = {}
 
-    trial_len = 20
-    trial_start = start_ind % trial_len
-
     for o in tqdm(objs[start_ind // trial_len :]):
-        # if get_category(o.split("_")[0]) != "Drawer":
-        #     print("skipping category")
-        #     continue
         if objcat == "all":
             object_dict = object_dict_meta[get_category(o.split("_")[0]).lower()]
         else:
             object_dict = object_dict_meta
         # Get demo ids list
         demo_id_list = list(object_dict.keys())
-        trial = trial_start
+        trial = 0
         while trial < trial_len:
             obj_id = f"{o}_{trial}"
 
@@ -415,7 +460,6 @@ if __name__ == "__main__":
                     pc_seg_obj == 99,
                     P_world_demo,
                     pc_seg_obj_demo == 99,
-                    isflow=isflow,
                 )
             except IndexError:
                 breakpoint()
@@ -424,62 +468,14 @@ if __name__ == "__main__":
             gt_flow[~(pc_seg_obj == 99)] = 0
             gt_goal = P_world + gt_flow
 
-            if isflow:
-                plot = create_plot(
-                    gt_goal,
-                    inferred_goal,
-                    pc_seg_obj_demo == 99,
-                    P_world_demo,
-                    pc_seg_obj == 99,
-                    demo_id,
-                    obj_id,
-                )
-            else:
-                if len(inferred_goal) == 2:
-                    plot = create_plot(
-                        gt_goal,
-                        inferred_goal[0],
-                        pc_seg_obj_demo == 99,
-                        P_world_demo,
-                        pc_seg_obj == 99,
-                        demo_id,
-                        obj_id,
-                    )
-                else:
-                    plot = dcp_correspondence_plot(
-                        obj_id,
-                        demo_id,
-                        inferred_goal[0],
-                        P_world_demo,
-                        pc_seg_obj_demo == 99,
-                        pc_seg_obj == 99,
-                        inferred_goal[1],
-                        inferred_goal[2],
-                        inferred_goal[3],
-                    )
-
             chamf_dist_start = calculate_chamfer_dist(P_world, gt_goal)
             if chamf_dist_start == 0:
-                p.disconnect()
                 continue
-            if isflow:
-                chamf_dist_goal = calculate_chamfer_dist(inferred_goal, gt_goal)
-                result_dict[obj_id] = chamf_dist_goal / chamf_dist_start
-            else:
-                chamf_dist_goal = calculate_chamfer_dist(inferred_goal[0], gt_goal)
-                result_dict[obj_id] = chamf_dist_goal / chamf_dist_start
-                chamf_dist_goal_intermediate = calculate_chamfer_dist(
-                    inferred_goal[1], gt_goal
-                )
-                result_dict_intermediate[obj_id] = (
-                    chamf_dist_goal_intermediate / chamf_dist_start
-                )
 
+            chamf_dist_goal = calculate_chamfer_dist(inferred_goal, gt_goal)
+            result_dict[obj_id] = chamf_dist_goal / chamf_dist_start
             if chamf_dist_goal / chamf_dist_start > 1:
                 result_dict[obj_id] = 1
-            if not isflow:
-                if chamf_dist_goal_intermediate / chamf_dist_start > 1:
-                    result_dict_intermediate[obj_id] = 1
 
             scene_pose = np.eye(4)
             scene_xyz, scene_rot = p.getBasePositionAndOrientation(
@@ -487,126 +483,89 @@ if __name__ == "__main__":
             )
             scene_pose[:3, -1] = np.array(scene_xyz)
             scene_pose[:3, :3] = R.from_quat(np.array(scene_rot)).as_matrix()
-            result_dir = result_dir_fcl
+            result_dir = result_dir
 
             # Motion planning
-            if mp:
-                if isflow:
-                    path_list_fcl = motion_planning_fcl(
-                        inferred_goal,
-                        P_world,
-                        P_world_full,
-                        pc_seg_obj == 99,
-                        pc_seg_obj_full == 99,
-                        start_full_pose,
-                        scene_pose,
-                        coll_net,
-                    )
-                else:
-                    reordered_goal = deepcopy(P_world)
-                    reordered_goal[pc_seg_obj == 99] = inferred_goal[0][:200]
-                    path_list_fcl = motion_planning_fcl(
-                        reordered_goal,
-                        P_world,
-                        P_world_full,
-                        pc_seg_obj == 99,
-                        pc_seg_obj_full == 99,
-                        start_full_pose,
-                        scene_pose,
-                        coll_net,
-                    )
-                # path_list_learned = motion_planning_learned(
-                #     inferred_goal,
-                #     P_world,
-                #     P_world_full,
-                #     pc_seg_obj == 99,
-                #     pc_seg_obj_full == 99,
-                #     start_full_pose,
-                #     scene_pose,
-                #     coll_net,
-                # )
-                if path_list_fcl is None:
-                    p.disconnect()
-                    continue
+            path_list_fcl = motion_planning_fcl(
+                inferred_goal,
+                P_world,
+                P_world_full,
+                pc_seg_obj == 99,
+                pc_seg_obj_full == 99,
+                start_full_pose,
+            )
 
-            result_dirs = [result_dir_fcl]
+            if path_list_fcl is None:
+                p.disconnect()
+                continue
+
+            result_dirs = [result_dir]
             trial += 1
             # for i, path_list in enumerate([path_list_fcl]):
             for i in range(1):
-                if mp:
-                    path_list = path_list_fcl
-                    result_dir = result_dirs[i]
-                    exec_gifs = []
+                path_list = path_list_fcl
+                result_dir = result_dirs[i]
+                exec_gifs = []
 
-                    # Initialize mp result logging
-                    # 1: success
-                    # 0: failure
-                    # key is [SUCC, NORM_DIST]
-                    mp_result_dict[obj_id] = [1]
-                    collision_counter = 0
-                    for pp in path_list:
-                        p.resetBasePositionAndOrientation(
-                            obs_block_id,
-                            posObj=pp[:3],
-                            ornObj=[0, 0, 0, 1],
-                            physicsClientId=obs_env.client_id,
-                        )
+                # Initialize mp result logging
+                # 1: success
+                # 0: failure
+                # key is [SUCC, NORM_DIST]
+                mp_result_dict[obj_id] = [1]
+                collision_counter = 0
+                for pp in path_list:
+                    p.resetBasePositionAndOrientation(
+                        obs_block_id,
+                        posObj=pp[:3],
+                        ornObj=[0, 0, 0, 1],
+                        physicsClientId=obs_env.client_id,
+                    )
 
-                        collision_counter_temp = (
-                            len(
-                                p.getClosestPoints(
-                                    bodyA=obs_block_id,
-                                    bodyB=obs_env.obj_id,
-                                    distance=0,
-                                    physicsClientId=obs_env.client_id,
-                                )
+                    collision_counter_temp = (
+                        len(
+                            p.getClosestPoints(
+                                bodyA=obs_block_id,
+                                bodyB=obs_env.obj_id,
+                                distance=0,
+                                physicsClientId=obs_env.client_id,
                             )
-                            > 0
                         )
+                        > 0
+                    )
 
-                        collision_counter += collision_counter_temp
-                        if collision_counter > 2:
-                            mp_result_dict[obj_id][0] = 0
+                    collision_counter += collision_counter_temp
+                    if collision_counter > 2:
+                        mp_result_dict[obj_id][0] = 0
 
-                        (
-                            rgb,
-                            depth,
-                            seg,
-                            P_cam,
-                            P_world,
-                            P_rgb,
-                            pc_seg,
-                            segmap,
-                        ) = obs_env.render(True)
-                        exec_gifs.append(rgb)
-                    imageio.mimsave(
-                        f"{result_dir}/vids/test_{obj_id}.gif", exec_gifs, fps=25
+                    (
+                        rgb,
+                        depth,
+                        seg,
+                        P_cam,
+                        P_world,
+                        P_rgb,
+                        pc_seg,
+                        segmap,
+                    ) = obs_env.render(True)
+                    exec_gifs.append(rgb)
+                imageio.mimsave(
+                    f"{result_dir}/vids/test_{obj_id}.gif", exec_gifs, fps=25
+                )
+                imageio.imsave(f"{result_dir}/vids/test_{obj_id}_goal.png", rgb_goal)
+                mp_result_dict[obj_id].append(
+                    min(
+                        1,
+                        np.linalg.norm(pp - gt_goal_xyz)
+                        / np.linalg.norm(start_xyz - gt_goal_xyz),
                     )
-                    imageio.imsave(
-                        f"{result_dir}/vids/test_{obj_id}_goal.png", rgb_goal
-                    )
-                    mp_result_dict[obj_id].append(
-                        min(
-                            1,
-                            np.linalg.norm(pp - gt_goal_xyz)
-                            / np.linalg.norm(start_xyz - gt_goal_xyz),
-                        )
-                    )
+                )
 
                 # Log the result to text file
                 goalinf_res_file = open(
                     os.path.join(result_dir, f"rollout_goalinf_res.txt"), "a"
                 )
                 print(f"{obj_id}: {result_dict[obj_id]}", file=goalinf_res_file)
-                if not isflow:
-                    goalinf_res_file_intermediate = open(
-                        os.path.join(result_dir, f"rollout_goalinf_res_before_ref.txt"),
-                        "a",
-                    )
-                    print(
-                        f"{obj_id}: {result_dict_intermediate[obj_id]}",
-                        file=goalinf_res_file_intermediate,
-                    )
+
                 if mp:
                     mp_res_file = open(
                         os.path.join(result_dir, f"rollout_mp_res.txt"), "a"

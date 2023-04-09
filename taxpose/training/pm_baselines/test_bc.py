@@ -89,7 +89,7 @@ def is_obs_valid(block_id, sim: PMRenderEnv):
     )
     _, pc_seg_obj, _ = render_input(block_id, sim)
     mask = pc_seg_obj == 99
-    return sum(mask) >= 0 and collision_counter == 0
+    return sum(mask) > 0 and collision_counter == 0
 
 
 def randomize_start_pose(block_id, sim: PMRenderEnv):
@@ -135,10 +135,7 @@ def create_test_env(
                     move_joints = full_sem_dset[mode][partsem][obj_id.split("_")[0]]
 
         obj_link_id = object_dict[obj_id.split("_")[0] + f"_{which_goal}"]["ind"]
-        try:
-            obj_id_links_tomove = move_joints[obj_link_id]
-        except:
-            obj_id_links_tomove = "link_0"
+        obj_id_links_tomove = move_joints[obj_link_id]
 
         # Open the joints.
         articulate_specific_joints(obs_env, obj_id_links_tomove, 0.9)
@@ -167,10 +164,7 @@ def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict, pm_root: str)
                 if goal_id.split("_")[0] in full_sem_dset[mode][partsem]:
                     move_joints = full_sem_dset[mode][partsem][goal_id.split("_")[0]]
         goal_link_id = object_dict[goal_id]["ind"]
-        try:
-            goal_id_links_tomove = move_joints[goal_link_id]
-        except:
-            goal_id_links_tomove = "link_0"
+        goal_id_links_tomove = move_joints[goal_link_id]
         articulate_specific_joints(goal_env, goal_id_links_tomove, 0.9)
 
     goal_block = f"{RAVENS_ASSETS}/block/block.urdf"
@@ -241,6 +235,7 @@ if __name__ == "__main__":
     parser.add_argument("--method", type=str, default="gc_bc")
     parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--indist", type=bool, default=True)
+    parser.add_argument("--rollout_dir", type=str, default="./baselines/rollouts")
     parser.add_argument(
         "--pm-root", type=str, default=os.path.expanduser("~/datasets/partnet-mobility")
     )
@@ -251,21 +246,26 @@ if __name__ == "__main__":
         type=str,
         default="./data/free_floating_traj_interp_multigoals",
     )
+    parser.add_argument("--rollout-len", type=int, default=20)
     args = parser.parse_args()
     objcat = args.cat
     method = args.method
     expname = args.model
     start_ind = args.start
     in_dist = args.indist
+    rollout_dir = args.rollout_dir
     pm_root = args.pm_root
     ckpt_dir = args.ckpt_dir
     freefloat_dset = args.freefloat_dset
+    rollout_len = args.rollout_len
+    trial_len = 20
 
-    # Get which joint to open
-    full_sem_dset = pickle.load(open(SEM_CLASS_DSET_PATH, "rb"))
-    object_dict_meta = pickle.load(
-        open(f"{GOAL_INF_DSET_PATH}/{objcat}_block_dset_multi.pkl", "rb")
-    )
+    with open(SEM_CLASS_DSET_PATH, "rb") as f:
+        full_sem_dset = pickle.load(f)
+    with open(
+        os.path.join(GOAL_INF_DSET_PATH, f"{objcat}_block_dset_multi.pkl"), "rb"
+    ) as f:
+        object_dict_meta = pickle.load(f)
 
     # Get goal inference model
     ckpt_path = get_checkpoint_path(method, ckpt_dir, expname)
@@ -273,7 +273,7 @@ if __name__ == "__main__":
     bc_model.eval()
 
     # Create result directory
-    result_dir = f"rollouts/{objcat}_{method}_{expname}"
+    result_dir = f"{rollout_dir}/{objcat}_{method}_{expname}"
     if not os.path.exists(result_dir):
         print("Creating result directory for rollouts")
         os.makedirs(result_dir, exist_ok=True)
@@ -287,16 +287,15 @@ if __name__ == "__main__":
     result_dict = {}
     mp_result_dict = {}
 
-    trial_start = start_ind % 20
-    for o in tqdm(objs[start_ind // 20 :]):
+    for o in tqdm(objs[start_ind // trial_len :]):
         if objcat == "all":
             object_dict = object_dict_meta[get_category(o.split("_")[0]).lower()]
         else:
             object_dict = object_dict_meta
         # Get demo ids list
         demo_id_list = list(object_dict.keys())
-        trial = trial_start
-        while trial < 20:
+        trial = 0
+        while trial < trial_len:
             obj_id = f"{o}_{trial}"
 
             # Get GT goal position
@@ -344,7 +343,7 @@ if __name__ == "__main__":
             current_xyz = np.array([start_xyz[0], start_xyz[1], start_xyz[2]])
             exec_gifs = []
             mp_result_dict[obj_id] = [1]
-            for t in range(20):
+            for t in range(rollout_len):
                 # Obtain observation data
                 p.resetBasePositionAndOrientation(
                     obs_block_id,
@@ -437,7 +436,6 @@ if __name__ == "__main__":
             mp_res_file.close()
 
             obs_env.close()
-        trial_start = 0
 
     print("Result: \n")
     print(result_dict)

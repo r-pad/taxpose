@@ -5,26 +5,23 @@ import imageio
 import numpy as np
 import pybullet as p
 import torch
-from rpad.partnet_mobility_utils.render.pybullet import PMRenderEnv
 from scipy.spatial.transform import Rotation as R
 from tqdm import tqdm
 
 from taxpose.datasets.pm_placement import (
     GOAL_INF_DSET_PATH,
-    RAVENS_ASSETS,
     SEM_CLASS_DSET_PATH,
     get_category,
     render_input,
     subsample_pcd,
 )
-from taxpose.training.pm_baselines.dataloader_ff_interp_bc import (
-    articulate_specific_joints,
-)
 from taxpose.training.pm_baselines.flow_model import FlowNet
 from taxpose.training.pm_baselines.test_bc import (
     calculate_chamfer_dist,
+    create_test_env,
+    get_checkpoint_path,
+    get_demo,
     get_ids,
-    randomize_start_pose,
 )
 
 """
@@ -32,104 +29,7 @@ This file loads a trained goal inference model and tests the rollout using motio
 """
 
 
-def load_model(method: str, exp_name: str) -> FlowNet:
-    d = os.path.join(
-        os.getcwd(),
-        f"checkpoints/{method}/{exp_name}/",
-    )
-    ckpt = os.listdir(d)[0]
-    net: FlowNet = FlowNet.load_from_checkpoint(
-        f"{d}/{ckpt}",
-    )
-    return net
-
-
-def create_test_env(
-    root: str,
-    obj_id: str,
-    full_sem_dset: dict,
-    object_dict: dict,
-    which_goal: str,
-    freefloat_dset: str,
-):
-    # This creates the test env for observation.
-    obs_env = PMRenderEnv(
-        obj_id.split("_")[0],
-        os.path.join(root, "raw"),
-        camera_pos=[-3, 0, 1.2],
-        gui=False,
-    )
-    block = f"{RAVENS_ASSETS}/block/block.urdf"
-    obs_block_id = p.loadURDF(block, physicsClientId=obs_env.client_id, globalScaling=4)
-
-    partsem = object_dict[obj_id.split("_")[0] + f"_{which_goal}"]["partsem"]
-    if partsem != "none":
-        for mode in full_sem_dset:
-            if partsem in full_sem_dset[mode]:
-                if obj_id.split("_")[0] in full_sem_dset[mode][partsem]:
-                    move_joints = full_sem_dset[mode][partsem][obj_id.split("_")[0]]
-
-        obj_link_id = object_dict[obj_id.split("_")[0] + f"_{which_goal}"]["ind"]
-        obj_id_links_tomove = move_joints[obj_link_id]
-
-        # Open the joints.
-        articulate_specific_joints(obs_env, obj_id_links_tomove, 0.9)
-
-    randomize_start_pose(obs_block_id, obs_env)
-    return obs_env, obs_block_id
-
-
-def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict, pm_root: str):
-    # This creates the test env for demonstration.
-
-    goal_env = PMRenderEnv(
-        goal_id.split("_")[0],
-        os.path.join(pm_root, "raw"),
-        camera_pos=[-3, 0, 1.2],
-        gui=False,
-    )
-    partsem = object_dict[goal_id]["partsem"]
-
-    if partsem != "none":
-        for mode in full_sem_dset:
-            if partsem in full_sem_dset[mode]:
-                if goal_id.split("_")[0] in full_sem_dset[mode][partsem]:
-                    move_joints = full_sem_dset[mode][partsem][goal_id.split("_")[0]]
-        goal_link_id = object_dict[goal_id]["ind"]
-        goal_id_links_tomove = move_joints[goal_link_id]
-        goal_env.articulate_specific_joints(goal_id_links_tomove, 0.9)
-
-    goal_block = f"{RAVENS_ASSETS}/block/block.urdf"
-    goal_block_id = p.loadURDF(
-        goal_block, physicsClientId=goal_env.client_id, globalScaling=4
-    )
-    goal_xyz = [
-        object_dict[goal_id]["x"],
-        object_dict[goal_id]["y"],
-        object_dict[goal_id]["z"],
-    ]
-    p.resetBasePositionAndOrientation(
-        goal_block_id,
-        posObj=goal_xyz,
-        ornObj=[0, 0, 0, 1],
-        physicsClientId=goal_env.client_id,
-    )
-    P_world_goal_full, pc_seg_obj_goal_full, rgb_goal = render_input(
-        goal_block_id, goal_env
-    )
-    P_world_goal, pc_seg_obj_goal = subsample_pcd(
-        P_world_goal_full, pc_seg_obj_goal_full
-    )
-    goal_env.close()
-    return (
-        P_world_goal,
-        pc_seg_obj_goal,
-        P_world_goal_full,
-        pc_seg_obj_goal_full,
-        rgb_goal,
-    )
-
-
+@torch.no_grad()
 def predict_next_step(
     goalinf_model, P_world, obj_mask, P_world_goal, goal_mask
 ) -> np.ndarray:
@@ -150,35 +50,50 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cat", type=str)
+    parser.add_argument("--cat", type=str, required=True)
+    parser.add_argument("--model", type=str, required=True)
     parser.add_argument("--method", type=str, default="gc_traj_flow")
-    parser.add_argument("--model", type=str)
-    parser.add_argument("--postfix", type=str)
     parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--indist", type=bool, default=True)
-    parser.add_argument("--postfix", type=str)
     parser.add_argument("--rollout_dir", type=str, default="./baselines/rollouts")
-
+    parser.add_argument(
+        "--pm-root", type=str, default=os.path.expanduser("~/datasets/partnet-mobility")
+    )
+    parser.add_argument("--ckpt-dir", type=str, default="./checkpoints")
+    parser.add_argument("--results-dir", type=str, default="./results")
+    parser.add_argument(
+        "--freefloat-dset",
+        type=str,
+        default="./data/free_floating_traj_interp_multigoals",
+    )
+    parser.add_argument("--rollout-len", type=int, default=20)
     args = parser.parse_args()
     objcat = args.cat
     method = args.method
     expname = args.model
     start_ind = args.start
     in_dist = args.indist
-    postfix = args.postfix
     rollout_dir = args.rollout_dir
+    pm_root = args.pm_root
+    ckpt_dir = args.ckpt_dir
+    freefloat_dset = args.freefloat_dset
+    rollout_len = args.rollout_len
 
     # Get which joint to open
-    full_sem_dset = pickle.load(open(SEM_CLASS_DSET_PATH, "rb"))
-    object_dict_meta = pickle.load(
-        open(f"{GOAL_INF_DSET_PATH}/{objcat}_block_dset_multi.pkl", "rb")
-    )
+    with open(SEM_CLASS_DSET_PATH, "rb") as f:
+        full_sem_dset = pickle.load(f)
+    with open(
+        os.path.join(GOAL_INF_DSET_PATH, f"{objcat}_block_dset_multi.pkl"), "rb"
+    ) as f:
+        object_dict_meta = pickle.load(f)
 
     # Get goal inference model
-    bc_model = load_model(method, expname)
+    ckpt_path = get_checkpoint_path(method, ckpt_dir, expname)
+    bc_model = FlowNet.load_from_checkpoint(ckpt_path)
+    bc_model.eval()
 
     # Create result directory
-    result_dir = f"{rollout_dir}/{objcat}_{method}_{expname}_{postfix}"
+    result_dir = f"{rollout_dir}/{objcat}_{method}_{expname}"
     if not os.path.exists(result_dir):
         print("Creating result directory for rollouts")
         os.makedirs(result_dir, exist_ok=True)
@@ -211,11 +126,13 @@ if __name__ == "__main__":
                 continue
 
             # Create obs env
-            obs_env, obs_block_id, gt_goal_xyz, _, _ = create_test_env(
+            obs_env, obs_block_id, gt_goal_xyz = create_test_env(
+                pm_root,
                 obj_id,
                 full_sem_dset,
                 object_dict,
                 which_goal,
+                freefloat_dset,
             )
 
             # Log starting position
@@ -238,7 +155,7 @@ if __name__ == "__main__":
                 P_demo_full,
                 pc_demo_full,
                 rgb_goal,
-            ) = get_demo(demo_id, full_sem_dset, object_dict)
+            ) = get_demo(demo_id, full_sem_dset, object_dict, pm_root)
             P_world_full, pc_seg_obj_full, _ = render_input(obs_block_id, obs_env)
             P_world_og, pc_seg_obj_og = subsample_pcd(P_world_full, pc_seg_obj_full)
 
@@ -246,7 +163,7 @@ if __name__ == "__main__":
             current_xyz = np.array([start_xyz[0], start_xyz[1], start_xyz[2]])
             exec_gifs = []
             mp_result_dict[obj_id] = [1]
-            for t in range(60):
+            for t in range(rollout_len):
                 # Obtain observation data
                 p.resetBasePositionAndOrientation(
                     obs_block_id,
@@ -296,16 +213,15 @@ if __name__ == "__main__":
             gt_flow[~(pc_seg_obj_og == 99)] = 0
             gt_goal = P_world_og + gt_flow
 
-            chamf_dist_start = calculate_chamfer_dist(P_world_og, gt_goal)
-
             syn_flow = np.tile(current_xyz - start_xyz, (P_world_og.shape[0], 1))
             syn_flow[~(pc_seg_obj_og == 99)] = 0
             inferred_goal = P_world_og + syn_flow
 
-            chamf_dist_goal = calculate_chamfer_dist(inferred_goal, gt_goal)
+            chamf_dist_start = calculate_chamfer_dist(P_world_og, gt_goal)
             if chamf_dist_start == 0:
-                p.disconnect()
                 continue
+
+            chamf_dist_goal = calculate_chamfer_dist(inferred_goal, gt_goal)
             result_dict[obj_id] = chamf_dist_goal / chamf_dist_start
             if chamf_dist_goal / chamf_dist_start > 1:
                 result_dict[obj_id] = 1
@@ -318,7 +234,7 @@ if __name__ == "__main__":
             # key is [SUCC, NORM_DIST]
             imageio.mimsave(f"{result_dir}/vids/test_{obj_id}.gif", exec_gifs, fps=25)
             imageio.imsave(f"{result_dir}/vids/test_{obj_id}_goal.png", rgb_goal)
-            p.disconnect()
+
             mp_result_dict[obj_id].append(
                 min(
                     1,
@@ -336,6 +252,8 @@ if __name__ == "__main__":
             print(f"{obj_id}: {mp_result_dict[obj_id]}", file=mp_res_file)
             goalinf_res_file.close()
             mp_res_file.close()
+
+            obs_env.close()
 
     print("Result: \n")
     print(result_dict)
