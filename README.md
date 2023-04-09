@@ -177,7 +177,24 @@ Original code can be found here: https://github.com/anthonysimeonov/ndf_robot
 
 ### Download the data.
 
-Clone the [ndf_repo](https://github.com/anthonysimeonov/ndf_robot), and follow their instructions for downloading the full dataset.
+Clone the [ndf_repo](https://github.com/anthonysimeonov/ndf_robot), and follow their instructions for:
+* "Setup additional tools (Franka Panda inverse kinematics -- unnecessary if not using simulated robot for evaluation):"
+```
+cd pybullet-planning/pybullet_tools/ikfast/franka_panda
+python setup.py
+```
+
+* "Setup environment variables (this script must be sourced in each new terminal where code from this repository is run)"
+```
+source ndf_env.sh
+```
+
+* downloading the full dataset.
+
+```
+./scripts/download_obj_data.sh
+./scripts/download_demo_demonstrations.sh
+```
 
 Make note of the path to this directory.
 
