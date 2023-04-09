@@ -371,5 +371,6 @@ checkpoints/
 data/
 wandb/
 results/
+rollouts/
 logs/
 outputs/

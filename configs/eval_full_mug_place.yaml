@@ -1,0 +1,85 @@
+hydra:
+  run:
+    dir: ${log_dir}/${experiment}/${now:%Y-%m-%d_%H%M%S}
+  sweep:
+    dir: ${log_dir}/${experiment}/sweep/${now:%Y-%m-%d_%H%M%S}
+    subdir: ${hydra.job.num}
+
+experiment: residual_flow_test_partial_cloud_initpose
+
+#### TO BE CHANGED ####
+checkpoint_file_place_refinement: Null
+checkpoint_file_grasp_refinement: Null
+checkpoint_file_grasp: ./logs/residual_flow_occlusion/2023-04-06_160520/residual_flow_occlusion/9f8r3n07/checkpoints/epoch=825-step=103250.ckpt
+checkpoint_file_place: Null
+# log saving dir
+log_dir: ./results/ndf/mug_place
+any_pose: True # arbitray pose or not
+num_iterations: 100
+object_class: mug
+data_dir: mug_place # directory name for data saved
+#### TO BE CHANGED ####
+
+# Model Settings
+flow_compute_type: 0
+emb_nn: dgcnn
+num_points: 1024
+inital_sampling_ratio: 1
+emb_dims: 512
+
+# Dataset Settings
+dataset_index: None
+action_class: 0
+anchor_class: 1
+dataset_size: 300
+rotation_variance: 180
+translation_variance: 0.5
+batch_size: 1
+num_workers: 4
+cloud_type: init
+no_transform_applied: True
+point_loss_type: 0
+gripper_lr_label: False
+return_flow_component: False
+center_feature: True
+overfit: False
+diff_emb: True
+diff_transformer: True
+
+#### TO BE CHANGED ####
+weight_normalize_place: l1
+sigmoid_on: True
+rotation_weight: 0
+consistency_weight: 1
+smoothness_weight: 0.1
+pred_weight: True
+softmax_temperature: 1
+weight_normalize_grasp: softmax
+softmax_temperature_grasp: 0.1
+residual_on: True
+#### TO BE CHANGED ####
+
+mlp: False
+freeze_embnn: False
+return_attn: True
+rand_mesh_scale: False
+loop: 1
+init_distribution_tranform_file: Null
+
+# Loss Settings
+lr: 1e-4
+
+# Logging Settings
+image_logging_period: 100
+debug: False
+seed: 10
+pybullet_viz: False
+only_test_ids: True
+demo_exp: grasp_rim_hang_handle_gaussian_precise_w_shelf
+exp: debug_eval
+num_demo: 12
+config: base_cfg
+model_path: multi_category_weights
+n_demos: 0
+single_instance: False
+start_iteration: 0
