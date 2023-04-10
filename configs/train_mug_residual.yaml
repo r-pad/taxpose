@@ -10,22 +10,19 @@ log_dir: logs
 experiment: residual_flow_occlusion
 image_logging_period: 100
 # $task \in {mug_place, mug_grasp}
-task: mug_place
-
+defaults:
+  - task: mug_grasp
+ 
 # Dataset Settings
 dataset_root: ./data
-train_data_dir: ${dataset_root}/${task}/train_data/renders
-test_data_dir: ${dataset_root}/${task}/test_data/renders
+train_data_dir: ${dataset_root}/${task.name}/train_data/renders
+test_data_dir: ${dataset_root}/${task.name}/test_data/renders
 num_workers: 52
 batch_size: 8
 num_points: 1024
 num_demo: 10
 dataset_index: None
-action_class: 0
-anchor_class: 1
 object_type: mug
-cloud_type: teleport
-action: place
 dataset_size: 1000
 rotation_variance: 180
 translation_variance: 0.5

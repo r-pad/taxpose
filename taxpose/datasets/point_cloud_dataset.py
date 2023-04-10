@@ -74,6 +74,7 @@ class PointCloudDataset(Dataset):
             for idx in self.dataset_indices
             if idx not in self.bad_demo_id
         ]
+
         if self.num_demo is not None:
             self.filenames = self.filenames[: self.num_demo]
 
@@ -107,13 +108,15 @@ class PointCloudDataset(Dataset):
 
         num_files = len(
             fnmatch.filter(
-                os.listdir(self.dataset_root), f"**_{self.cloud_type}_obj_points.npz"
+                os.listdir(
+                    self.dataset_root), f"**_{self.cloud_type}_obj_points.npz"
             )
         )
         file_indices = [
             int(fn.split("_")[0])
             for fn in fnmatch.filter(
-                os.listdir(self.dataset_root), f"**_{self.cloud_type}_obj_points.npz"
+                os.listdir(
+                    self.dataset_root), f"**_{self.cloud_type}_obj_points.npz"
             )
         ]
         return file_indices
@@ -137,7 +140,8 @@ class PointCloudDataset(Dataset):
             num_cameras = np.random.randint(
                 low=self.min_num_cameras, high=self.max_num_cameras + 1
             )
-            sampled_camera_idxs = np.random.choice(4, num_cameras, replace=False)
+            sampled_camera_idxs = np.random.choice(
+                4, num_cameras, replace=False)
             valid_idxs = np.isin(camera_idxs, sampled_camera_idxs)
             points_raw_np = points_raw_np[valid_idxs]
             classes_raw_np = classes_raw_np[valid_idxs]
@@ -313,7 +317,8 @@ class PointCloudDataset(Dataset):
             )  # num_points, 1
             symmetric_cls = symmetric_cls.unsqueeze(-1)
             if self.action_class == 0:
-                points_action = torch.cat([points_action, symmetric_cls], axis=-1)
+                points_action = torch.cat(
+                    [points_action, symmetric_cls], axis=-1)
 
                 points_anchor = torch.cat(
                     [points_anchor, torch.ones(symmetric_cls.shape)], axis=-1
@@ -326,7 +331,8 @@ class PointCloudDataset(Dataset):
                 )
 
             elif self.anchor_class == 0:
-                points_anchor = torch.cat([points_anchor, symmetric_cls], axis=-1)
+                points_anchor = torch.cat(
+                    [points_anchor, symmetric_cls], axis=-1)
 
                 points_action = torch.cat(
                     [points_action, torch.ones(symmetric_cls.shape)], axis=-1
