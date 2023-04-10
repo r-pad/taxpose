@@ -13,7 +13,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-
+        with:
+          submodules: 'true'
       ##############################################
       # Skip caching if using a local runner.
       - uses: actions/setup-python@v4
