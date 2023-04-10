@@ -8,9 +8,9 @@ hydra:
 experiment: residual_flow_test_partial_cloud_initpose
 
 #### TO BE CHANGED ####
- 
-checkpoint_file_grasp: /home/exx/Documents/taxpose//pretrained_models/ndf/mug/upright/grasp.ckpt
-checkpoint_file_place: /home/exx/Documents/taxpose//pretrained_models/ndf/mug/upright/place.ckpt
+
+checkpoint_file_grasp: ./trained_models/ndf/upright/grasp.ckpt
+checkpoint_file_place: ./trained_models/ndf/upright/place.ckpt
 # log saving dir
 log_dir: ./results/ndf/mug_place
 any_pose: False # arbitray pose or not
