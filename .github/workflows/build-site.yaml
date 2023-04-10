@@ -33,7 +33,7 @@ jobs:
         run: pip install fvcore iopath
 
       - name: Install pytorch3d
-        run: pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py310_cu113_pyt1110/download.html
+        run: pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py39_cu113_pyt1110/download.html
 
       - name: Install Dependencies
         run: pip install -e ".[build_docs]"
