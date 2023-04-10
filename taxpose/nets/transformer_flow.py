@@ -110,8 +110,7 @@ class ResidualMLPHead(nn.Module):
             )
         else:
             self.proj_flow = nn.Sequential(
-                PointNet([emb_dims, emb_dims // 2,
-                         emb_dims // 4, emb_dims // 8]),
+                PointNet([emb_dims, emb_dims // 2, emb_dims // 4, emb_dims // 8]),
                 nn.Conv1d(emb_dims // 8, 3, kernel_size=1, bias=False),
             )
         self.pred_weight = pred_weight
@@ -146,8 +145,7 @@ class ResidualMLPHead(nn.Module):
             ) / math.sqrt(d_k)
             # W_i # B, N, N (N=number of points, 1024 cur)
             scores = torch.softmax(scores, dim=2)
-        corr_points = torch.matmul(
-            anchor_points, scores.transpose(2, 1).contiguous())
+        corr_points = torch.matmul(anchor_points, scores.transpose(2, 1).contiguous())
         # \tilde{y}_i = sum_{j}{w_ij,y_j}, - x_i  # B, 3, N
         corr_flow = corr_points - action_points
 
@@ -224,10 +222,8 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         action_points = input[0].permute(0, 2, 1)[:, :3]  # B,3,num_points
         anchor_points = input[1].permute(0, 2, 1)[:, :3]
 
-        action_points_dmean = action_points - \
-            action_points.mean(dim=2, keepdim=True)
-        anchor_points_dmean = anchor_points - \
-            anchor_points.mean(dim=2, keepdim=True)
+        action_points_dmean = action_points - action_points.mean(dim=2, keepdim=True)
+        anchor_points_dmean = anchor_points - anchor_points.mean(dim=2, keepdim=True)
         # mean center point cloud before DGCNN
         if not self.center_feature:
             action_points_dmean = action_points
@@ -248,10 +244,12 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 anchor_embedding, action_embedding
             )
         else:
-            action_embedding_tf = \
-                self.transformer_action(action_embedding, anchor_embedding)
-            anchor_embedding_tf = \
-                self.transformer_anchor(anchor_embedding, action_embedding)
+            action_embedding_tf = self.transformer_action(
+                action_embedding, anchor_embedding
+            )
+            anchor_embedding_tf = self.transformer_anchor(
+                anchor_embedding, action_embedding
+            )
             action_attn = None
             anchor_attn = None
 
@@ -271,8 +269,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 return_flow_component=self.return_flow_component,
             )
             flow_action = flow_output_action["full_flow"].permute(0, 2, 1)
-            residual_flow_action = flow_output_action["residual_flow"].permute(
-                0, 2, 1)
+            residual_flow_action = flow_output_action["residual_flow"].permute(0, 2, 1)
             corr_flow_action = flow_output_action["corr_flow"].permute(0, 2, 1)
         else:
             flow_action = self.head_action(
@@ -299,8 +296,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 residual_flow_anchor = flow_output_anchor["residual_flow"].permute(
                     0, 2, 1
                 )
-                corr_flow_anchor = flow_output_anchor["corr_flow"].permute(
-                    0, 2, 1)
+                corr_flow_anchor = flow_output_anchor["corr_flow"].permute(0, 2, 1)
             else:
                 flow_anchor = self.head_anchor(
                     anchor_embedding_tf,
@@ -317,7 +313,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                     "residual_flow_action": residual_flow_action,
                     "residual_flow_anchor": residual_flow_anchor,
                     "corr_flow_action": corr_flow_action,
-                    "corr_flow_anchor": corr_flow_anchor
+                    "corr_flow_anchor": corr_flow_anchor,
                 }
             else:
                 return flow_action, flow_anchor
@@ -325,7 +321,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             return {
                 "flow_action": flow_action,
                 "residual_flow_action": residual_flow_action,
-                "corr_flow_action": corr_flow_action
+                "corr_flow_action": corr_flow_action,
             }
         else:
             return flow_action

@@ -49,8 +49,7 @@ def random_se3(
     constrained_axix_angle = rot_ratio * axis_angle_random  # max angle is rot_var
     R = axis_angle_to_matrix(constrained_axix_angle)
     random_translation = torch.randn(N, 3, device=device)
-    translation_ratio = trans_var / \
-        torch.norm(random_translation, dim=1).max().item()
+    translation_ratio = trans_var / torch.norm(random_translation, dim=1).max().item()
     t = torch.rand(1).item() * translation_ratio * random_translation
     return Rotate(R, device=device).translate(t)
 
@@ -96,12 +95,13 @@ def pure_translation_se3(N, t, device=None):
         t: torch tensor of shape (3)
     """
     axis = torch.tensor([0, 0, 1])
-    axis_angle = 0.*axis
+    axis_angle = 0.0 * axis
     axis_angle = axis_angle.unsqueeze(0)  # (1,3)
     axis_angle = torch.repeat_interleave(axis_angle, N, dim=0)  # (N,3)
     R = axis_angle_to_matrix(axis_angle.to(device))  # identity
     assert torch.allclose(
-        torch.eye(3).to(device), R[0]), "R should be identity for pure translation se3"
+        torch.eye(3).to(device), R[0]
+    ), "R should be identity for pure translation se3"
     t = torch.repeat_interleave(t.unsqueeze(0), N, dim=0).to(device)  # N,3
     return Rotate(R, device=device).translate(t)
 
@@ -144,8 +144,7 @@ def flow2pose(
     if weights is None:
         weights = torch.ones(xyz.shape[:-1], device=xyz.device)
     if normalization_scehme == "l1":
-        w = F.normalize(weights, p=1.0, dim=-
-                        1).unsqueeze(-1)  # B, num_points, 1
+        w = F.normalize(weights, p=1.0, dim=-1).unsqueeze(-1)  # B, num_points, 1
     elif normalization_scehme == "softmax":
         softmax_operator = torch.nn.Softmax(dim=-1)
         # B, num_points, 1
@@ -226,10 +225,8 @@ def dualflow2pose(
     flow_centered_tgt = flow_tgt - flow_mean_tgt
 
     w = torch.cat([w_src, w_tgt], dim=1)
-    xyz_1 = torch.cat(
-        [xyz_centered_src, xyz_centered_tgt + flow_centered_tgt], dim=1)
-    xyz_2 = torch.cat(
-        [xyz_centered_src + flow_centered_src, xyz_centered_tgt], dim=1)
+    xyz_1 = torch.cat([xyz_centered_src, xyz_centered_tgt + flow_centered_tgt], dim=1)
+    xyz_2 = torch.cat([xyz_centered_src + flow_centered_src, xyz_centered_tgt], dim=1)
 
     X = torch.bmm(xyz_1.transpose(-2, -1), w * xyz_2)
 
@@ -407,8 +404,7 @@ def dense_flow_loss(points, flow_pred, trans_gt):
 
 
 def svd_flow_loss(points, flow_pred, points_tgt, weights_pred=None):
-    T_pred = flow2pose(points, flow_pred, weights_pred,
-                       return_transform3d=True)
+    T_pred = flow2pose(points, flow_pred, weights_pred, return_transform3d=True)
     points_pred = T_pred.transform_points(points)
     induced_flow = (points_pred - points).detach()
 

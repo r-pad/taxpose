@@ -12,7 +12,7 @@ image_logging_period: 100
 # $task \in {mug_place, mug_grasp}
 defaults:
   - task: mug_grasp
- 
+
 # Dataset Settings
 dataset_root: ./data
 train_data_dir: ${dataset_root}/${task.name}/train_data/renders
