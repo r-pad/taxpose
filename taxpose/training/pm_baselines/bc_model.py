@@ -20,7 +20,7 @@ class BCNet(pl.LightningModule):
         self.gfe_net_1 = pnp.PN2Encoder(in_dim=1, out_dim=128, p=pnp.PN2EncoderParams())
         self.lin1 = torch.nn.Linear(256, 128)
         self.lin2 = torch.nn.Linear(128, 64)
-        self.lin3 = torch.nn.Linear(64, 3)
+        self.lin3 = torch.nn.Linear(64, 7)
         self.bc_loss = nn.MSELoss()
 
     def forward(self, src_data, dst_data):  # type: ignore

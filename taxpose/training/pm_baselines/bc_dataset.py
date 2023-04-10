@@ -14,6 +14,7 @@ from rpad.core.distributed import NPSeed
 from rpad.partnet_mobility_utils.data import PMObject as PMRawData
 from rpad.partnet_mobility_utils.render.pybullet import PMRenderEnv
 from rpad.pyg.dataset import CachedByKeyDataset
+from scipy.spatial.transform import Rotation as R
 from torch_geometric.data import Data
 
 from taxpose.datasets.pm_placement import (
@@ -24,6 +25,12 @@ from taxpose.datasets.pm_placement import (
     render_input,
     subsample_pcd,
 )
+
+
+def quaternion_diff(q1, q2):
+    R1 = R.from_quat(q1).as_matrix()
+    R2 = R.from_quat(q2).as_matrix()
+    return np.linalg.inv(R1) @ R2
 
 
 def articulate_specific_joints(sim, joint_list, amount):
@@ -94,7 +101,7 @@ class GCBCDataset(tgd.Dataset):
             chunk += "_random"
         if even_sampling:
             chunk += "_even"
-        return f"goal_cond_{mode}_traj" + chunk
+        return f"taxpose_goal_cond_{mode}_traj" + chunk
 
     def len(self) -> int:
         return len(self.env_names)
@@ -118,22 +125,27 @@ class GCBCDataset(tgd.Dataset):
             block, physicsClientId=obs_env.client_id, globalScaling=4
         )
 
-        curr_xyz_p1 = traj[curr_traj_idx + 1]
         if self.mode == "bc":
-            curr_xyz = traj[curr_traj_idx]
+            curr_xyz = traj[curr_traj_idx][:3]
+            curr_xyz_p1 = traj[curr_traj_idx + 1][:3]
+            curr_rot = traj[curr_traj_idx][3:]
+            curr_rot_p1 = traj[curr_traj_idx + 1][3:]
         elif self.mode == "dagger":
+            curr_xyz_p1 = traj[curr_traj_idx + 1][:3]
+            curr_rot = traj[curr_traj_idx][3:]
+            curr_rot_p1 = traj[curr_traj_idx + 1][3:]
             bern = rng.uniform()
             if bern < 0.1:
-                curr_xyz = traj[curr_traj_idx]
+                curr_xyz = traj[curr_traj_idx][:3]
             else:
-                curr_xyz = traj[curr_traj_idx]
+                curr_xyz = traj[curr_traj_idx][:3]
                 curr_xyz = randomize_dagger(curr_xyz, curr_xyz_p1, rng)
         else:
             raise ValueError(f"Unknown mode {self.mode}")
         p.resetBasePositionAndOrientation(
             obs_block_id,
             posObj=curr_xyz,
-            ornObj=[0, 0, 0, 1],
+            ornObj=curr_rot,
             physicsClientId=obs_env.client_id,
         )
         self.raw_data[obj_id] = PMRawData(
@@ -208,10 +220,19 @@ class GCBCDataset(tgd.Dataset):
         P_world_goal, pc_seg_obj_goal = subsample_pcd(
             P_world_goal, pc_seg_obj_goal, rng
         )
-
-        action = curr_xyz_p1 - curr_xyz
-        flow = np.tile(action, (P_world.shape[0], 1))
-        flow[pc_seg_obj != 99] = [0, 0, 0]
+        action_translation = curr_xyz_p1 - curr_xyz
+        action_rotation = quaternion_diff(curr_rot, curr_rot_p1).T
+        action = np.concatenate(
+            [action_translation, R.from_matrix(action_rotation).as_quat()]
+        )
+        flowed_points = P_world[pc_seg_obj == 99] @ action_rotation
+        flowed_points = (
+            flowed_points
+            + (P_world[pc_seg_obj == 99].mean(axis=0) - flowed_points.mean(axis=0))
+            + action_translation
+        )
+        flow = np.zeros_like(P_world)
+        flow[pc_seg_obj == 99] = flowed_points - P_world[pc_seg_obj == 99]
 
         mask = (~(flow == 0.0).all(axis=-1)).astype(int)
 

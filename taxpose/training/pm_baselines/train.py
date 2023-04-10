@@ -17,7 +17,7 @@ from taxpose.training.pm_baselines.bc_dataset import (
     create_gcdagger_dataset,
 )
 from taxpose.training.pm_baselines.bc_model import BCNet
-from taxpose.training.pm_baselines.dataloader_goal_flow import create_gf_dataset
+from taxpose.training.pm_baselines.flow_dataset import create_gf_dataset
 from taxpose.training.pm_baselines.flow_model import FlowNet
 
 SEEN_CATS = [
@@ -174,7 +174,7 @@ def create_dataset(
 
 def train(
     root: str = os.path.expanduser("~/datasets/partnet-mobility"),
-    freefloat_dset: str = "./data/free_floating_traj_interp_multigoals",
+    freefloat_dset: str = "./data/free_floating_traj_interp_multigoals_rot",
     epochs: int = 100,
     model_type: str = "bc",
     even_sampling: bool = False,

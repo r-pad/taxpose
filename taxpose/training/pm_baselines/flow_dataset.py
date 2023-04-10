@@ -36,7 +36,7 @@ def get_random_action_obj(seed: NPSeed = None):
     return action_obj.urdf, action_obj.random_scale(rng)
 
 
-class GoalInfFlowNaiveDataset(tgd.Dataset):
+class GCGoalFlowDataset(tgd.Dataset):
     def __init__(
         self,
         root: str,
@@ -67,9 +67,7 @@ class GoalInfFlowNaiveDataset(tgd.Dataset):
     def processed_dir(self) -> str:
         return os.path.join(
             self.root,
-            GoalInfFlowNaiveDataset.processed_base(
-                self.randomize_camera, self.even_sampling
-            ),
+            GCGoalFlowDataset.processed_base(self.randomize_camera, self.even_sampling),
         )
 
     @staticmethod
@@ -79,7 +77,7 @@ class GoalInfFlowNaiveDataset(tgd.Dataset):
             chunk += "_random"
         if even_sampling:
             chunk += "_even"
-        return f"goal_inference_naive_multi_rotation" + chunk
+        return f"taxpose_goal_flow" + chunk
 
     def len(self) -> int:
         return len(self.env_names)
@@ -241,10 +239,10 @@ def create_gf_dataset(
     n_workers=30,
     n_proc_per_worker=2,
     seed=0,
-) -> CachedByKeyDataset[GoalInfFlowNaiveDataset]:
+) -> CachedByKeyDataset[GCGoalFlowDataset]:
     """Creates the GCBC dataset."""
     return CachedByKeyDataset(
-        dset_cls=GoalInfFlowNaiveDataset,
+        dset_cls=GCGoalFlowDataset,
         dset_kwargs={
             "root": root,
             "obj_ids": obj_ids,
@@ -254,7 +252,7 @@ def create_gf_dataset(
         },
         data_keys=obj_ids,
         root=root,
-        processed_dirname=GoalInfFlowNaiveDataset.processed_base(
+        processed_dirname=GCGoalFlowDataset.processed_base(
             randomize_camera, even_sampling
         ),
         n_repeat=n_repeat,
