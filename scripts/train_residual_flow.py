@@ -28,8 +28,8 @@ def main(cfg):
     )
 
     dm = MultiviewDataModule(
-        dataset_root=cfg.train_data_dir,
-        test_dataset_root=cfg.test_data_dir,
+        dataset_root=hydra.utils.to_absolute_path(cfg.train_data_dir),
+        test_dataset_root=hydra.utils.to_absolute_path(cfg.test_data_dir),
         dataset_index=cfg.dataset_index,
         action_class=cfg.task.action_class,
         anchor_class=cfg.task.anchor_class,
@@ -73,19 +73,25 @@ def main(cfg):
     if cfg.checkpoint_file is not None:
         print("loaded checkpoint from")
         print(cfg.checkpoint_file)
-        model.load_state_dict(torch.load(cfg.checkpoint_file)["state_dict"])
+        model.load_state_dict(
+            torch.load(hydra.utils.to_absolute_path(cfg.checkpoint_file))["state_dict"]
+        )
 
     else:
         if cfg.checkpoint_file_action is not None:
             model.model.emb_nn_action.load_state_dict(
-                torch.load(cfg.checkpoint_file_action)["embnn_state_dict"]
+                torch.load(hydra.utils.to_absolute_path(cfg.checkpoint_file_action))[
+                    "embnn_state_dict"
+                ]
             )
             print(
                 "-----------------------Pretrained EmbNN Action Model Loaded!-----------------------"
             )
         if cfg.checkpoint_file_anchor is not None:
             model.model.emb_nn_anchor.load_state_dict(
-                torch.load(cfg.checkpoint_file_anchor)["embnn_state_dict"]
+                torch.load(hydra.utils.to_absolute_path(cfg.checkpoint_file_anchor))[
+                    "embnn_state_dict"
+                ]
             )
             print(
                 "-----------------------Pretrained EmbNN Anchor Model Loaded!-----------------------"
