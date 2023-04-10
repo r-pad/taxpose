@@ -290,6 +290,9 @@ if __name__ == "__main__":
 
     trial_start = start_ind % 20
     which_goal = postfix
+    num_trials = 10
+    rollout_len = 20
+
     for o in tqdm(objs[start_ind // 20 :]):
         if objcat == "all":
             object_dict = object_dict_meta[get_category(o.split("_")[0]).lower()]
@@ -298,7 +301,7 @@ if __name__ == "__main__":
         # Get demo ids list
         demo_id_list = list(object_dict.keys())
         trial = trial_start
-        while trial < 10:
+        while trial < num_trials:
             obj_id = f"{o}_{trial}"
             skip = False
             try:
@@ -313,7 +316,7 @@ if __name__ == "__main__":
                     trial += 1
                     continue
             except FileNotFoundError:
-                skil = False
+                skip = False
 
             # Get GT goal position
 
@@ -361,17 +364,17 @@ if __name__ == "__main__":
 
             # BC POLICY ROLLOUT LOOP
             current_xyz = np.array([start_xyz[0], start_xyz[1], start_xyz[2]])
-            current_quat = np.array(
+            curr_quat = np.array(
                 [start_quat[0], start_quat[1], start_quat[2], start_quat[3]]
             )
             exec_gifs = []
             mp_result_dict[obj_id] = [1]
-            for t in range(20):
+            for t in range(rollout_len):
                 # Obtain observation data
                 p.resetBasePositionAndOrientation(
                     obs_block_id,
                     posObj=current_xyz,
-                    ornObj=current_quat,
+                    ornObj=curr_quat,
                     physicsClientId=obs_env.client_id,
                 )
                 collision_counter = len(
@@ -403,7 +406,7 @@ if __name__ == "__main__":
                         P_world_demo,
                         0 * (pc_seg_obj_demo == 99),
                         current_xyz,
-                        current_quat,
+                        curr_quat,
                     )
                     pred_action_tr = pred_action_tr.reshape(
                         -1,
@@ -423,10 +426,6 @@ if __name__ == "__main__":
             gt_flow = np.tile(gt_goal_xyz - start_xyz, (P_world_og.shape[0], 1))
             gt_flow[~(pc_seg_obj_og == 99)] = 0
             gt_goal = P_world_og + gt_flow
-
-            syn_flow = np.tile(current_xyz - start_xyz, (P_world_og.shape[0], 1))
-            syn_flow[~(pc_seg_obj_og == 99)] = 0
-            inferred_goal = P_world_og + syn_flow
 
             start_trans_dist = np.linalg.norm(start_xyz - gt_goal_xyz)
             end_trans_dist = np.linalg.norm(current_xyz - gt_goal_xyz)
@@ -476,7 +475,6 @@ if __name__ == "__main__":
             print(f"{obj_id}: {mp_result_dict[obj_id]}", file=mp_res_file)
             goalinf_res_file.close()
             mp_res_file.close()
-        trial_start = 0
 
     print("Result: \n")
     print(result_dict)

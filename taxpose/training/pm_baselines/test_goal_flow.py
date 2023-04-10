@@ -378,7 +378,7 @@ if __name__ == "__main__":
             except IndexError:
                 breakpoint()
             current_xyz = np.array([start_xyz[0], start_xyz[1], start_xyz[2]])
-            current_quat = np.array(
+            curr_quat = np.array(
                 [start_quat[0], start_quat[1], start_quat[2], start_quat[3]]
             )
             if not isflow:
@@ -392,14 +392,14 @@ if __name__ == "__main__":
             current_xyz = current_xyz + pred_t.reshape(
                 3,
             )
-            current_quat = quaternion_sum(current_quat, R.from_matrix(pred_R).as_quat())
-            current_quat = R.from_matrix(current_quat).as_quat()
+            curr_quat = quaternion_sum(curr_quat, R.from_matrix(pred_R).as_quat())
+            curr_quat = R.from_matrix(curr_quat).as_quat()
 
             if isflow:
                 start_trans_dist = np.linalg.norm(start_xyz - gt_goal_xyz)
                 end_trans_dist = np.linalg.norm(current_xyz - gt_goal_xyz)
                 A = R.from_quat([0, 0, 0, 1]).as_matrix()
-                B = R.from_quat(current_quat).as_matrix()
+                B = R.from_quat(curr_quat).as_matrix()
 
                 end_rot_dist = np.arccos((np.trace(A.T @ B) - 1) / 2) * 360 / 2 / np.pi
 
@@ -412,7 +412,7 @@ if __name__ == "__main__":
                 start_trans_dist = np.linalg.norm(start_xyz - gt_goal_xyz)
                 end_trans_dist = np.linalg.norm(current_xyz - gt_goal_xyz)
                 A = R.from_quat([0, 0, 0, 1]).as_matrix()
-                B = R.from_quat(current_quat).as_matrix()
+                B = R.from_quat(curr_quat).as_matrix()
 
                 end_rot_dist = np.arccos((np.trace(A.T @ B) - 1) / 2) * 360 / 2 / np.pi
 

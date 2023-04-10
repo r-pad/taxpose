@@ -1,4 +1,3 @@
-import json
 import os
 import pickle
 
@@ -6,132 +5,21 @@ import imageio
 import numpy as np
 import pybullet as p
 import torch
-from chamferdist import ChamferDistance
-from rpad.partnet_mobility_utils.render.pybullet import PMRenderEnv
 from scipy.spatial.transform import Rotation as R
 from tqdm import tqdm
 
-from taxpose.datasets.pm_placement import (
-    SEEN_CATS,
-    UNSEEN_CATS,
-    get_category,
-    get_dataset_ids_all,
-    render_input,
-    subsample_pcd,
-)
+from taxpose.datasets.pm_placement import get_category, render_input, subsample_pcd
 from taxpose.training.pm_baselines.flow_model import FlowNet as TrajFlowNet
-from taxpose.training.pm_baselines.test_bc import create_test_env, quaternion_sum
+from taxpose.training.pm_baselines.test_bc import (
+    create_test_env,
+    get_demo,
+    get_ids,
+    quaternion_sum,
+)
 
 """
 This file loads a trained goal inference model and tests the rollout using motion planning in simulation.
 """
-
-
-def get_ids(cat):
-    if cat != "All":
-        split_file = json.load(
-            open(os.path.expanduser("~/umpnet/mobility_dataset/split-full.json"))
-        )
-        res = []
-        for mode in split_file:
-            if cat in split_file[mode]:
-                res += split_file[mode][cat]["train"]
-                res += split_file[mode][cat]["test"]
-        return res
-    else:
-        _, val_res, unseen_res = get_dataset_ids_all(SEEN_CATS, UNSEEN_CATS)
-        return val_res + unseen_res
-
-
-def load_model(method: str, exp_name: str) -> TrajFlowNet:
-    d = os.path.join(
-        os.getcwd(),
-        f"checkpoints/{method}/{exp_name}/",
-    )
-    ckpt = os.listdir(d)[0]
-    net: TrajFlowNet = TrajFlowNet.load_from_checkpoint(
-        f"{d}/{ckpt}",
-    ).cuda()
-    return net
-
-
-def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
-    # This creates the test env for demonstration.
-
-    goal_env = PMRenderEnv(
-        goal_id.split("_")[0],
-        os.path.expanduser("~/partnet-mobility/raw"),
-        camera_pos=[-3, 0, 1.2],
-        gui=False,
-    )
-    partsem = object_dict[goal_id]["partsem"]
-
-    if partsem != "none":
-        for mode in full_sem_dset:
-            if partsem in full_sem_dset[mode]:
-                if goal_id.split("_")[0] in full_sem_dset[mode][partsem]:
-                    move_joints = full_sem_dset[mode][partsem][goal_id.split("_")[0]]
-        goal_link_id = object_dict[goal_id]["ind"]
-        goal_id_links_tomove = move_joints[goal_link_id]
-        goal_env.articulate_specific_joints(goal_id_links_tomove, 0.9)
-
-    goal_block = os.path.expanduser(
-        "/home/harry/discriminative_embeddings/third_party/ravens/ravens/environments/assets/block/block.urdf"
-    )
-    goal_block_id = p.loadURDF(
-        goal_block, physicsClientId=goal_env.client_id, globalScaling=4
-    )
-    goal_xyz = [
-        object_dict[goal_id]["x"],
-        object_dict[goal_id]["y"],
-        object_dict[goal_id]["z"],
-    ]
-    p.resetBasePositionAndOrientation(
-        goal_block_id,
-        posObj=goal_xyz,
-        ornObj=[0, 0, 0, 1],
-        physicsClientId=goal_env.client_id,
-    )
-    P_world_goal_full, pc_seg_obj_goal_full, rgb_goal = render_input(
-        goal_block_id, goal_env
-    )
-    P_world_goal, pc_seg_obj_goal = subsample_pcd(
-        P_world_goal_full, pc_seg_obj_goal_full
-    )
-    return (
-        P_world_goal,
-        pc_seg_obj_goal,
-        P_world_goal_full,
-        pc_seg_obj_goal_full,
-        rgb_goal,
-    )
-
-
-def calculate_chamfer_dist(inferred_goal, gt_goal):
-    # This calculates the chamfer distance between inferred and GT goal.
-    chamferDist = ChamferDistance()
-    source_pcd = torch.from_numpy(inferred_goal[np.newaxis, :]).cuda()
-    target_pcd = torch.from_numpy(gt_goal[np.newaxis, :]).cuda()
-    assert len(source_pcd.shape) == 3
-    assert len(target_pcd.shape) == 3
-    dist = chamferDist(source_pcd, target_pcd).cpu().item()
-    return dist
-
-
-def predict_next_step(
-    goalinf_model, P_world, obj_mask, P_world_goal, goal_mask
-) -> np.ndarray:
-    # This infers the goal using the goalinf_modem obs PCD (P_world), and demo PCD (P_world_goal)
-    pred_act = goalinf_model.predict(
-        torch.from_numpy(P_world).float(),
-        torch.from_numpy(obj_mask).float(),
-        torch.from_numpy(P_world_goal).float(),
-        torch.from_numpy(goal_mask).float(),
-    )
-    pred_flow = pred_act.cpu().numpy()
-    pred_flow[~obj_mask] = 0
-    inferred_next_step: np.ndarray = pred_flow
-    return inferred_next_step
 
 
 def rigid_transform_3D(A, B):
@@ -176,6 +64,34 @@ def rigid_transform_3D(A, B):
     t = -R @ centroid_A + centroid_B
 
     return R, t
+
+
+def load_model(method: str, exp_name: str) -> TrajFlowNet:
+    d = os.path.join(
+        os.getcwd(),
+        f"checkpoints/{method}/{exp_name}/",
+    )
+    ckpt = os.listdir(d)[0]
+    net: TrajFlowNet = TrajFlowNet.load_from_checkpoint(
+        f"{d}/{ckpt}",
+    )
+    return net.cuda()
+
+
+def predict_next_step(
+    goalinf_model, P_world, obj_mask, P_world_goal, goal_mask
+) -> np.ndarray:
+    # This infers the goal using the goalinf_modem obs PCD (P_world), and demo PCD (P_world_goal)
+    pred_act = goalinf_model.predict(
+        torch.from_numpy(P_world).float(),
+        torch.from_numpy(obj_mask).float(),
+        torch.from_numpy(P_world_goal).float(),
+        torch.from_numpy(goal_mask).float(),
+    )
+    pred_flow = pred_act.cpu().numpy()
+    pred_flow[~obj_mask] = 0
+    inferred_next_step: np.ndarray = pred_flow
+    return inferred_next_step
 
 
 if __name__ == "__main__":
@@ -231,7 +147,11 @@ if __name__ == "__main__":
 
     result_dict = {}
     mp_result_dict = {}
+
+    trial_start = start_ind % 20
     which_goal = postfix
+    num_trials = 8
+    rollout_len = 60
 
     for o in tqdm(objs[start_ind // 20 :]):
         if objcat == "all":
@@ -240,8 +160,8 @@ if __name__ == "__main__":
             object_dict = object_dict_meta
         # Get demo ids list
         demo_id_list = list(object_dict.keys())
-        trial = 0
-        while trial < 8:
+        trial = trial_start
+        while trial < num_trials:
             obj_id = f"{o}_{trial}"
             skip = False
             try:
@@ -262,10 +182,10 @@ if __name__ == "__main__":
 
             demo_id = np.random.choice(demo_id_list)
             demo_id = f"{demo_id.split('_')[0]}_{which_goal}"
-            if demo_id == "7263_1":
-                continue
             if demo_id not in demo_id_list:
                 trial += 1
+                continue
+            if demo_id == "7263_1":
                 continue
             gt_goal_xyz = [
                 object_dict[f"{o}_{which_goal}"]["x"],
@@ -304,17 +224,17 @@ if __name__ == "__main__":
 
             # BC POLICY ROLLOUT LOOP
             current_xyz = np.array([start_xyz[0], start_xyz[1], start_xyz[2]])
-            current_quat = np.array(
+            curr_quat = np.array(
                 [start_quat[0], start_quat[1], start_quat[2], start_quat[3]]
             )
             exec_gifs = []
             mp_result_dict[obj_id] = [1]
-            for t in range(60):
+            for t in range(rollout_len):
                 # Obtain observation data
                 p.resetBasePositionAndOrientation(
                     obs_block_id,
                     posObj=current_xyz,
-                    ornObj=current_quat,
+                    ornObj=curr_quat,
                     physicsClientId=obs_env.client_id,
                 )
                 collision_counter = len(
@@ -356,10 +276,10 @@ if __name__ == "__main__":
                     current_xyz = current_xyz + pred_t.reshape(
                         3,
                     )
-                    current_quat = quaternion_sum(
-                        current_quat, R.from_matrix(pred_R).as_quat()
+                    curr_quat = quaternion_sum(
+                        curr_quat, R.from_matrix(pred_R).as_quat()
                     )
-                    current_quat = R.from_matrix(current_quat).as_quat()
+                    curr_quat = R.from_matrix(curr_quat).as_quat()
 
                 if np.linalg.norm(current_xyz - gt_goal_xyz) <= 5e-2:
                     break
@@ -381,7 +301,7 @@ if __name__ == "__main__":
             # )
 
             A = R.from_quat([0, 0, 0, 1]).as_matrix()
-            B = R.from_quat(current_quat).as_matrix()
+            B = R.from_quat(curr_quat).as_matrix()
 
             end_rot_dist = np.arccos((np.trace(A.T @ B) - 1) / 2) * 360 / 2 / np.pi
 
@@ -390,6 +310,7 @@ if __name__ == "__main__":
                 end_trans_dist / start_trans_dist,
                 end_rot_dist,
             ]
+
             trial += 1
 
             # Initialize mp result logging
