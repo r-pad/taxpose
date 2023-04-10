@@ -110,7 +110,8 @@ class ResidualMLPHead(nn.Module):
             )
         else:
             self.proj_flow = nn.Sequential(
-                PointNet([emb_dims, emb_dims // 2, emb_dims // 4, emb_dims // 8]),
+                PointNet([emb_dims, emb_dims // 2,
+                         emb_dims // 4, emb_dims // 8]),
                 nn.Conv1d(emb_dims // 8, 3, kernel_size=1, bias=False),
             )
         self.pred_weight = pred_weight
@@ -145,7 +146,8 @@ class ResidualMLPHead(nn.Module):
             ) / math.sqrt(d_k)
             # W_i # B, N, N (N=number of points, 1024 cur)
             scores = torch.softmax(scores, dim=2)
-        corr_points = torch.matmul(anchor_points, scores.transpose(2, 1).contiguous())
+        corr_points = torch.matmul(
+            anchor_points, scores.transpose(2, 1).contiguous())
         # \tilde{y}_i = sum_{j}{w_ij,y_j}, - x_i  # B, 3, N
         corr_flow = corr_points - action_points
 
@@ -181,11 +183,10 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         emb_nn="dgcnn",
         return_flow_component=False,
         center_feature=False,
-        inital_sampling_ratio=0.2,
         pred_weight=True,
         residual_on=True,
         freeze_embnn=False,
-        use_transformer_attention=True,
+        return_attn=True,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.emb_dims = emb_dims
@@ -200,13 +201,13 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.pred_weight = pred_weight
         self.residual_on = residual_on
         self.freeze_embnn = freeze_embnn
-        self.use_transformer_attention = use_transformer_attention
+        self.return_attn = return_attn
 
         self.transformer_action = CustomTransformer(
-            emb_dims=emb_dims, return_attn=True, bidirectional=False
+            emb_dims=emb_dims, return_attn=self.return_attn, bidirectional=False
         )
         self.transformer_anchor = CustomTransformer(
-            emb_dims=emb_dims, return_attn=True, bidirectional=False
+            emb_dims=emb_dims, return_attn=self.return_attn, bidirectional=False
         )
         self.head_action = ResidualMLPHead(
             emb_dims=emb_dims,
@@ -223,8 +224,10 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         action_points = input[0].permute(0, 2, 1)[:, :3]  # B,3,num_points
         anchor_points = input[1].permute(0, 2, 1)[:, :3]
 
-        action_points_dmean = action_points - action_points.mean(dim=2, keepdim=True)
-        anchor_points_dmean = anchor_points - anchor_points.mean(dim=2, keepdim=True)
+        action_points_dmean = action_points - \
+            action_points.mean(dim=2, keepdim=True)
+        anchor_points_dmean = anchor_points - \
+            anchor_points.mean(dim=2, keepdim=True)
         # mean center point cloud before DGCNN
         if not self.center_feature:
             action_points_dmean = action_points
@@ -237,21 +240,27 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
 
         # tilde_phi, phi are both B,512,N
-        action_embedding_tf, action_attn = self.transformer_action(
-            action_embedding, anchor_embedding
-        )
-        anchor_embedding_tf, anchor_attn = self.transformer_anchor(
-            anchor_embedding, action_embedding
-        )
+        if self.return_attn:
+            action_embedding_tf, action_attn = self.transformer_action(
+                action_embedding, anchor_embedding
+            )
+            anchor_embedding_tf, anchor_attn = self.transformer_anchor(
+                anchor_embedding, action_embedding
+            )
+        else:
+            action_embedding_tf = \
+                self.transformer_action(action_embedding, anchor_embedding)
+            anchor_embedding_tf = \
+                self.transformer_anchor(anchor_embedding, action_embedding)
+            action_attn = None
+            anchor_attn = None
 
         action_embedding_tf = action_embedding + action_embedding_tf
         anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
 
-        if not self.use_transformer_attention:
-            action_attn = None
-            anchor_attn = None
+        if action_attn is not None:
+            action_attn = action_attn.mean(dim=1)
 
-        action_attn = action_attn.mean(dim=1)
         if self.return_flow_component:
             flow_output_action = self.head_action(
                 action_embedding_tf,
@@ -262,7 +271,8 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 return_flow_component=self.return_flow_component,
             )
             flow_action = flow_output_action["full_flow"].permute(0, 2, 1)
-            residual_flow_action = flow_output_action["residual_flow"].permute(0, 2, 1)
+            residual_flow_action = flow_output_action["residual_flow"].permute(
+                0, 2, 1)
             corr_flow_action = flow_output_action["corr_flow"].permute(0, 2, 1)
         else:
             flow_action = self.head_action(
@@ -289,7 +299,8 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 residual_flow_anchor = flow_output_anchor["residual_flow"].permute(
                     0, 2, 1
                 )
-                corr_flow_anchor = flow_output_anchor["corr_flow"].permute(0, 2, 1)
+                corr_flow_anchor = flow_output_anchor["corr_flow"].permute(
+                    0, 2, 1)
             else:
                 flow_anchor = self.head_anchor(
                     anchor_embedding_tf,
@@ -306,13 +317,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                     "residual_flow_action": residual_flow_action,
                     "residual_flow_anchor": residual_flow_anchor,
                     "corr_flow_action": corr_flow_action,
-                    "corr_flow_anchor": corr_flow_anchor,
-                    "action_attn": action_attn,
-                    "anchor_attn": anchor_attn,
-                    "corr_points_action": flow_output_action["corr_points"],
-                    "scores_action": flow_output_action["scores"],
-                    "corr_points_anchor": flow_output_anchor["corr_points"],
-                    "scores_anchor": flow_output_anchor["scores"],
+                    "corr_flow_anchor": corr_flow_anchor
                 }
             else:
                 return flow_action, flow_anchor
@@ -320,10 +325,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             return {
                 "flow_action": flow_action,
                 "residual_flow_action": residual_flow_action,
-                "corr_flow_action": corr_flow_action,
-                "action_attn": action_attn,
-                "corr_points_action": flow_output_action["corr_points"],
-                "scores_action": flow_output_action["scores"],
+                "corr_flow_action": corr_flow_action
             }
         else:
             return flow_action

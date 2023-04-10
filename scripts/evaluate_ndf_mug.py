@@ -1,34 +1,14 @@
 """This is a fork of https://github.com/anthonysimeonov/ndf_robot/blob/master/src/ndf_robot/eval/evaluate_ndf.py"""
 
-import os
-import os.path as osp
-import random
-import signal
-import time
-from pathlib import Path
-
-# Gotta do some path hacking to convince ndf_robot to work.
-NDF_ROOT = Path(__file__).parent.parent / "third_party" / "ndf_robot"
-os.environ["NDF_SOURCE_DIR"] = str(NDF_ROOT / "src" / "ndf_robot")
-os.environ["PB_PLANNING_SOURCE_DIR"] = str(NDF_ROOT / "pybullet-planning")
-
-import hydra
-import numpy as np
-import pybullet as p
-import pytorch_lightning as pl
-import torch
-from airobot import Robot, log_info, log_warn, set_log_level
-from airobot.utils import common
-from airobot.utils.common import euler2quat
-from ndf_robot.config.default_eval_cfg import get_eval_cfg_defaults
-from ndf_robot.config.default_obj_cfg import get_obj_cfg_defaults
-from ndf_robot.robot.multicam import MultiCams
-from ndf_robot.share.globals import (
-    bad_shapenet_bottles_ids_list,
-    bad_shapenet_bowls_ids_list,
-    bad_shapenet_mug_ids_list,
+from taxpose.utils.se3 import pure_translation_se3
+from taxpose.utils.ndf_sim_utils import get_clouds, get_object_clouds
+from taxpose.training.flow_equivariance_training_module_nocentering_eval_init import (
+    EquivarianceTestingModule,
 )
-from ndf_robot.utils import path_util, util
+from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
+from pytorch3d.ops import sample_farthest_points
+from ndf_robot.utils.util import np2img
+from ndf_robot.utils.franka_ik import FrankaIK
 from ndf_robot.utils.eval_gen_utils import (
     constraint_grasp_close,
     constraint_grasp_open,
@@ -43,31 +23,34 @@ from ndf_robot.utils.eval_gen_utils import (
     safeRemoveConstraint,
     soft_grasp_close,
 )
-from ndf_robot.utils.franka_ik import FrankaIK
-from ndf_robot.utils.util import np2img
-from pytorch3d.ops import sample_farthest_points
-
-from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
-from taxpose.training.flow_equivariance_training_module_nocentering_eval_init import (
-    EquivarianceTestingModule,
+from ndf_robot.utils import path_util, util
+from ndf_robot.share.globals import (
+    bad_shapenet_bottles_ids_list,
+    bad_shapenet_bowls_ids_list,
+    bad_shapenet_mug_ids_list,
 )
-from taxpose.utils.ndf_sim_utils import get_clouds, get_object_clouds
-from taxpose.utils.se3 import pure_translation_se3
+from ndf_robot.robot.multicam import MultiCams
+from ndf_robot.config.default_obj_cfg import get_obj_cfg_defaults
+from ndf_robot.config.default_eval_cfg import get_eval_cfg_defaults
+from airobot.utils.common import euler2quat
+from airobot.utils import common
+from airobot import Robot, log_info, log_warn, set_log_level
+import torch
+import pytorch_lightning as pl
+import pybullet as p
+import numpy as np
+import hydra
+import os
+import os.path as osp
+import random
+import signal
+import time
+from pathlib import Path
 
-# Some original imports with different variations.
-# from taxpose.nets.transformer_flow import (
-# CorrespondenceFlow_DiffEmbMLP,
-# ResidualFlow,
-# ResidualFlow_Correspondence,
-# ResidualFlow_DiffEmb,
-# ResidualFlow_DiffEmbTransformer,
-# ResidualFlow_Identity,
-# ResidualFlow_PE,
-# ResidualFlow_V1,
-# ResidualFlow_V2,
-# ResidualFlow_V3,
-# ResidualFlow_V4,
-# )
+# Gotta do some path hacking to convince ndf_robot to work.
+NDF_ROOT = Path(__file__).parent.parent / "third_party" / "ndf_robot"
+os.environ["NDF_SOURCE_DIR"] = str(NDF_ROOT / "src" / "ndf_robot")
+os.environ["PB_PLANNING_SOURCE_DIR"] = str(NDF_ROOT / "pybullet-planning")
 
 
 def get_world_transform(pred_T_action_mat, obj_start_pose, point_cloud, invert=False):
@@ -90,7 +73,8 @@ def get_world_transform(pred_T_action_mat, obj_start_pose, point_cloud, invert=F
     centered_pose = util.transform_pose(
         pose_source=obj_start_pose, pose_transform=centering_pose
     )  # obj_start_pose: stamped_pose
-    trans_pose = util.transform_pose(pose_source=centered_pose, pose_transform=pose)
+    trans_pose = util.transform_pose(
+        pose_source=centered_pose, pose_transform=pose)
     final_pose = util.transform_pose(
         pose_source=trans_pose, pose_transform=uncentering_pose
     )
@@ -117,7 +101,8 @@ def load_data(num_points, clouds, classes, action_class, anchor_class):
     points_action = torch.from_numpy(points_action_np).float().unsqueeze(0)
     points_anchor = torch.from_numpy(points_anchor_np).float().unsqueeze(0)
 
-    points_action, points_anchor = subsample(num_points, points_action, points_anchor)
+    points_action, points_anchor = subsample(
+        num_points, points_action, points_anchor)
 
     return points_action.cuda(), points_anchor.cuda()
 
@@ -133,7 +118,8 @@ def load_data_raw(num_points, clouds, classes, action_class, anchor_class):
     points_action = torch.from_numpy(points_action_np).float().unsqueeze(0)
     points_anchor = torch.from_numpy(points_anchor_np).float().unsqueeze(0)
 
-    points_action, points_anchor = subsample(num_points, points_action, points_anchor)
+    points_action, points_anchor = subsample(
+        num_points, points_action, points_anchor)
     if points_action is None:
         return None, None
 
@@ -191,7 +177,6 @@ def main(hydra_cfg):
         os.makedirs(save_dir)
 
     eval_data_dir = hydra_cfg.data_dir
-    txt_file_name = "{}.txt".format(eval_data_dir)
     obj_class = hydra_cfg.object_class
     shapenet_obj_dir = osp.join(
         path_util.get_ndf_obj_descriptions(), obj_class + "_centered_obj_normalized"
@@ -246,7 +231,8 @@ def main(hydra_cfg):
     if osp.exists(config_fname):
         cfg.merge_from_file(config_fname)
     else:
-        log_info("Config file %s does not exist, using defaults" % config_fname)
+        log_info("Config file %s does not exist, using defaults" %
+                 config_fname)
     cfg.freeze()
 
     # object specific configs
@@ -267,7 +253,8 @@ def main(hydra_cfg):
     util.safe_makedirs(eval_teleport_imgs_dir)
 
     test_shapenet_ids = np.loadtxt(
-        osp.join(path_util.get_ndf_share(), "%s_test_object_split.txt" % obj_class),
+        osp.join(path_util.get_ndf_share(),
+                 "%s_test_object_split.txt" % obj_class),
         dtype=str,
     ).tolist()
     if obj_class == "mug":
@@ -292,7 +279,8 @@ def main(hydra_cfg):
     table_z = cfg.TABLE_Z
 
     preplace_horizontal_tf_list = cfg.PREPLACE_HORIZONTAL_OFFSET_TF
-    preplace_horizontal_tf = util.list2pose_stamped(cfg.PREPLACE_HORIZONTAL_OFFSET_TF)
+    preplace_horizontal_tf = util.list2pose_stamped(
+        cfg.PREPLACE_HORIZONTAL_OFFSET_TF)
     preplace_offset_tf = util.list2pose_stamped(cfg.PREPLACE_OFFSET_TF)
 
     if cfg.DEMOS.PLACEMENT_SURFACE == "shelf":
@@ -482,83 +470,19 @@ def main(hydra_cfg):
     def show_link(obj_id, link_id, color):
         if link_id is not None:
             p.changeVisualShape(obj_id, link_id, rgbaColor=color)
-
-    viz_data_list = []
-
     pl.seed_everything(hydra_cfg.seed)
 
-    if hydra_cfg.flow_compute_type == 0:
-        if hydra_cfg.diff_emb:
-            if hydra_cfg.diff_transformer:
-                if hydra_cfg.mlp:
-                    raise ValueError("model version is not included in the release")
-                    # network = CorrespondenceFlow_DiffEmbMLP(
-                    #     emb_dims=hydra_cfg.emb_dims,
-                    #     emb_nn=hydra_cfg.emb_nn,
-                    #     center_feature=hydra_cfg.center_feature,
-                    #     inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                    # )
-                else:
-                    network = ResidualFlow_DiffEmbTransformer(
-                        emb_dims=hydra_cfg.emb_dims,
-                        emb_nn=hydra_cfg.emb_nn,
-                        center_feature=hydra_cfg.center_feature,
-                        inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                        pred_weight=hydra_cfg.pred_weight,
-                        residual_on=hydra_cfg.residual_on,
-                        return_flow_component=hydra_cfg.return_flow_component,
-                        freeze_embnn=hydra_cfg.freeze_embnn,
-                        return_attn=hydra_cfg.return_attn,
-                        input_dims=3,
-                    )
-            else:
-                raise ValueError("model version is not included in the release")
-                # network = ResidualFlow_DiffEmb(
-                #     emb_nn=hydra_cfg.emb_nn,
-                #     return_flow_component=hydra_cfg.return_flow_component,
-                #     center_feature=hydra_cfg.center_feature,
-                #     inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                # )
-        else:
-            raise ValueError("model version is not included in the release")
-            # network = ResidualFlow(
-            #     emb_nn=hydra_cfg.emb_nn,
-            #     return_flow_component=hydra_cfg.return_flow_component,
-            #     center_feature=hydra_cfg.center_feature,
-            # )
-    elif hydra_cfg.flow_compute_type == 1:
-        raise ValueError("model version is not included in the release")
-        # network = ResidualFlow_V1(
-        #     emb_nn=hydra_cfg.emb_nn,
-        #     return_flow_component=hydra_cfg.return_flow_component,
-        # )
-    elif hydra_cfg.flow_compute_type == 2:
-        raise ValueError("model version is not included in the release")
-        # network = ResidualFlow_V2(
-        #     emb_nn=hydra_cfg.emb_nn,
-        #     return_flow_component=hydra_cfg.return_flow_component,
-        # )
-    elif hydra_cfg.flow_compute_type == 3:
-        raise ValueError("model version is not included in the release")
-        # network = ResidualFlow_V3(
-        #     emb_nn=hydra_cfg.emb_nn,
-        #     return_flow_component=hydra_cfg.return_flow_component,
-        # )
-    elif hydra_cfg.flow_compute_type == 4:
-        raise ValueError("model version is not included in the release")
-        # network = ResidualFlow_V4(
-        #     emb_nn=hydra_cfg.emb_nn,
-        #     return_flow_component=hydra_cfg.return_flow_component,
-        # )
-    elif hydra_cfg.flow_compute_type == 5:
-        raise ValueError("model version is not included in the release")
-        # network = ResidualFlow_Correspondence(emb_nn=hydra_cfg.emb_nn)
-    elif hydra_cfg.flow_compute_type == 6:
-        raise ValueError("model version is not included in the release")
-        # network = ResidualFlow_Identity(emb_nn=hydra_cfg.emb_nn)
-    elif hydra_cfg.flow_compute_type == "pe":
-        raise ValueError("model version is not included in the release")
-        # network = ResidualFlow_PE(emb_nn=hydra_cfg.emb_nn)
+    network = ResidualFlow_DiffEmbTransformer(
+        emb_dims=hydra_cfg.emb_dims,
+        emb_nn=hydra_cfg.emb_nn,
+        center_feature=hydra_cfg.center_feature,
+        pred_weight=hydra_cfg.pred_weight,
+        residual_on=hydra_cfg.residual_on,
+        return_flow_component=hydra_cfg.return_flow_component,
+        freeze_embnn=hydra_cfg.freeze_embnn,
+        return_attn=hydra_cfg.return_attn
+    )
+
     place_model = EquivarianceTestingModule(
         network,
         lr=hydra_cfg.lr,
@@ -574,149 +498,7 @@ def main(hydra_cfg):
             torch.load(hydra_cfg.checkpoint_file_place)["state_dict"]
         )
         log_info("Model Loaded from " + str(hydra_cfg.checkpoint_file_place))
-    if hydra_cfg.checkpoint_file_place_refinement is not None:
-        if hydra_cfg.flow_compute_type == 0:
-            if hydra_cfg.diff_emb:
-                if hydra_cfg.diff_transformer:
-                    if hydra_cfg.mlp:
-                        network = CorrespondenceFlow_DiffEmbMLP(
-                            emb_dims=hydra_cfg.emb_dims,
-                            emb_nn=hydra_cfg.emb_nn,
-                            center_feature=hydra_cfg.center_feature,
-                            inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                        )
-                    else:
-                        network = ResidualFlow_DiffEmbTransformer(
-                            emb_dims=hydra_cfg.emb_dims,
-                            emb_nn=hydra_cfg.emb_nn,
-                            center_feature=hydra_cfg.center_feature,
-                            inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                            pred_weight=hydra_cfg.pred_weight,
-                            residual_on=hydra_cfg.residual_on,
-                            return_flow_component=hydra_cfg.return_flow_component,
-                            freeze_embnn=hydra_cfg.freeze_embnn,
-                            return_attn=hydra_cfg.return_attn,
-                            input_dims=3,
-                        )
-                else:
-                    network = ResidualFlow_DiffEmb(
-                        emb_nn=hydra_cfg.emb_nn,
-                        return_flow_component=hydra_cfg.return_flow_component,
-                        center_feature=hydra_cfg.center_feature,
-                        inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                    )
-            else:
-                network = ResidualFlow(
-                    emb_nn=hydra_cfg.emb_nn,
-                    return_flow_component=hydra_cfg.return_flow_component,
-                    center_feature=hydra_cfg.center_feature,
-                )
-        elif hydra_cfg.flow_compute_type == 1:
-            network = ResidualFlow_V1(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 2:
-            network = ResidualFlow_V2(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 3:
-            network = ResidualFlow_V3(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 4:
-            network = ResidualFlow_V4(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 5:
-            network = ResidualFlow_Correspondence(emb_nn=hydra_cfg.emb_nn)
-        elif hydra_cfg.flow_compute_type == 6:
-            network = ResidualFlow_Identity(emb_nn=hydra_cfg.emb_nn)
-        elif hydra_cfg.flow_compute_type == "pe":
-            network = ResidualFlow_PE(emb_nn=hydra_cfg.emb_nn)
-        place_model_refinement = EquivarianceTestingModule(
-            network,
-            lr=hydra_cfg.lr,
-            image_log_period=hydra_cfg.image_logging_period,
-            weight_normalize=hydra_cfg.weight_normalize_place,
-            loop=hydra_cfg.loop,
-        )
 
-        place_model_refinement.cuda()
-
-        place_model_refinement.load_state_dict(
-            torch.load(hydra_cfg.checkpoint_file_place_refinement)["state_dict"]
-        )
-        log_info(
-            "Place Refinement Model Loaded from "
-            + str(hydra_cfg.checkpoint_file_place_refinement)
-        )
-
-    if hydra_cfg.flow_compute_type == 0:
-        if hydra_cfg.diff_emb:
-            if hydra_cfg.diff_transformer:
-                if hydra_cfg.mlp:
-                    network = CorrespondenceFlow_DiffEmbMLP(
-                        emb_dims=hydra_cfg.emb_dims,
-                        emb_nn=hydra_cfg.emb_nn,
-                        center_feature=hydra_cfg.center_feature,
-                        inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                    )
-                else:
-                    network = ResidualFlow_DiffEmbTransformer(
-                        emb_dims=hydra_cfg.emb_dims,
-                        emb_nn=hydra_cfg.emb_nn,
-                        center_feature=hydra_cfg.center_feature,
-                        inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                        pred_weight=hydra_cfg.pred_weight,
-                        residual_on=hydra_cfg.residual_on,
-                        return_flow_component=hydra_cfg.return_flow_component,
-                        freeze_embnn=hydra_cfg.freeze_embnn,
-                        return_attn=hydra_cfg.return_attn,
-                        input_dims=3,
-                    )
-            else:
-                network = ResidualFlow_DiffEmb(
-                    emb_nn=hydra_cfg.emb_nn,
-                    return_flow_component=hydra_cfg.return_flow_component,
-                    center_feature=hydra_cfg.center_feature,
-                    inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                )
-        else:
-            network = ResidualFlow(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-                center_feature=hydra_cfg.center_feature,
-            )
-    elif hydra_cfg.flow_compute_type == 1:
-        network = ResidualFlow_V1(
-            emb_nn=hydra_cfg.emb_nn,
-            return_flow_component=hydra_cfg.return_flow_component,
-        )
-    elif hydra_cfg.flow_compute_type == 2:
-        network = ResidualFlow_V2(
-            emb_nn=hydra_cfg.emb_nn,
-            return_flow_component=hydra_cfg.return_flow_component,
-        )
-    elif hydra_cfg.flow_compute_type == 3:
-        network = ResidualFlow_V3(
-            emb_nn=hydra_cfg.emb_nn,
-            return_flow_component=hydra_cfg.return_flow_component,
-        )
-    elif hydra_cfg.flow_compute_type == 4:
-        network = ResidualFlow_V4(
-            emb_nn=hydra_cfg.emb_nn,
-            return_flow_component=hydra_cfg.return_flow_component,
-        )
-    elif hydra_cfg.flow_compute_type == 5:
-        network = ResidualFlow_Correspondence(emb_nn=hydra_cfg.emb_nn)
-    elif hydra_cfg.flow_compute_type == 6:
-        network = ResidualFlow_Identity(emb_nn=hydra_cfg.emb_nn)
-    elif hydra_cfg.flow_compute_type == "pe":
-        network = ResidualFlow_PE(emb_nn=hydra_cfg.emb_nn)
     grasp_model = EquivarianceTestingModule(
         network,
         lr=hydra_cfg.lr,
@@ -733,88 +515,6 @@ def main(hydra_cfg):
             torch.load(hydra_cfg.checkpoint_file_grasp)["state_dict"]
         )
         log_info("Model Loaded from " + str(hydra_cfg.checkpoint_file_grasp))
-    if hydra_cfg.checkpoint_file_grasp_refinement is not None:
-        if hydra_cfg.flow_compute_type == 0:
-            if hydra_cfg.diff_emb:
-                if hydra_cfg.diff_transformer:
-                    if hydra_cfg.mlp:
-                        network = CorrespondenceFlow_DiffEmbMLP(
-                            emb_dims=hydra_cfg.emb_dims,
-                            emb_nn=hydra_cfg.emb_nn,
-                            center_feature=hydra_cfg.center_feature,
-                            inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                        )
-                    else:
-                        network = ResidualFlow_DiffEmbTransformer(
-                            emb_dims=hydra_cfg.emb_dims,
-                            emb_nn=hydra_cfg.emb_nn,
-                            center_feature=hydra_cfg.center_feature,
-                            inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                            pred_weight=hydra_cfg.pred_weight,
-                            residual_on=hydra_cfg.residual_on,
-                            return_flow_component=hydra_cfg.return_flow_component,
-                            freeze_embnn=hydra_cfg.freeze_embnn,
-                            return_attn=hydra_cfg.return_attn,
-                            input_dims=3,
-                        )
-                else:
-                    network = ResidualFlow_DiffEmb(
-                        emb_nn=hydra_cfg.emb_nn,
-                        return_flow_component=hydra_cfg.return_flow_component,
-                        center_feature=hydra_cfg.center_feature,
-                        inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                    )
-            else:
-                network = ResidualFlow(
-                    emb_nn=hydra_cfg.emb_nn,
-                    return_flow_component=hydra_cfg.return_flow_component,
-                    center_feature=hydra_cfg.center_feature,
-                )
-        elif hydra_cfg.flow_compute_type == 1:
-            network = ResidualFlow_V1(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 2:
-            network = ResidualFlow_V2(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 3:
-            network = ResidualFlow_V3(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 4:
-            network = ResidualFlow_V4(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 5:
-            network = ResidualFlow_Correspondence(emb_nn=hydra_cfg.emb_nn)
-        elif hydra_cfg.flow_compute_type == 6:
-            network = ResidualFlow_Identity(emb_nn=hydra_cfg.emb_nn)
-        elif hydra_cfg.flow_compute_type == "pe":
-            network = ResidualFlow_PE(emb_nn=hydra_cfg.emb_nn)
-        grasp_model_refinement = EquivarianceTestingModule(
-            network,
-            lr=hydra_cfg.lr,
-            image_log_period=hydra_cfg.image_logging_period,
-            weight_normalize=hydra_cfg.weight_normalize_grasp,
-            softmax_temperature=hydra_cfg.softmax_temperature_grasp,
-            loop=hydra_cfg.loop,
-        )
-
-        grasp_model_refinement.cuda()
-
-        if hydra_cfg.checkpoint_file_grasp_refinement is not None:
-            grasp_model_refinement.load_state_dict(
-                torch.load(hydra_cfg.checkpoint_file_grasp_refinement)["state_dict"]
-            )
-            log_info(
-                "Model Grasp Refinement Model Loaded from "
-                + str(hydra_cfg.checkpoint_file_grasp_refinement)
-            )
 
     for iteration in range(hydra_cfg.start_iteration, hydra_cfg.num_iterations):
         # load a test object
@@ -840,7 +540,8 @@ def main(hydra_cfg):
         scale_high, scale_low = cfg.MESH_SCALE_HIGH, cfg.MESH_SCALE_LOW
         scale_default = cfg.MESH_SCALE_DEFAULT
         if hydra_cfg.rand_mesh_scale:
-            mesh_scale = [np.random.random() * (scale_high - scale_low) + scale_low] * 3
+            mesh_scale = [np.random.random() * (scale_high -
+                                                scale_low) + scale_low] * 3
         else:
             mesh_scale = [scale_default] * 3
 
@@ -878,7 +579,8 @@ def main(hydra_cfg):
             rand_yaw_T = util.rand_body_yaw_transform(
                 pos, min_theta=-np.pi, max_theta=np.pi
             )
-            pose_w_yaw = util.transform_pose(pose, util.pose_from_matrix(rand_yaw_T))
+            pose_w_yaw = util.transform_pose(
+                pose, util.pose_from_matrix(rand_yaw_T))
             pos, ori = (
                 util.pose_stamped2list(pose_w_yaw)[:3],
                 util.pose_stamped2list(pose_w_yaw)[3:],
@@ -977,7 +679,8 @@ def main(hydra_cfg):
 
         time.sleep(1.5)
         teleport_rgb = robot.cam.get_images(get_rgb=True)[0]
-        teleport_img_fname = osp.join(eval_teleport_imgs_dir, "%d_init.png" % iteration)
+        teleport_img_fname = osp.join(
+            eval_teleport_imgs_dir, "%d_init.png" % iteration)
         np2img(teleport_rgb.astype(np.uint8), teleport_img_fname)
         cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
         obj_points, obj_colors, obj_classes = get_object_clouds(cams)
@@ -1008,30 +711,9 @@ def main(hydra_cfg):
 
         ans = place_model.get_transform(points_mug, points_rack)  # 1, 4, 4
 
-        if hydra_cfg.checkpoint_file_place_refinement is not None:
-            pred_points_action = ans["pred_points_action"]
-            pred_T_action = ans["pred_T_action"]
-            (
-                points_trans_action,
-                points_trans_anchor,
-                points_action_mean,
-            ) = place_model.action_centered(pred_points_action, points_rack)
-            T_trans = pure_translation_se3(
-                1, points_action_mean.squeeze(), device=points_trans_action.device
-            )
-            ans_refinement = place_model_refinement.get_transform(
-                points_trans_action, points_trans_anchor
-            )
-            pred_T_action = pred_T_action.compose(
-                T_trans.inverse()
-                .compose(ans_refinement["pred_T_action"])
-                .compose(T_trans)
-            )
-            ans_refinement["pred_T_action"] = pred_T_action
-            ans = ans_refinement
-
         pred_T_action_init = ans["pred_T_action"]
-        pred_T_action_mat = pred_T_action_init.get_matrix()[0].T.detach().cpu().numpy()
+        pred_T_action_mat = pred_T_action_init.get_matrix()[
+            0].T.detach().cpu().numpy()
         obj_pose_world = p.getBasePositionAndOrientation(obj_id)  # list
         obj_pose_world = util.list2pose_stamped(
             list(obj_pose_world[0]) + list(obj_pose_world[1])
@@ -1056,10 +738,12 @@ def main(hydra_cfg):
             action_class=2,
             anchor_class=0,
         )
-        ans_grasp = grasp_model.get_transform(points_gripper, points_mug)  # 1, 4, 4
+        ans_grasp = grasp_model.get_transform(
+            points_gripper, points_mug)  # 1, 4, 4
         pred_T_action_init_gripper2mug = ans_grasp["pred_T_action"]
         pred_T_action_mat_gripper2mug = (
-            pred_T_action_init_gripper2mug.get_matrix()[0].T.detach().cpu().numpy()
+            pred_T_action_init_gripper2mug.get_matrix()[
+                0].T.detach().cpu().numpy()
         )
         pred_T_action_mat_gripper2mug[2, -1] -= 0.001
 
@@ -1106,13 +790,15 @@ def main(hydra_cfg):
         )
 
         # reset object to placement pose to detect placement success
-        safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=False)
+        safeCollisionFilterPair(
+            obj_id, table_id, -1, -1, enableCollision=False)
         safeCollisionFilterPair(
             obj_id, table_id, -1, placement_link_id, enableCollision=False
         )
         robot.pb_client.set_step_sim(True)
         safeRemoveConstraint(o_cid)
-        robot.pb_client.reset_body(obj_id, obj_end_pose_list[:3], obj_end_pose_list[3:])
+        robot.pb_client.reset_body(
+            obj_id, obj_end_pose_list[:3], obj_end_pose_list[3:])
 
         cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
         obj_points, obj_colors, obj_classes = get_object_clouds(cams)
@@ -1171,7 +857,8 @@ def main(hydra_cfg):
         )
         np2img(teleport_rgb.astype(np.uint8), teleport_img_fname)
 
-        obj_surf_contacts = p.getContactPoints(obj_id, table_id, -1, placement_link_id)
+        obj_surf_contacts = p.getContactPoints(
+            obj_id, table_id, -1, placement_link_id)
         touching_surf = len(obj_surf_contacts) > 0
         place_success_teleport = touching_surf
         place_success_teleport_list.append(place_success_teleport)
@@ -1188,7 +875,8 @@ def main(hydra_cfg):
         for g_idx in range(2):
             # reset everything
             robot.pb_client.set_step_sim(False)
-            safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
+            safeCollisionFilterPair(
+                obj_id, table_id, -1, -1, enableCollision=True)
             if hydra_cfg.any_pose:
                 robot.pb_client.set_step_sim(True)
             safeRemoveConstraint(o_cid)
@@ -1249,8 +937,10 @@ def main(hydra_cfg):
                         eval_grasp_imgs_dir, "pre_grasp_%d.png" % iteration
                     )
                     np2img(grasp_rgb.astype(np.uint8), grasp_img_fname)
-                    cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
-                    obj_points, obj_colors, obj_classes = get_object_clouds(cams)
+                    cloud_points, cloud_colors, cloud_classes = get_clouds(
+                        cams)
+                    obj_points, obj_colors, obj_classes = get_object_clouds(
+                        cams)
 
                     np.savez(
                         f"{save_dir}/{iteration}_pre_grasp_all_points.npz",
@@ -1273,10 +963,10 @@ def main(hydra_cfg):
                 ########################### planning to pre_pre_grasp and pre_grasp ##########################
                 if grasp_plan is None:
                     plan1 = ik_helper.plan_joint_motion(
-                        robot.arm.get_jpos(), jnt_pos, file_name=txt_file_name
+                        robot.arm.get_jpos(), jnt_pos
                     )
                     plan2 = ik_helper.plan_joint_motion(
-                        jnt_pos, grasp_jnt_pos, file_name=txt_file_name
+                        jnt_pos, grasp_jnt_pos
                     )
 
                     if plan1 is not None and plan2 is not None:
@@ -1295,14 +985,16 @@ def main(hydra_cfg):
                         # get pose that's straight up
                         offset_pose = util.transform_pose(
                             pose_source=util.list2pose_stamped(
-                                np.concatenate(robot.arm.get_ee_pose()[:2]).tolist()
+                                np.concatenate(
+                                    robot.arm.get_ee_pose()[:2]).tolist()
                             ),
                             pose_transform=util.list2pose_stamped(
                                 [0, 0, 0.15, 0, 0, 0, 1]
                             ),
                         )
                         offset_pose_list = util.pose_stamped2list(offset_pose)
-                        offset_jnts = ik_helper.get_feasible_ik(offset_pose_list)
+                        offset_jnts = ik_helper.get_feasible_ik(
+                            offset_pose_list)
 
                         # turn ON collisions between robot and object, and close fingers
                         for i in range(p.getNumJoints(robot.arm.robot_id)):
@@ -1340,8 +1032,10 @@ def main(hydra_cfg):
                             eval_grasp_imgs_dir, "post_grasp_%d.png" % iteration
                         )
                         np2img(grasp_rgb.astype(np.uint8), grasp_img_fname)
-                        cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
-                        obj_points, obj_colors, obj_classes = get_object_clouds(cams)
+                        cloud_points, cloud_colors, cloud_classes = get_clouds(
+                            cams)
+                        obj_points, obj_colors, obj_classes = get_object_clouds(
+                            cams)
 
                         np.savez(
                             f"{save_dir}/{iteration}_post_grasp_all_points.npz",
@@ -1373,7 +1067,8 @@ def main(hydra_cfg):
                                 p.resetBasePositionAndOrientation(
                                     obj_id, obj_pos_before_grasp, ori
                                 )
-                                soft_grasp_close(robot, finger_joint_id, force=40)
+                                soft_grasp_close(
+                                    robot, finger_joint_id, force=40)
                                 robot.arm.set_jpos(
                                     jnt_pos_before_grasp, ignore_physics=True
                                 )
@@ -1425,8 +1120,10 @@ def main(hydra_cfg):
 
             ####################################### get place pose ###########################################
 
-            pre_place_jnt_pos1 = ik_helper.get_feasible_ik(pre_ee_end_pose1_list)
-            pre_place_jnt_pos2 = ik_helper.get_feasible_ik(pre_ee_end_pose2_list)
+            pre_place_jnt_pos1 = ik_helper.get_feasible_ik(
+                pre_ee_end_pose1_list)
+            pre_place_jnt_pos2 = ik_helper.get_feasible_ik(
+                pre_ee_end_pose2_list)
             place_jnt_pos = ik_helper.get_feasible_ik(ee_end_pose_list)
 
             if (
@@ -1440,7 +1137,8 @@ def main(hydra_cfg):
                 plan2 = ik_helper.plan_joint_motion(
                     pre_place_jnt_pos1, pre_place_jnt_pos2
                 )
-                plan3 = ik_helper.plan_joint_motion(pre_place_jnt_pos2, place_jnt_pos)
+                plan3 = ik_helper.plan_joint_motion(
+                    pre_place_jnt_pos2, place_jnt_pos)
 
                 if plan1 is not None and plan2 is not None and plan3 is not None:
                     place_plan = plan1 + plan2
@@ -1465,7 +1163,8 @@ def main(hydra_cfg):
                         time.sleep(0.075)
                     robot.arm.set_jpos(plan3[-1], wait=True)
 
-                    p.changeDynamics(obj_id, -1, linearDamping=5, angularDamping=5)
+                    p.changeDynamics(
+                        obj_id, -1, linearDamping=5, angularDamping=5)
                     constraint_grasp_open(cid)
                     robot.arm.eetool.open()
 
@@ -1535,7 +1234,8 @@ def main(hydra_cfg):
         eval_iter_dir = osp.join(eval_save_dir, "trial_%d" % iteration)
         if not osp.exists(eval_iter_dir):
             os.makedirs(eval_iter_dir)
-        sample_fname = osp.join(eval_iter_dir, "success_rate_eval_implicit.npz")
+        sample_fname = osp.join(
+            eval_iter_dir, "success_rate_eval_implicit.npz")
         np.savez(
             sample_fname,
             obj_shapenet_id=obj_shapenet_id,

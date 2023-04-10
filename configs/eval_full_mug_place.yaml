@@ -8,13 +8,12 @@ hydra:
 experiment: residual_flow_test_partial_cloud_initpose
 
 #### TO BE CHANGED ####
-checkpoint_file_place_refinement: Null
-checkpoint_file_grasp_refinement: Null
-checkpoint_file_grasp: ./logs/residual_flow_occlusion/2023-04-06_160520/residual_flow_occlusion/9f8r3n07/checkpoints/epoch=825-step=103250.ckpt
-checkpoint_file_place: Null
+ 
+checkpoint_file_grasp: /home/exx/Documents/taxpose//pretrained_models/ndf/mug/upright/grasp.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose//pretrained_models/ndf/mug/upright/place.ckpt
 # log saving dir
 log_dir: ./results/ndf/mug_place
-any_pose: True # arbitray pose or not
+any_pose: False # arbitray pose or not
 num_iterations: 100
 object_class: mug
 data_dir: mug_place # directory name for data saved
@@ -24,7 +23,6 @@ data_dir: mug_place # directory name for data saved
 flow_compute_type: 0
 emb_nn: dgcnn
 num_points: 1024
-inital_sampling_ratio: 1
 emb_dims: 512
 
 # Dataset Settings
