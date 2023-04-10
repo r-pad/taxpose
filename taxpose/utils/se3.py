@@ -100,7 +100,7 @@ def pure_translation_se3(N, t, device=None):
     axis_angle = torch.repeat_interleave(axis_angle, N, dim=0)  # (N,3)
     R = axis_angle_to_matrix(axis_angle.to(device))  # identity
     assert torch.allclose(
-        torch.eye(3), R[0]
+        torch.eye(3).to(device), R[0]
     ), "R should be identity for pure translation se3"
     t = torch.repeat_interleave(t.unsqueeze(0), N, dim=0).to(device)  # N,3
     return Rotate(R, device=device).translate(t)

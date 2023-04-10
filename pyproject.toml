@@ -3,7 +3,7 @@ name = "taxpose"
 version = "0.1.0"
 description = "TAX-Pose: Task-Specific Cross-Pose Estimation for Robot Manipulation"
 readme = "README.md"
-requires-python = ">=3.6"
+requires-python = ">=3.6, <3.10" # ndf_robot requires < 3.10 :(
 license = {file = "LICENSE.txt"}
 authors = [
   {email = "chuerp@andrew.cmu.edu", name = "Chuer Pan"},
@@ -16,10 +16,14 @@ dependencies = [
   "dgl ~= 1.0",
   "dglgo ~= 0.0.2",
   "h5py",
+  "hydra-core",
+  "imageio",
   "jupyterlab",
+  "opencv-python",
   "pybullet",
   "pyg_lib ~= 0.1; sys_platform == 'linux'",
   "pytorch3d ~= 0.7.2",
+  "pytorch_lightning < 2.0",
   "rpad-partnet-mobility-utils @ git+https://github.com/r-pad/partnet_mobility_utils.git",
   "rpad-pyg @ git+https://github.com/r-pad/pyg_libs.git",
   "rpad-visualize-3d @ git+https://github.com/r-pad/visualize_3d.git",
@@ -68,10 +72,11 @@ taxpose = ["py.typed"]
 exclude = "third_party/*"
 
 [tool.isort]
+known_third_party = ["wandb"]
 profile = "black"
 
 [tool.mypy]
-python_version = 3.8
+python_version = 3.9
 warn_return_any = true
 warn_unused_configs = true
 mypy_path = "src"
@@ -81,6 +86,8 @@ explicit_package_bases = true
 # Uncomment this when you have imports for mypy to ignore.
 [[tool.mypy.overrides]]
 module = [
+  "cv2.*",
+  "display.*",
   "dgl.*",
   "h5py.*",
   "matplotlib.*",
@@ -90,6 +97,7 @@ module = [
   "scipy.*",
   "torch_cluster.*",
   "torch_geometric.*",
+  "torchvision.*",
 ]
 ignore_missing_imports = true
 
@@ -103,3 +111,4 @@ disable = [
   "C0115", # Missing class docstring.
   "C0116", # Missing function or method docstring.
 ]
+known-third-party = ["wandb"]

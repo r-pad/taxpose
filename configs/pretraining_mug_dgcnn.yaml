@@ -1,0 +1,31 @@
+# Logging Settings
+log_dir: logs
+experiment: embedding_pretraining_mug
+image_logging_period: 1000
+
+# Dataset Settings
+dataset_root: data/train_data/renders
+pretraining_data_path: data/pretraining
+num_workers: 4
+batch_size: 8
+num_points: 1024
+dataset_index: None
+cloud_class: 0
+cloud_type: init
+overfit: false
+seed: 0
+
+# Network Settings
+emb_dims: 512
+emb_nn: dgcnn
+inital_sampling_ratio: 1
+normalize_features: true
+
+# Loss Settings
+con_weighting: dist
+l2_reg_weight: 0
+temperature: 0.1
+
+# Training Settings
+checkpoint_file: Null
+lr: 1e-4

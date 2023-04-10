@@ -1,3 +1,7 @@
 [submodule "third_party/ravens"]
 	path = third_party/ravens
 	url = https://github.com/google-research/ravens.git
+[submodule "third_party/ndf_robot"]
+	path = third_party/ndf_robot
+	url = https://github.com/anthonysimeonov/ndf_robot.git
+	ignore = dirty
