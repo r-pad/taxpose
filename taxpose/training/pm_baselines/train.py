@@ -12,11 +12,11 @@ import torch_geometric.loader as tgl
 import typer
 
 from taxpose.datasets.pm_placement import get_dataset_ids_all
-from taxpose.training.pm_baselines.bc_model import BCNet
-from taxpose.training.pm_baselines.dataloader_ff_interp_bc import create_gcbc_dataset
-from taxpose.training.pm_baselines.dataloader_ff_interp_dagger import (
+from taxpose.training.pm_baselines.bc_dataset import (
+    create_gcbc_dataset,
     create_gcdagger_dataset,
 )
+from taxpose.training.pm_baselines.bc_model import BCNet
 from taxpose.training.pm_baselines.dataloader_goal_flow import create_gf_dataset
 from taxpose.training.pm_baselines.flow_model import FlowNet
 

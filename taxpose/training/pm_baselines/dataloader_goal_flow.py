@@ -27,9 +27,7 @@ from taxpose.datasets.pm_placement import (
     render_input,
     subsample_pcd,
 )
-from taxpose.training.pm_baselines.dataloader_ff_interp_bc import (
-    articulate_specific_joints,
-)
+from taxpose.training.pm_baselines.bc_dataset import articulate_specific_joints
 
 
 def get_random_action_obj(seed: NPSeed = None):
@@ -56,7 +54,6 @@ class GoalInfFlowNaiveDataset(tgd.Dataset):
         self.obj_ids = obj_ids
         with open(SEM_CLASS_DSET_PATH, "rb") as f:
             self.full_sem_dset = pickle.load(f)
-
         self.even_sampling = even_sampling
         self.randomize_camera = randomize_camera
         self.n_points = n_points
@@ -64,7 +61,6 @@ class GoalInfFlowNaiveDataset(tgd.Dataset):
         self.goal_raw_data: Dict[str, PMRawData] = {}
         with open(ALL_BLOCK_DSET_PATH, "rb") as f:
             self.object_dict = pickle.load(f)
-
         super().__init__(root, transform, pre_transform, pre_filter)
 
     @property
@@ -144,6 +140,7 @@ class GoalInfFlowNaiveDataset(tgd.Dataset):
         if partsem != "none":
             articulate_specific_joints(obs_env, obj_id_links_tomove, 0.9)
             articulate_specific_joints(goal_env, goal_id_links_tomove, 0.9)
+
         goal_block, goal_rand_scale = get_random_action_obj()
         goal_block_id = p.loadURDF(
             goal_block,
@@ -179,10 +176,11 @@ class GoalInfFlowNaiveDataset(tgd.Dataset):
             valid_start = is_action_pose_valid(obs_block_id, obs_env)
 
         # Obs data and subsample
-        P_world, pc_seg_obj, rgb = render_input(obs_block_id, obs_env)
+        P_world, pc_seg_obj, _ = render_input(obs_block_id, obs_env)
         P_world, pc_seg_obj = subsample_pcd(P_world, pc_seg_obj, rng)
-        # Goal data and subsample
-        P_world_goal, pc_seg_obj_goal, rgb_goal = render_input(goal_block_id, goal_env)
+
+        # Goal data
+        P_world_goal, pc_seg_obj_goal, _ = render_input(goal_block_id, goal_env)
         P_world_goal, pc_seg_obj_goal = subsample_pcd(
             P_world_goal, pc_seg_obj_goal, rng
         )

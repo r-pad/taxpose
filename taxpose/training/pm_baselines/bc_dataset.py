@@ -4,7 +4,7 @@ i.e. Placing a box into the oven
 """
 import os
 import pickle
-from typing import Callable, Dict, Optional, Protocol
+from typing import Callable, Dict, Literal, Optional
 
 import numpy as np
 import pybullet as p
@@ -35,12 +35,16 @@ def articulate_specific_joints(sim, joint_list, amount):
             p.resetJointState(sim.obj_id, i, angle, 0, sim.client_id)
 
 
-class PCData(Protocol):
-    id: str  # Object ID.
-
-    pos: torch.Tensor
-
-    x: Optional[torch.Tensor] = None
+def randomize_dagger(src_pose, dst_pose, seed: NPSeed = None):
+    rng = np.random.default_rng(seed)
+    normalized_vec = (dst_pose - src_pose) / np.linalg.norm(dst_pose - src_pose)
+    r = rng.uniform(low=0, high=np.linalg.norm(dst_pose - src_pose))
+    v = rng.uniform(low=0, high=1, size=3)
+    v = v / np.linalg.norm(v)
+    if np.dot(normalized_vec, v) < 0:
+        v = -v
+    v = v * r
+    return src_pose + v
 
 
 class GCBCDataset(tgd.Dataset):
@@ -48,6 +52,7 @@ class GCBCDataset(tgd.Dataset):
         self,
         root: str,
         freefloat_dset_path: str,
+        mode: Literal["bc", "dagger"] = "bc",
         obj_ids=None,
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
@@ -60,45 +65,50 @@ class GCBCDataset(tgd.Dataset):
 
         # Extract the name.
         self.obj_ids = obj_ids
-        self.full_sem_dset = pickle.load(open(SEM_CLASS_DSET_PATH, "rb"))
-
+        self.mode = mode
+        with open(SEM_CLASS_DSET_PATH, "rb") as f:
+            self.full_sem_dset = pickle.load(f)
         self.freefloat_dset_path = freefloat_dset_path
         self.even_sampling = even_sampling
         self.randomize_camera = randomize_camera
         self.n_points = n_points
         self.raw_data: Dict[str, PMRawData] = {}
         self.goal_raw_data: Dict[str, PMRawData] = {}
-        self.object_dict = pickle.load(open(ALL_BLOCK_DSET_PATH, "rb"))
-
+        with open(ALL_BLOCK_DSET_PATH, "rb") as f:
+            self.object_dict = pickle.load(f)
         super().__init__(root, transform, pre_transform, pre_filter)
 
     @property
     def processed_dir(self) -> str:
         return os.path.join(
             self.root,
-            GCBCDataset.processed_base(self.randomize_camera, self.even_sampling),
+            GCBCDataset.processed_base(
+                self.mode, self.randomize_camera, self.even_sampling
+            ),
         )
 
     @staticmethod
-    def processed_base(randomize_camera, even_sampling) -> str:
+    def processed_base(mode: str, randomize_camera, even_sampling) -> str:
         chunk = ""
         if randomize_camera:
             chunk += "_random"
         if even_sampling:
             chunk += "_even"
-        return f"goal_cond_bc_traj" + chunk
+        return f"goal_cond_{mode}_traj" + chunk
 
     def len(self) -> int:
         return len(self.env_names)
 
     def get(self, idx: int) -> Data:
-        return self.get_data(idx)
+        return self.get_data(self.obj_ids[idx])
 
     def get_data(self, obj_id: str, seed: NPSeed = None) -> Data:
         # Get the trajectory
         traj_name = f"{'_'.join(obj_id.split('_')[:-1])}.npy"
         traj = np.load(os.path.join(self.freefloat_dset_path, traj_name))
         curr_traj_idx = int(obj_id.split("_")[-1])
+
+        rng = np.random.default_rng(seed)
 
         obs_env = PMRenderEnv(
             obj_id.split("_")[0], self.raw_dir, camera_pos=[-3, 0, 1.2], gui=False
@@ -107,8 +117,19 @@ class GCBCDataset(tgd.Dataset):
         obs_block_id = p.loadURDF(
             block, physicsClientId=obs_env.client_id, globalScaling=4
         )
-        curr_xyz = traj[curr_traj_idx]
+
         curr_xyz_p1 = traj[curr_traj_idx + 1]
+        if self.mode == "bc":
+            curr_xyz = traj[curr_traj_idx]
+        elif self.mode == "dagger":
+            bern = rng.uniform()
+            if bern < 0.1:
+                curr_xyz = traj[curr_traj_idx]
+            else:
+                curr_xyz = traj[curr_traj_idx]
+                curr_xyz = randomize_dagger(curr_xyz, curr_xyz_p1, rng)
+        else:
+            raise ValueError(f"Unknown mode {self.mode}")
         p.resetBasePositionAndOrientation(
             obs_block_id,
             posObj=curr_xyz,
@@ -120,10 +141,6 @@ class GCBCDataset(tgd.Dataset):
         )
 
         object_dict = self.object_dict[get_category(obj_id.split("_")[0]).lower()]
-        curr_xyz = traj[curr_traj_idx]
-        curr_xyz_p1 = traj[curr_traj_idx + 1]
-
-        rng = np.random.default_rng(seed)
 
         goal_id_list = list(object_dict.keys())
         goal_id = rng.choice(goal_id_list)
@@ -140,10 +157,7 @@ class GCBCDataset(tgd.Dataset):
                         ]
 
             obj_link_id = object_dict[obj_id.split("_")[0] + f"_{which_goal}"]["ind"]
-            try:
-                obj_id_links_tomove = move_joints[obj_link_id]
-            except:
-                obj_id_links_tomove = "link_0"
+            obj_id_links_tomove = move_joints[obj_link_id]
             for mode in self.full_sem_dset:
                 if partsem in self.full_sem_dset[mode]:
                     if goal_id.split("_")[0] in self.full_sem_dset[mode][partsem]:
@@ -151,10 +165,7 @@ class GCBCDataset(tgd.Dataset):
                             goal_id.split("_")[0]
                         ]
             goal_link_id = object_dict[goal_id]["ind"]
-            try:
-                goal_id_links_tomove = move_joints[goal_link_id]
-            except:
-                goal_id_links_tomove = "link_0"
+            goal_id_links_tomove = move_joints[goal_link_id]
 
         goal_env = PMRenderEnv(
             goal_id.split("_")[0], self.raw_dir, camera_pos=[-3, 0, 1.2], gui=False
@@ -222,7 +233,6 @@ class GCBCDataset(tgd.Dataset):
             mask=torch.from_numpy(mask_goal[:output_len]).float(),
             x=torch.from_numpy(mask_goal[:output_len].reshape((-1, 1))).float(),
         )
-
         obs_env.close()
         goal_env.close()
 
@@ -246,6 +256,7 @@ def create_gcbc_dataset(
         dset_cls=GCBCDataset,
         dset_kwargs={
             "root": root,
+            "mode": "bc",
             "freefloat_dset_path": freefloat_dset_path,
             "obj_ids": obj_ids,
             "even_sampling": even_sampling,
@@ -254,7 +265,45 @@ def create_gcbc_dataset(
         },
         data_keys=obj_ids,
         root=root,
-        processed_dirname=GCBCDataset.processed_base(randomize_camera, even_sampling),
+        processed_dirname=GCBCDataset.processed_base(
+            "bc", randomize_camera, even_sampling
+        ),
+        n_repeat=n_repeat,
+        n_workers=n_workers,
+        n_proc_per_worker=n_proc_per_worker,
+        seed=seed,
+    )
+
+
+def create_gcdagger_dataset(
+    root,
+    freefloat_dset_path,
+    obj_ids,
+    even_sampling=False,
+    randomize_camera=False,
+    n_points=1200,
+    n_repeat=1,
+    n_workers=30,
+    n_proc_per_worker=2,
+    seed=0,
+) -> CachedByKeyDataset[GCBCDataset]:
+    """Creates the GCBC dataset."""
+    return CachedByKeyDataset(
+        dset_cls=GCBCDataset,
+        dset_kwargs={
+            "root": root,
+            "mode": "dagger",
+            "freefloat_dset_path": freefloat_dset_path,
+            "obj_ids": obj_ids,
+            "even_sampling": even_sampling,
+            "randomize_camera": randomize_camera,
+            "n_points": n_points,
+        },
+        data_keys=obj_ids,
+        root=root,
+        processed_dirname=GCBCDataset.processed_base(
+            "dagger", randomize_camera, even_sampling
+        ),
         n_repeat=n_repeat,
         n_workers=n_workers,
         n_proc_per_worker=n_proc_per_worker,
