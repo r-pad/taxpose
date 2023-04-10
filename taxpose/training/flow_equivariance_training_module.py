@@ -6,7 +6,7 @@ from torch import nn
 from torchvision.transforms import ToTensor
 
 from taxpose.training.point_cloud_training_module import PointCloudTrainingModule
-from taxpose.utils.display_headless import quiver3d, scatter3d
+from taxpose.utils.display_headless import quiver3d, scatter3d  # type: ignore
 from taxpose.utils.se3 import flow2pose, get_degree_angle, get_translation
 
 mse_criterion = nn.MSELoss(reduction="sum")

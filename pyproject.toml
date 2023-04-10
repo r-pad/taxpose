@@ -76,7 +76,7 @@ known_third_party = ["wandb"]
 profile = "black"
 
 [tool.mypy]
-python_version = 3.8
+python_version = 3.9
 warn_return_any = true
 warn_unused_configs = true
 mypy_path = "src"
@@ -87,6 +87,7 @@ explicit_package_bases = true
 [[tool.mypy.overrides]]
 module = [
   "cv2.*",
+  "display.*",
   "dgl.*",
   "h5py.*",
   "matplotlib.*",
