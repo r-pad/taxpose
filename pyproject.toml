@@ -13,6 +13,7 @@ authors = [
   {email = "dheld@andrew.cmu.edu", name = "David Held"},
 ]
 dependencies = [
+  "chamferdist",
   "dgl ~= 1.0",
   "dglgo ~= 0.0.2",
   "h5py",
