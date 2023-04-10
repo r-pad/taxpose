@@ -6,7 +6,7 @@ from torch import nn
 
 from taxpose.nets.dgcnn_gc import DGCNN_GC
 from taxpose.nets.pointnet import PointNet
-from taxpose.nets.se3_utils import dualflow2pose
+from taxpose.utils.se3 import dualflow2pose
 from third_party.dcp.model import (
     Decoder,
     DecoderLayer,

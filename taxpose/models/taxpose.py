@@ -5,8 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
 
-from taxpose.models.utils import norm_scale_batch
-from taxpose.nets.brian_chuer_model import BrianChuerAdapter
+from taxpose.nets.transformer_flow_pm import BrianChuerAdapter
 from third_party.dcp.model import DGCNN
 
 mse_criterion = nn.MSELoss(reduction="sum")
@@ -214,9 +213,9 @@ class TAXPoseModel(nn.Module):
         aws = None
         if self.arch == "dummy":
             Ex, Ey = self.net(action, anchor)
-        elif self.arch == "pn":
-            Ex = self.action_net(norm_scale_batch(action))
-            Ey = self.anchor_net(norm_scale_batch(anchor))
+        # elif self.arch == "pn":
+        #     Ex = self.action_net(norm_scale_batch(action))
+        #     Ey = self.anchor_net(norm_scale_batch(anchor))
         elif self.arch == "dgcnn":
             Xns = self.norm_scale(X.view(action.num_graphs, -1, 3)).transpose(-1, -2)
             Yns = self.norm_scale(Y.view(anchor.num_graphs, -1, 3)).transpose(-1, -2)

@@ -367,7 +367,12 @@ cython_debug/
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,macos,pycharm,git,linux
 
 .idea/
+
 checkpoints/
 data/
-wandb/
+logs/
+mug_place/
+outputs/
 results/
+rollouts/
+wandb/

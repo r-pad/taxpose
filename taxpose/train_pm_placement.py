@@ -9,9 +9,9 @@ import pytorch3d
 import torch
 import torch_geometric.loader as tgl
 import typer
+import wandb
 from tqdm import tqdm
 
-import wandb
 from taxpose.datasets.pm_placement import (
     CATEGORIES,
     DatasetSplit,
