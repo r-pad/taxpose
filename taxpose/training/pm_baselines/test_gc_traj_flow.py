@@ -8,7 +8,13 @@ import torch
 from scipy.spatial.transform import Rotation as R
 from tqdm import tqdm
 
-from taxpose.datasets.pm_placement import get_category, render_input, subsample_pcd
+from taxpose.datasets.pm_placement import (
+    GOAL_INF_DSET_PATH,
+    SEM_CLASS_DSET_PATH,
+    get_category,
+    render_input,
+    subsample_pcd,
+)
 from taxpose.training.pm_baselines.flow_model import FlowNet as TrajFlowNet
 from taxpose.training.pm_baselines.test_bc import (
     create_test_env,
@@ -98,12 +104,15 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cat", type=str)
-    parser.add_argument("--method", type=str, default="dgcnn_traj_flow")
-    parser.add_argument("--model", type=str)
+    parser.add_argument("--cat", type=str, required=True)
+    parser.add_argument("--method", type=str, default="traj_flow")
+    parser.add_argument("--model", type=str, required=True)
     parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--indist", type=bool, default=True)
     parser.add_argument("--postfix", type=str)
+    parser.add_argument(
+        "--pm-root", type=str, default=os.path.expanduser("~/dataset/partnet-mobility")
+    )
     args = parser.parse_args()
     objcat = args.cat
     method = args.method
@@ -111,32 +120,23 @@ if __name__ == "__main__":
     start_ind = args.start
     in_dist = args.indist
     postfix = args.postfix
+    pm_root = args.pm_root
 
     # Get which joint to open
-    full_sem_dset = pickle.load(
-        open(
-            os.path.expanduser(
-                "~/discriminative_embeddings/goal_inf_dset/sem_class_transfer_dset_more.pkl"
-            ),
-            "rb",
-        )
-    )
-    object_dict_meta = pickle.load(
-        open(
-            os.path.expanduser(
-                f"~/discriminative_embeddings/goal_inf_dset/{objcat}_block_dset_multi.pkl"
-            ),
-            "rb",
-        )
-    )
+    with open(SEM_CLASS_DSET_PATH, "rb") as f:
+        full_sem_dset = pickle.load(f)
+    with open(
+        os.path.join(GOAL_INF_DSET_PATH, f"{objcat}_block_dset_multi.pkl"), "rb"
+    ) as f:
+        object_dict_meta = pickle.load(f)
 
     # Get goal inference model
     bc_model = load_model(method, expname)
 
     # Create result directory
-    result_dir = f"part_embedding/goal_inference/baselines_rotation/rollouts/{objcat}_{method}_{postfix}"
+    result_dir = f"./results/pm_baselines/{method}_{expname}_{postfix}"
     if not os.path.exists(result_dir):
-        print("Creating result directory for rollouts")
+        print("Creating result directory for results")
         os.makedirs(result_dir, exist_ok=True)
         os.makedirs(f"{result_dir}/vids", exist_ok=True)
 
@@ -152,6 +152,8 @@ if __name__ == "__main__":
     which_goal = postfix
     num_trials = 8
     rollout_len = 60
+
+    rng = np.random.default_rng(123456)
 
     for o in tqdm(objs[start_ind // 20 :]):
         if objcat == "all":
@@ -180,7 +182,7 @@ if __name__ == "__main__":
 
             # Get GT goal position
 
-            demo_id = np.random.choice(demo_id_list)
+            demo_id = rng.choice(demo_id_list)
             demo_id = f"{demo_id.split('_')[0]}_{which_goal}"
             if demo_id not in demo_id_list:
                 trial += 1
@@ -195,7 +197,7 @@ if __name__ == "__main__":
 
             # Create obs env
             obs_env, obs_block_id = create_test_env(
-                obj_id, full_sem_dset, object_dict, which_goal, in_dist
+                pm_root, obj_id, full_sem_dset, object_dict, which_goal, in_dist, rng
             )
 
             # Log starting position
@@ -218,7 +220,7 @@ if __name__ == "__main__":
                 P_demo_full,
                 pc_demo_full,
                 rgb_goal,
-            ) = get_demo(demo_id, full_sem_dset, object_dict)
+            ) = get_demo(pm_root, demo_id, full_sem_dset, object_dict)
             P_world_full, pc_seg_obj_full, _ = render_input(obs_block_id, obs_env)
             P_world_og, pc_seg_obj_og = subsample_pcd(P_world_full, pc_seg_obj_full)
 
