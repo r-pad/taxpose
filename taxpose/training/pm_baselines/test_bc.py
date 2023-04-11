@@ -1,7 +1,6 @@
 import json
 import os
 import pickle
-import time
 
 import imageio
 import numpy as np
@@ -14,7 +13,9 @@ from tqdm import tqdm
 
 from taxpose.datasets.pm_placement import (
     ACTION_OBJS,
+    GOAL_INF_DSET_PATH,
     SEEN_CATS,
+    SEM_CLASS_DSET_PATH,
     UNSEEN_CATS,
     get_category,
     get_dataset_ids_all,
@@ -22,6 +23,7 @@ from taxpose.datasets.pm_placement import (
     render_input,
     subsample_pcd,
 )
+from taxpose.training.pm_baselines.bc_dataset import articulate_specific_joints
 from taxpose.training.pm_baselines.bc_model import BCNet as DaggerNet
 
 """
@@ -46,24 +48,23 @@ def get_ids(cat):
 
 
 def randomize_block_pose(seed, in_dist=True):
-    np.random.seed(seed)
+    rng = np.random.default_rng(seed)
     if in_dist:
         randomized_pose = np.array(
             [
-                np.random.uniform(low=-1, high=-0.1),
-                np.random.uniform(low=-1.4, high=-1.0),
-                np.random.uniform(low=0.1, high=0.25),
+                rng.uniform(low=-1, high=-0.1),
+                rng.uniform(low=-1.4, high=-1.0),
+                rng.uniform(low=0.1, high=0.25),
             ]
         )
     else:
         randomized_pose = np.array(
             [
-                np.random.uniform(low=1.5, high=2),
-                np.random.uniform(low=-3, high=3),
-                np.random.uniform(low=1.5, high=2),
+                rng.uniform(low=1.5, high=2),
+                rng.uniform(low=-3, high=3),
+                rng.uniform(low=1.5, high=2),
             ]
         )
-    print(randomized_pose)
     return randomized_pose
 
 
@@ -79,14 +80,15 @@ def load_model(method: str, exp_name: str) -> DaggerNet:
     return net.cuda()
 
 
-def randomize_start_pose(block_id, sim: PMRenderEnv, in_dist=True, goal_pos=None):
+def randomize_start_pose(
+    block_id, sim: PMRenderEnv, in_dist=True, goal_pos=None, seed=None
+):
     # This randomizes the starting pose
+    rng = np.random.default_rng(seed)
     valid_start = False
     while not valid_start:
-        obs_curr_xyz = randomize_block_pose(
-            (os.getpid() * int(time.time())) % 123456789, in_dist
-        )
-        angle = np.random.uniform(-60, 60)
+        obs_curr_xyz = randomize_block_pose(rng, in_dist)
+        angle = rng.uniform(-60, 60)
         start_ort = R.from_euler("z", angle, degrees=True).as_quat()
         p.resetBasePositionAndOrientation(
             block_id,
@@ -101,16 +103,18 @@ def randomize_start_pose(block_id, sim: PMRenderEnv, in_dist=True, goal_pos=None
 
 
 def create_test_env(
+    pm_root: str,
     obj_id: str,
     full_sem_dset: dict,
     object_dict: dict,
     which_goal: str,
     in_dist=True,
+    seed=None,
 ):
     # This creates the test env for observation.
     obs_env = PMRenderEnv(
         obj_id.split("_")[0],
-        os.path.expanduser("~/partnet-mobility/raw"),
+        os.path.join(pm_root, "raw"),
         camera_pos=[-3, 0, 1.2],
         gui=False,
     )
@@ -128,18 +132,18 @@ def create_test_env(
         obj_id_links_tomove = move_joints[obj_link_id]
 
         # Open the joints.
-        obs_env.articulate_specific_joints(obj_id_links_tomove, 0.9)
+        articulate_specific_joints(obs_env, obj_id_links_tomove, 0.9)
 
-    randomize_start_pose(obs_block_id, obs_env, in_dist)
+    randomize_start_pose(obs_block_id, obs_env, in_dist, seed)
     return obs_env, obs_block_id
 
 
-def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
+def get_demo(pm_root: str, goal_id: str, full_sem_dset: dict, object_dict: dict):
     # This creates the test env for demonstration.
 
     goal_env = PMRenderEnv(
         goal_id.split("_")[0],
-        os.path.expanduser("~/partnet-mobility/raw"),
+        os.path.join(pm_root, "raw"),
         camera_pos=[-3, 0, 1.2],
         gui=False,
     )
@@ -152,7 +156,7 @@ def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
                     move_joints = full_sem_dset[mode][partsem][goal_id.split("_")[0]]
         goal_link_id = object_dict[goal_id]["ind"]
         goal_id_links_tomove = move_joints[goal_link_id]
-        goal_env.articulate_specific_joints(goal_id_links_tomove, 0.9)
+        articulate_specific_joints(goal_env, goal_id_links_tomove, 0.9)
 
     goal_block = ACTION_OBJS["block"].urdf
     goal_block_id = p.loadURDF(
@@ -238,12 +242,15 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cat", type=str)
-    parser.add_argument("--method", type=str, default="dgcnn_bc")
-    parser.add_argument("--model", type=str)
+    parser.add_argument("--cat", type=str, required=True)
+    parser.add_argument("--method", type=str, default="bc")
+    parser.add_argument("--model", type=str, required=True)
     parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--indist", type=bool, default=True)
     parser.add_argument("--postfix", type=str)
+    parser.add_argument(
+        "--pm-root", type=str, default=os.path.expanduser("~/dataset/partnet-mobility")
+    )
     args = parser.parse_args()
     objcat = args.cat
     method = args.method
@@ -251,32 +258,23 @@ if __name__ == "__main__":
     start_ind = args.start
     in_dist = args.indist
     postfix = args.postfix
+    pm_root = args.pm_root
 
     # Get which joint to open
-    full_sem_dset = pickle.load(
-        open(
-            os.path.expanduser(
-                "~/discriminative_embeddings/goal_inf_dset/sem_class_transfer_dset_more.pkl"
-            ),
-            "rb",
-        )
-    )
-    object_dict_meta = pickle.load(
-        open(
-            os.path.expanduser(
-                f"~/discriminative_embeddings/goal_inf_dset/{objcat}_block_dset_multi.pkl"
-            ),
-            "rb",
-        )
-    )
+    with open(SEM_CLASS_DSET_PATH, "rb") as f:
+        full_sem_dset = pickle.load(f)
+    with open(
+        os.path.join(GOAL_INF_DSET_PATH, f"{objcat}_block_dset_multi.pkl"), "rb"
+    ) as f:
+        object_dict_meta = pickle.load(f)
 
     # Get goal inference model
     bc_model = load_model(method, expname)
 
     # Create result directory
-    result_dir = f"part_embedding/goal_inference/baselines_rotation/rollouts/{method}_{expname}_{postfix}"
+    result_dir = f"./results/pm_baselines/{method}_{expname}_{postfix}"
     if not os.path.exists(result_dir):
-        print("Creating result directory for rollouts")
+        print("Creating result directory for results")
         os.makedirs(result_dir, exist_ok=True)
         os.makedirs(f"{result_dir}/vids", exist_ok=True)
 
@@ -292,6 +290,8 @@ if __name__ == "__main__":
     which_goal = postfix
     num_trials = 10
     rollout_len = 20
+
+    rng = np.random.default_rng(123456)
 
     for o in tqdm(objs[start_ind // 20 :]):
         if objcat == "all":
@@ -320,7 +320,7 @@ if __name__ == "__main__":
 
             # Get GT goal position
 
-            demo_id = np.random.choice(demo_id_list)
+            demo_id = rng.choice(demo_id_list)
             demo_id = f"{demo_id.split('_')[0]}_{which_goal}"
             if demo_id not in demo_id_list:
                 trial += 1
@@ -335,7 +335,7 @@ if __name__ == "__main__":
 
             # Create obs env
             obs_env, obs_block_id = create_test_env(
-                obj_id, full_sem_dset, object_dict, which_goal, in_dist
+                pm_root, obj_id, full_sem_dset, object_dict, which_goal, in_dist, rng
             )
 
             # Log starting position
@@ -358,7 +358,7 @@ if __name__ == "__main__":
                 P_demo_full,
                 pc_demo_full,
                 rgb_goal,
-            ) = get_demo(demo_id, full_sem_dset, object_dict)
+            ) = get_demo(pm_root, demo_id, full_sem_dset, object_dict)
             P_world_full, pc_seg_obj_full, _ = render_input(obs_block_id, obs_env)
             P_world_og, pc_seg_obj_og = subsample_pcd(P_world_full, pc_seg_obj_full)
 
