@@ -317,9 +317,7 @@ class FlowNet(pl.LightningModule):
         return flow
 
     def _step(self, batch: tgd.Batch, mode):
-        n_nodes = torch.as_tensor([d.num_nodes for d in batch[0].to_data_list()]).to(
-            self.device
-        )
+        n_nodes = torch.as_tensor([d.num_nodes for d in batch[0].to_data_list()]).to(self.device)  # type: ignore
         # dst_data: object of interest
         # src_data: transferred object
         src_data, dst_data = batch

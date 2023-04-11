@@ -134,7 +134,7 @@ def find_link_index_to_open(full_sem_dset, partsem, obj_id, object_dict, goal_id
     return links_tomove
 
 
-def is_action_pose_valid(block_id, sim: PMRenderEnv, n_valid_points=50):
+def is_action_pose_valid(block_id, sim: PMRenderEnv, n_valid_points=50) -> bool:
     # Valid only if the block is visible in the rendered image AND there's no collision.
     collision_counter = len(
         p.getClosestPoints(

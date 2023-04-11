@@ -1,7 +1,6 @@
 import json
 import os
 import pickle
-import time
 
 import imageio
 import numpy as np
@@ -14,7 +13,9 @@ from tqdm import tqdm
 
 from taxpose.datasets.pm_placement import (
     ACTION_OBJS,
+    GOAL_INF_DSET_PATH,
     SEEN_CATS,
+    SEM_CLASS_DSET_PATH,
     UNSEEN_CATS,
     get_category,
     get_dataset_ids_all,
@@ -22,11 +23,57 @@ from taxpose.datasets.pm_placement import (
     render_input,
     subsample_pcd,
 )
+from taxpose.training.pm_baselines.bc_dataset import articulate_specific_joints
 from taxpose.training.pm_baselines.bc_model import BCNet as DaggerNet
+from taxpose.training.pm_baselines.flow_model import FlowNet as TrajFlowNet
 
 """
 This file loads a trained BC model and tests the rollout in simulation.
 """
+
+
+def rigid_transform_3D(A, B):
+    assert A.shape == B.shape
+
+    num_rows, num_cols = A.shape
+    if num_rows != 3:
+        raise Exception(f"matrix A is not 3xN, it is {num_rows}x{num_cols}")
+
+    num_rows, num_cols = B.shape
+    if num_rows != 3:
+        raise Exception(f"matrix B is not 3xN, it is {num_rows}x{num_cols}")
+
+    # find mean column wise
+    centroid_A = np.mean(A, axis=1)
+    centroid_B = np.mean(B, axis=1)
+
+    # ensure centroids are 3x1
+    centroid_A = centroid_A.reshape(-1, 1)
+    centroid_B = centroid_B.reshape(-1, 1)
+
+    # subtract mean
+    Am = A - centroid_A
+    Bm = B - centroid_B
+
+    H = Am @ np.transpose(Bm)
+
+    # sanity check
+    # if linalg.matrix_rank(H) < 3:
+    #    raise ValueError("rank of H = {}, expecting 3".format(linalg.matrix_rank(H)))
+
+    # find rotation
+    U, S, Vt = np.linalg.svd(H)
+    R = Vt.T @ U.T
+
+    # special reflection case
+    if np.linalg.det(R) < 0:
+        print("det(R) < R, reflection detected!, correcting for it ...")
+        Vt[2, :] *= -1
+        R = Vt.T @ U.T
+
+    t = -R @ centroid_A + centroid_B
+
+    return R, t
 
 
 def get_ids(cat):
@@ -46,47 +93,35 @@ def get_ids(cat):
 
 
 def randomize_block_pose(seed, in_dist=True):
-    np.random.seed(seed)
+    rng = np.random.default_rng(seed)
     if in_dist:
         randomized_pose = np.array(
             [
-                np.random.uniform(low=-1, high=-0.1),
-                np.random.uniform(low=-1.4, high=-1.0),
-                np.random.uniform(low=0.1, high=0.25),
+                rng.uniform(low=-1, high=-0.1),
+                rng.uniform(low=-1.4, high=-1.0),
+                rng.uniform(low=0.1, high=0.25),
             ]
         )
     else:
         randomized_pose = np.array(
             [
-                np.random.uniform(low=1.5, high=2),
-                np.random.uniform(low=-3, high=3),
-                np.random.uniform(low=1.5, high=2),
+                rng.uniform(low=1.5, high=2),
+                rng.uniform(low=-3, high=3),
+                rng.uniform(low=1.5, high=2),
             ]
         )
-    print(randomized_pose)
     return randomized_pose
 
 
-def load_model(method: str, exp_name: str) -> DaggerNet:
-    d = os.path.join(
-        os.getcwd(),
-        f"checkpoints/{method}/{exp_name}/",
-    )
-    ckpt = os.listdir(d)[0]
-    net = DaggerNet.load_from_checkpoint(
-        f"{d}/{ckpt}",
-    )
-    return net.cuda()
-
-
-def randomize_start_pose(block_id, sim: PMRenderEnv, in_dist=True, goal_pos=None):
+def randomize_start_pose(
+    block_id, sim: PMRenderEnv, in_dist=True, goal_pos=None, seed=None
+):
     # This randomizes the starting pose
+    rng = np.random.default_rng(seed)
     valid_start = False
     while not valid_start:
-        obs_curr_xyz = randomize_block_pose(
-            (os.getpid() * int(time.time())) % 123456789, in_dist
-        )
-        angle = np.random.uniform(-60, 60)
+        obs_curr_xyz = randomize_block_pose(rng, in_dist)
+        angle = rng.uniform(-60, 60)
         start_ort = R.from_euler("z", angle, degrees=True).as_quat()
         p.resetBasePositionAndOrientation(
             block_id,
@@ -95,22 +130,24 @@ def randomize_start_pose(block_id, sim: PMRenderEnv, in_dist=True, goal_pos=None
             physicsClientId=sim.client_id,
         )
         valid_start = is_action_pose_valid(block_id, sim, n_valid_points=0) and (
-            in_dist or np.linalg.norm(goal_pos - obs_curr_xyz) >= 0.3
+            in_dist or np.linalg.norm(goal_pos - obs_curr_xyz) >= 0.3  # type: ignore
         )
     return obs_curr_xyz
 
 
 def create_test_env(
+    pm_root: str,
     obj_id: str,
     full_sem_dset: dict,
     object_dict: dict,
     which_goal: str,
     in_dist=True,
+    seed=None,
 ):
     # This creates the test env for observation.
     obs_env = PMRenderEnv(
         obj_id.split("_")[0],
-        os.path.expanduser("~/partnet-mobility/raw"),
+        os.path.join(pm_root, "raw"),
         camera_pos=[-3, 0, 1.2],
         gui=False,
     )
@@ -128,18 +165,18 @@ def create_test_env(
         obj_id_links_tomove = move_joints[obj_link_id]
 
         # Open the joints.
-        obs_env.articulate_specific_joints(obj_id_links_tomove, 0.9)
+        articulate_specific_joints(obs_env, obj_id_links_tomove, 0.9)
 
-    randomize_start_pose(obs_block_id, obs_env, in_dist)
+    randomize_start_pose(obs_block_id, obs_env, in_dist, seed)
     return obs_env, obs_block_id
 
 
-def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
+def get_demo(pm_root: str, goal_id: str, full_sem_dset: dict, object_dict: dict):
     # This creates the test env for demonstration.
 
     goal_env = PMRenderEnv(
         goal_id.split("_")[0],
-        os.path.expanduser("~/partnet-mobility/raw"),
+        os.path.join(pm_root, "raw"),
         camera_pos=[-3, 0, 1.2],
         gui=False,
     )
@@ -152,7 +189,7 @@ def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
                     move_joints = full_sem_dset[mode][partsem][goal_id.split("_")[0]]
         goal_link_id = object_dict[goal_id]["ind"]
         goal_id_links_tomove = move_joints[goal_link_id]
-        goal_env.articulate_specific_joints(goal_id_links_tomove, 0.9)
+        articulate_specific_joints(goal_env, goal_id_links_tomove, 0.9)
 
     goal_block = ACTION_OBJS["block"].urdf
     goal_block_id = p.loadURDF(
@@ -207,7 +244,19 @@ def quaternion_diff(q1, q2):
     return np.linalg.inv(R1) @ R2
 
 
-def predict_next_step(
+def load_bc_model(method: str, exp_name: str) -> DaggerNet:
+    d = os.path.join(
+        os.getcwd(),
+        f"checkpoints/{method}/{exp_name}/",
+    )
+    ckpt = os.listdir(d)[0]
+    net = DaggerNet.load_from_checkpoint(
+        f"{d}/{ckpt}",
+    )
+    return net.cuda()
+
+
+def predict_next_step_bc(
     goalinf_model, P_world, obj_mask, P_world_goal, goal_mask, curr_xyz, curr_quat
 ):
     # This infers the goal using the goalinf_modem obs PCD (P_world), and demo PCD (P_world_goal)
@@ -234,16 +283,102 @@ def predict_next_step(
     return inferred_next_step_tr, inferred_next_step_quat
 
 
+def bc_policy(
+    model,
+    P_world,
+    pc_seg_obj,
+    P_world_demo,
+    pc_seg_obj_demo,
+    current_xyz,
+    curr_quat,
+):
+    pred_action_tr, pred_action_rot = predict_next_step_bc(
+        model,
+        P_world,
+        pc_seg_obj == 99,
+        P_world_demo,
+        0 * (pc_seg_obj_demo == 99),
+        current_xyz,
+        curr_quat,
+    )
+    pred_action_tr = pred_action_tr.reshape(
+        -1,
+    )
+    pred_action_rot = pred_action_rot.reshape(
+        -1,
+    )
+
+    if (pc_seg_obj == 99).any():
+        current_xyz = pred_action_tr
+        curr_quat = pred_action_rot
+
+    return current_xyz, curr_quat
+
+
+def load_model_traj_flow(method: str, exp_name: str) -> TrajFlowNet:
+    d = os.path.join(
+        os.getcwd(),
+        f"checkpoints/{method}/{exp_name}/",
+    )
+    ckpt = os.listdir(d)[0]
+    net: TrajFlowNet = TrajFlowNet.load_from_checkpoint(
+        f"{d}/{ckpt}",
+    )
+    return net.cuda()
+
+
+def predict_next_step_traj_flow(
+    goalinf_model, P_world, obj_mask, P_world_goal, goal_mask
+) -> np.ndarray:
+    # This infers the goal using the goalinf_modem obs PCD (P_world), and demo PCD (P_world_goal)
+    pred_act = goalinf_model.predict(
+        torch.from_numpy(P_world).float(),
+        torch.from_numpy(obj_mask).float(),
+        torch.from_numpy(P_world_goal).float(),
+        torch.from_numpy(goal_mask).float(),
+    )
+    pred_flow = pred_act.cpu().numpy()
+    pred_flow[~obj_mask] = 0
+    inferred_next_step: np.ndarray = pred_flow
+    return inferred_next_step
+
+
+def traj_flow_policy(
+    model, P_world, pc_seg_obj, P_world_demo, pc_seg_obj_demo, current_xyz, curr_quat
+):
+    pred_flow = predict_next_step_traj_flow(
+        model,
+        P_world,
+        pc_seg_obj == 99,
+        P_world_demo,
+        pc_seg_obj_demo == 99,
+    )
+    pred_flow = 0.1 * pred_flow
+
+    if (pc_seg_obj == 99).any():
+        curr_obj = P_world[pc_seg_obj == 99]
+        next_obj = curr_obj + pred_flow[pc_seg_obj == 99]
+        pred_R, pred_t = rigid_transform_3D(curr_obj.T, next_obj.T)
+        current_xyz = current_xyz + pred_t.reshape((3,))
+        curr_quat = quaternion_sum(curr_quat, R.from_matrix(pred_R).as_quat())
+        curr_quat = R.from_matrix(curr_quat).as_quat()
+
+    return current_xyz, curr_quat
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cat", type=str)
-    parser.add_argument("--method", type=str, default="dgcnn_bc")
-    parser.add_argument("--model", type=str)
+    parser.add_argument("--cat", type=str, required=True)
+    parser.add_argument("--method", type=str, default="bc")
+    parser.add_argument("--model", type=str, required=True)
     parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--indist", type=bool, default=True)
     parser.add_argument("--postfix", type=str)
+    parser.add_argument(
+        "--pm-root", type=str, default=os.path.expanduser("~/datasets/partnet-mobility")
+    )
     args = parser.parse_args()
     objcat = args.cat
     method = args.method
@@ -251,32 +386,33 @@ if __name__ == "__main__":
     start_ind = args.start
     in_dist = args.indist
     postfix = args.postfix
+    pm_root = args.pm_root
+
+    # goal flow gets run in a different file.
+    assert method in {"bc", "dagger", "traj_flow"}
 
     # Get which joint to open
-    full_sem_dset = pickle.load(
-        open(
-            os.path.expanduser(
-                "~/discriminative_embeddings/goal_inf_dset/sem_class_transfer_dset_more.pkl"
-            ),
-            "rb",
-        )
-    )
-    object_dict_meta = pickle.load(
-        open(
-            os.path.expanduser(
-                f"~/discriminative_embeddings/goal_inf_dset/{objcat}_block_dset_multi.pkl"
-            ),
-            "rb",
-        )
-    )
+    with open(SEM_CLASS_DSET_PATH, "rb") as f:
+        full_sem_dset = pickle.load(f)
+    with open(
+        os.path.join(GOAL_INF_DSET_PATH, f"{objcat}_block_dset_multi.pkl"), "rb"
+    ) as f:
+        object_dict_meta = pickle.load(f)
 
     # Get goal inference model
-    bc_model = load_model(method, expname)
+    if method == "bc" or method == "dagger":
+        model = load_bc_model(method, expname)
+    elif method == "traj_flow":
+        model = load_model_traj_flow(method, expname)
+    elif method == "goal_flow":
+        raise ValueError("Goal flow not implemented yet")
+    else:
+        raise ValueError("Invalid method")
 
     # Create result directory
-    result_dir = f"part_embedding/goal_inference/baselines_rotation/rollouts/{method}_{expname}_{postfix}"
+    result_dir = f"./results/pm_baselines/{method}/{expname}/{postfix}"
     if not os.path.exists(result_dir):
-        print("Creating result directory for rollouts")
+        print("Creating result directory for results")
         os.makedirs(result_dir, exist_ok=True)
         os.makedirs(f"{result_dir}/vids", exist_ok=True)
 
@@ -290,6 +426,19 @@ if __name__ == "__main__":
 
     trial_start = start_ind % 20
     which_goal = postfix
+    if method == "bc" or method == "dagger":
+        num_trials = 10
+        rollout_len = 20
+    elif method == "traj_flow":
+        num_trials = 8
+        rollout_len = 60
+    elif method == "goal_flow":
+        raise ValueError("Goal flow not implemented yet")
+    else:
+        raise ValueError("Invalid method")
+
+    rng = np.random.default_rng(123456)
+
     for o in tqdm(objs[start_ind // 20 :]):
         if objcat == "all":
             object_dict = object_dict_meta[get_category(o.split("_")[0]).lower()]
@@ -298,7 +447,7 @@ if __name__ == "__main__":
         # Get demo ids list
         demo_id_list = list(object_dict.keys())
         trial = trial_start
-        while trial < 10:
+        while trial < num_trials:
             obj_id = f"{o}_{trial}"
             skip = False
             try:
@@ -313,11 +462,11 @@ if __name__ == "__main__":
                     trial += 1
                     continue
             except FileNotFoundError:
-                skil = False
+                skip = False
 
             # Get GT goal position
 
-            demo_id = np.random.choice(demo_id_list)
+            demo_id = rng.choice(demo_id_list)
             demo_id = f"{demo_id.split('_')[0]}_{which_goal}"
             if demo_id not in demo_id_list:
                 trial += 1
@@ -332,7 +481,7 @@ if __name__ == "__main__":
 
             # Create obs env
             obs_env, obs_block_id = create_test_env(
-                obj_id, full_sem_dset, object_dict, which_goal, in_dist
+                pm_root, obj_id, full_sem_dset, object_dict, which_goal, in_dist, rng
             )
 
             # Log starting position
@@ -355,23 +504,23 @@ if __name__ == "__main__":
                 P_demo_full,
                 pc_demo_full,
                 rgb_goal,
-            ) = get_demo(demo_id, full_sem_dset, object_dict)
+            ) = get_demo(pm_root, demo_id, full_sem_dset, object_dict)
             P_world_full, pc_seg_obj_full, _ = render_input(obs_block_id, obs_env)
             P_world_og, pc_seg_obj_og = subsample_pcd(P_world_full, pc_seg_obj_full)
 
             # BC POLICY ROLLOUT LOOP
             current_xyz = np.array([start_xyz[0], start_xyz[1], start_xyz[2]])
-            current_quat = np.array(
+            curr_quat = np.array(
                 [start_quat[0], start_quat[1], start_quat[2], start_quat[3]]
             )
             exec_gifs = []
             mp_result_dict[obj_id] = [1]
-            for t in range(20):
+            for t in range(rollout_len):
                 # Obtain observation data
                 p.resetBasePositionAndOrientation(
                     obs_block_id,
                     posObj=current_xyz,
-                    ornObj=current_quat,
+                    ornObj=curr_quat,
                     physicsClientId=obs_env.client_id,
                 )
                 collision_counter = len(
@@ -395,27 +544,32 @@ if __name__ == "__main__":
                 P_world_demo = P_world_demo[:output_len]
                 pc_seg_obj = pc_seg_obj[:output_len]
                 pc_seg_obj_demo = pc_seg_obj_demo[:output_len]
-                try:
-                    pred_action_tr, pred_action_rot = predict_next_step(
-                        bc_model,
+
+                if method == "bc" or method == "dagger":
+                    current_xyz, curr_quat = bc_policy(
+                        model,
                         P_world,
-                        pc_seg_obj == 99,
+                        pc_seg_obj,
                         P_world_demo,
-                        0 * (pc_seg_obj_demo == 99),
+                        pc_seg_obj_demo,
                         current_xyz,
-                        current_quat,
+                        curr_quat,
                     )
-                    pred_action_tr = pred_action_tr.reshape(
-                        -1,
+                elif method == "traj_flow":
+                    current_xyz, curr_quat = traj_flow_policy(
+                        model,
+                        P_world,
+                        pc_seg_obj,
+                        P_world_demo,
+                        pc_seg_obj_demo,
+                        current_xyz,
+                        curr_quat,
                     )
-                    pred_action_rot = pred_action_rot.reshape(
-                        -1,
-                    )
-                except IndexError:
-                    breakpoint()
-                if (pc_seg_obj == 99).any():
-                    current_xyz = pred_action_tr
-                    curr_quat = pred_action_rot
+                elif method == "goal_flow":
+                    raise ValueError("Goal flow not implemented yet")
+                else:
+                    raise ValueError("Invalid method")
+
                 if np.linalg.norm(current_xyz - gt_goal_xyz) <= 5e-2:
                     break
 
@@ -423,10 +577,6 @@ if __name__ == "__main__":
             gt_flow = np.tile(gt_goal_xyz - start_xyz, (P_world_og.shape[0], 1))
             gt_flow[~(pc_seg_obj_og == 99)] = 0
             gt_goal = P_world_og + gt_flow
-
-            syn_flow = np.tile(current_xyz - start_xyz, (P_world_og.shape[0], 1))
-            syn_flow[~(pc_seg_obj_og == 99)] = 0
-            inferred_goal = P_world_og + syn_flow
 
             start_trans_dist = np.linalg.norm(start_xyz - gt_goal_xyz)
             end_trans_dist = np.linalg.norm(current_xyz - gt_goal_xyz)
@@ -459,13 +609,10 @@ if __name__ == "__main__":
             imageio.mimsave(f"{result_dir}/vids/test_{obj_id}.gif", exec_gifs, fps=25)
             imageio.imsave(f"{result_dir}/vids/test_{obj_id}_goal.png", rgb_goal)
             p.disconnect()
-            mp_result_dict[obj_id].append(
-                min(
-                    1,
-                    np.linalg.norm(current_xyz - gt_goal_xyz)
-                    / np.linalg.norm(start_xyz - gt_goal_xyz),
-                )
+            nd = np.linalg.norm(current_xyz - gt_goal_xyz) / np.linalg.norm(
+                start_xyz - gt_goal_xyz
             )
+            mp_result_dict[obj_id].append(min(1, nd))  # type: ignore
 
             # Log the result to text file
             goalinf_res_file = open(
@@ -476,7 +623,6 @@ if __name__ == "__main__":
             print(f"{obj_id}: {mp_result_dict[obj_id]}", file=mp_res_file)
             goalinf_res_file.close()
             mp_res_file.close()
-        trial_start = 0
 
     print("Result: \n")
     print(result_dict)

@@ -87,12 +87,14 @@ explicit_package_bases = true
 # Uncomment this when you have imports for mypy to ignore.
 [[tool.mypy.overrides]]
 module = [
+  "chamferdist.*",
   "cv2.*",
   "display.*",
   "dgl.*",
   "h5py.*",
   "matplotlib.*",
   "pandas.*",
+  "plotly.*",
   "pybullet.*",
   "pytorch3d.*",
   "scipy.*",

@@ -71,7 +71,7 @@ class GCGoalFlowDataset(tgd.Dataset):
         )
 
     @staticmethod
-    def processed_base(randomize_camera, even_sampling):
+    def processed_base(randomize_camera, even_sampling) -> str:
         chunk = ""
         if randomize_camera:
             chunk += "_random"
