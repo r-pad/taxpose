@@ -451,7 +451,6 @@ if __name__ == "__main__":
         objs.remove("7292")
 
     result_dict = {}
-    mp_result_dict = {}
 
     trial_len = 10
     trial_start = start_ind % trial_len

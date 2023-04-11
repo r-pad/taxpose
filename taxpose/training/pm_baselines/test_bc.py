@@ -130,7 +130,7 @@ def randomize_start_pose(
             physicsClientId=sim.client_id,
         )
         valid_start = is_action_pose_valid(block_id, sim, n_valid_points=0) and (
-            in_dist or np.linalg.norm(goal_pos - obs_curr_xyz) >= 0.3
+            in_dist or np.linalg.norm(goal_pos - obs_curr_xyz) >= 0.3  # type: ignore
         )
     return obs_curr_xyz
 
@@ -609,13 +609,10 @@ if __name__ == "__main__":
             imageio.mimsave(f"{result_dir}/vids/test_{obj_id}.gif", exec_gifs, fps=25)
             imageio.imsave(f"{result_dir}/vids/test_{obj_id}_goal.png", rgb_goal)
             p.disconnect()
-            mp_result_dict[obj_id].append(
-                min(
-                    1,
-                    np.linalg.norm(current_xyz - gt_goal_xyz)
-                    / np.linalg.norm(start_xyz - gt_goal_xyz),
-                )
+            nd = np.linalg.norm(current_xyz - gt_goal_xyz) / np.linalg.norm(
+                start_xyz - gt_goal_xyz
             )
+            mp_result_dict[obj_id].append(min(1, nd))  # type: ignore
 
             # Log the result to text file
             goalinf_res_file = open(
