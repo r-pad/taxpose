@@ -331,7 +331,11 @@ In order to create the dataset on your own, you can run the following command:
 
 This will create and log the dataset to this directory: ```./taxpose/datasets/pm_data/free_floating_traj_interp_multigoals```
 
-TODO(harry): Add a script which synthesizes all the individual goal locations into different data frames.
+Top reproduce Table 4 in the paper, simply run the provided Jupyter Notebook:
+
+```
+./taxpose/training/pm_baselines/baselines_results_agg.ipynb
+```
 
 
 NOTE: This uses wandb to log results and generate checkpoint structure.
