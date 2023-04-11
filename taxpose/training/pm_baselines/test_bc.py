@@ -377,7 +377,7 @@ if __name__ == "__main__":
     parser.add_argument("--indist", type=bool, default=True)
     parser.add_argument("--postfix", type=str)
     parser.add_argument(
-        "--pm-root", type=str, default=os.path.expanduser("~/dataset/partnet-mobility")
+        "--pm-root", type=str, default=os.path.expanduser("~/datasets/partnet-mobility")
     )
     args = parser.parse_args()
     objcat = args.cat
@@ -388,7 +388,8 @@ if __name__ == "__main__":
     postfix = args.postfix
     pm_root = args.pm_root
 
-    assert method in {"bc", "dagger", "traj_flow", "goal_flow"}
+    # goal flow gets run in a different file.
+    assert method in {"bc", "dagger", "traj_flow"}
 
     # Get which joint to open
     with open(SEM_CLASS_DSET_PATH, "rb") as f:
@@ -409,7 +410,7 @@ if __name__ == "__main__":
         raise ValueError("Invalid method")
 
     # Create result directory
-    result_dir = f"./results/pm_baselines/{method}_{expname}_{postfix}"
+    result_dir = f"./results/pm_baselines/{method}/{expname}/{postfix}"
     if not os.path.exists(result_dir):
         print("Creating result directory for results")
         os.makedirs(result_dir, exist_ok=True)
