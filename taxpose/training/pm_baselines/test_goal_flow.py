@@ -76,7 +76,7 @@ def get_ids(cat):
         return val_res + unseen_res
 
 
-def load_model(method: str, exp_name: str, in_dim: int):
+def load_bc_model(method: str, exp_name: str, in_dim: int):
     d = os.path.join(
         os.getcwd(),
         f"checkpoints/{method}/{exp_name}/",
@@ -254,7 +254,7 @@ if __name__ == "__main__":
     )
 
     # Get goal inference model
-    goalinf_model = load_model(method, expname, in_dim).cuda()
+    goalinf_model = load_bc_model(method, expname, in_dim).cuda()
 
     # Get collision model
     coll_net = None

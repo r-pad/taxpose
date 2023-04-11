@@ -25,10 +25,55 @@ from taxpose.datasets.pm_placement import (
 )
 from taxpose.training.pm_baselines.bc_dataset import articulate_specific_joints
 from taxpose.training.pm_baselines.bc_model import BCNet as DaggerNet
+from taxpose.training.pm_baselines.flow_model import FlowNet as TrajFlowNet
 
 """
 This file loads a trained BC model and tests the rollout in simulation.
 """
+
+
+def rigid_transform_3D(A, B):
+    assert A.shape == B.shape
+
+    num_rows, num_cols = A.shape
+    if num_rows != 3:
+        raise Exception(f"matrix A is not 3xN, it is {num_rows}x{num_cols}")
+
+    num_rows, num_cols = B.shape
+    if num_rows != 3:
+        raise Exception(f"matrix B is not 3xN, it is {num_rows}x{num_cols}")
+
+    # find mean column wise
+    centroid_A = np.mean(A, axis=1)
+    centroid_B = np.mean(B, axis=1)
+
+    # ensure centroids are 3x1
+    centroid_A = centroid_A.reshape(-1, 1)
+    centroid_B = centroid_B.reshape(-1, 1)
+
+    # subtract mean
+    Am = A - centroid_A
+    Bm = B - centroid_B
+
+    H = Am @ np.transpose(Bm)
+
+    # sanity check
+    # if linalg.matrix_rank(H) < 3:
+    #    raise ValueError("rank of H = {}, expecting 3".format(linalg.matrix_rank(H)))
+
+    # find rotation
+    U, S, Vt = np.linalg.svd(H)
+    R = Vt.T @ U.T
+
+    # special reflection case
+    if np.linalg.det(R) < 0:
+        print("det(R) < R, reflection detected!, correcting for it ...")
+        Vt[2, :] *= -1
+        R = Vt.T @ U.T
+
+    t = -R @ centroid_A + centroid_B
+
+    return R, t
 
 
 def get_ids(cat):
@@ -66,18 +111,6 @@ def randomize_block_pose(seed, in_dist=True):
             ]
         )
     return randomized_pose
-
-
-def load_model(method: str, exp_name: str) -> DaggerNet:
-    d = os.path.join(
-        os.getcwd(),
-        f"checkpoints/{method}/{exp_name}/",
-    )
-    ckpt = os.listdir(d)[0]
-    net = DaggerNet.load_from_checkpoint(
-        f"{d}/{ckpt}",
-    )
-    return net.cuda()
 
 
 def randomize_start_pose(
@@ -211,7 +244,19 @@ def quaternion_diff(q1, q2):
     return np.linalg.inv(R1) @ R2
 
 
-def predict_next_step(
+def load_bc_model(method: str, exp_name: str) -> DaggerNet:
+    d = os.path.join(
+        os.getcwd(),
+        f"checkpoints/{method}/{exp_name}/",
+    )
+    ckpt = os.listdir(d)[0]
+    net = DaggerNet.load_from_checkpoint(
+        f"{d}/{ckpt}",
+    )
+    return net.cuda()
+
+
+def predict_next_step_bc(
     goalinf_model, P_world, obj_mask, P_world_goal, goal_mask, curr_xyz, curr_quat
 ):
     # This infers the goal using the goalinf_modem obs PCD (P_world), and demo PCD (P_world_goal)
@@ -238,6 +283,89 @@ def predict_next_step(
     return inferred_next_step_tr, inferred_next_step_quat
 
 
+def bc_policy(
+    model,
+    P_world,
+    pc_seg_obj,
+    P_world_demo,
+    pc_seg_obj_demo,
+    current_xyz,
+    curr_quat,
+):
+    pred_action_tr, pred_action_rot = predict_next_step_bc(
+        model,
+        P_world,
+        pc_seg_obj == 99,
+        P_world_demo,
+        0 * (pc_seg_obj_demo == 99),
+        current_xyz,
+        curr_quat,
+    )
+    pred_action_tr = pred_action_tr.reshape(
+        -1,
+    )
+    pred_action_rot = pred_action_rot.reshape(
+        -1,
+    )
+
+    if (pc_seg_obj == 99).any():
+        current_xyz = pred_action_tr
+        curr_quat = pred_action_rot
+
+    return current_xyz, curr_quat
+
+
+def load_model_traj_flow(method: str, exp_name: str) -> TrajFlowNet:
+    d = os.path.join(
+        os.getcwd(),
+        f"checkpoints/{method}/{exp_name}/",
+    )
+    ckpt = os.listdir(d)[0]
+    net: TrajFlowNet = TrajFlowNet.load_from_checkpoint(
+        f"{d}/{ckpt}",
+    )
+    return net.cuda()
+
+
+def predict_next_step_traj_flow(
+    goalinf_model, P_world, obj_mask, P_world_goal, goal_mask
+) -> np.ndarray:
+    # This infers the goal using the goalinf_modem obs PCD (P_world), and demo PCD (P_world_goal)
+    pred_act = goalinf_model.predict(
+        torch.from_numpy(P_world).float(),
+        torch.from_numpy(obj_mask).float(),
+        torch.from_numpy(P_world_goal).float(),
+        torch.from_numpy(goal_mask).float(),
+    )
+    pred_flow = pred_act.cpu().numpy()
+    pred_flow[~obj_mask] = 0
+    inferred_next_step: np.ndarray = pred_flow
+    return inferred_next_step
+
+
+def traj_flow_policy(
+    model, P_world, pc_seg_obj, P_world_demo, pc_seg_obj_demo, current_xyz, curr_quat
+):
+    pred_flow = predict_next_step_traj_flow(
+        model,
+        P_world,
+        pc_seg_obj == 99,
+        P_world_demo,
+        pc_seg_obj_demo == 99,
+    )
+    pred_flow = 0.1 * pred_flow
+
+    if (pc_seg_obj == 99).any():
+        curr_obj = P_world[pc_seg_obj == 99]
+        next_obj = curr_obj + pred_flow[pc_seg_obj == 99]
+        pred_R, pred_t = rigid_transform_3D(curr_obj.T, next_obj.T)
+        current_xyz = current_xyz + pred_t.reshape((3,))
+        curr_quat = quaternion_sum(curr_quat, R.from_matrix(pred_R).as_quat())
+        curr_quat = R.from_matrix(curr_quat).as_quat()
+
+    return current_xyz, curr_quat
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -260,6 +388,8 @@ if __name__ == "__main__":
     postfix = args.postfix
     pm_root = args.pm_root
 
+    assert method in {"bc", "dagger", "traj_flow", "goal_flow"}
+
     # Get which joint to open
     with open(SEM_CLASS_DSET_PATH, "rb") as f:
         full_sem_dset = pickle.load(f)
@@ -269,7 +399,14 @@ if __name__ == "__main__":
         object_dict_meta = pickle.load(f)
 
     # Get goal inference model
-    bc_model = load_model(method, expname)
+    if method == "bc" or method == "dagger":
+        model = load_bc_model(method, expname)
+    elif method == "traj_flow":
+        model = load_model_traj_flow(method, expname)
+    elif method == "goal_flow":
+        raise ValueError("Goal flow not implemented yet")
+    else:
+        raise ValueError("Invalid method")
 
     # Create result directory
     result_dir = f"./results/pm_baselines/{method}_{expname}_{postfix}"
@@ -288,8 +425,16 @@ if __name__ == "__main__":
 
     trial_start = start_ind % 20
     which_goal = postfix
-    num_trials = 10
-    rollout_len = 20
+    if method == "bc" or method == "dagger":
+        num_trials = 10
+        rollout_len = 20
+    elif method == "traj_flow":
+        num_trials = 8
+        rollout_len = 60
+    elif method == "goal_flow":
+        raise ValueError("Goal flow not implemented yet")
+    else:
+        raise ValueError("Invalid method")
 
     rng = np.random.default_rng(123456)
 
@@ -398,27 +543,32 @@ if __name__ == "__main__":
                 P_world_demo = P_world_demo[:output_len]
                 pc_seg_obj = pc_seg_obj[:output_len]
                 pc_seg_obj_demo = pc_seg_obj_demo[:output_len]
-                try:
-                    pred_action_tr, pred_action_rot = predict_next_step(
-                        bc_model,
+
+                if method == "bc" or method == "dagger":
+                    current_xyz, curr_quat = bc_policy(
+                        model,
                         P_world,
-                        pc_seg_obj == 99,
+                        pc_seg_obj,
                         P_world_demo,
-                        0 * (pc_seg_obj_demo == 99),
+                        pc_seg_obj_demo,
                         current_xyz,
                         curr_quat,
                     )
-                    pred_action_tr = pred_action_tr.reshape(
-                        -1,
+                elif method == "traj_flow":
+                    current_xyz, curr_quat = traj_flow_policy(
+                        model,
+                        P_world,
+                        pc_seg_obj,
+                        P_world_demo,
+                        pc_seg_obj_demo,
+                        current_xyz,
+                        curr_quat,
                     )
-                    pred_action_rot = pred_action_rot.reshape(
-                        -1,
-                    )
-                except IndexError:
-                    breakpoint()
-                if (pc_seg_obj == 99).any():
-                    current_xyz = pred_action_tr
-                    curr_quat = pred_action_rot
+                elif method == "goal_flow":
+                    raise ValueError("Goal flow not implemented yet")
+                else:
+                    raise ValueError("Invalid method")
+
                 if np.linalg.norm(current_xyz - gt_goal_xyz) <= 5e-2:
                     break
 
