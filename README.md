@@ -324,9 +324,12 @@ TODO(beisner): Still need to add the code for this, although its performance is 
 
 #### Baselines
 
-TODO(harry): Add instructions for generating this bc dataset.
-
+We provide the following dataset for training the baselines methods mentioned in our paper.
 [free_floationg_traj_interp_multigoals.zip](https://drive.google.com/file/d/18aLo7PZ9wv58GO2kJxlS8ai8OKE5Pm1l/view?usp=share_link)
+In order to create the dataset on your own, you can run the following command:
+```python -m taxpose.training.pm_baselones.ompl_traj_gen```
+
+This will create and log the dataset to this directory: ```./taxpose/datasets/pm_data/free_floating_traj_interp_multigoals```
 
 TODO(harry): Add a script which synthesizes all the individual goal locations into different data frames.
 
@@ -345,16 +348,6 @@ Evaluate:
 # In
 python taxpose/training/pm_baselines/test_bc.py --cat all --method bc --model <wandb model name>  --postfix 0
 
-<<<<<<< HEAD
-#### E2E BC, E2E DAgger, Traj Flow, Goal Flow
-
-TODO: Add instructions for generating the dataset. Otherwise, provide link to the Google drive link.
-
-[free_floationg_traj_interp_multigoals.zip](https://drive.google.com/file/d/18aLo7PZ9wv58GO2kJxlS8ai8OKE5Pm1l/view?usp=share_link)
-
-These baselines are currently in a partially-functional state. The code is provided, but not currently reproducible.
-
-=======
 # Top
 python taxpose/training/pm_baselines/test_bc.py --cat all --method bc --model <wandb model name>  --postfix 1
 
@@ -432,7 +425,6 @@ python taxpose/training/pm_baselines/test_goal_flow.py --cat all --method goal_f
 # Right
 python taxpose/training/pm_baselines/test_goal_flow.py --cat all --method goal_flow --model <wandb model name>  --postfix 3
 ```
->>>>>>> 72d26d24f8c61ce568dadf8d74acdee583bba844
 
 ### Generate Results Table.
 

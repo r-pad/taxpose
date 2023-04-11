@@ -79,7 +79,11 @@ def rigid_transform_3D(A, B):
 def get_ids(cat):
     if cat != "All":
         split_file = json.load(
-            open(os.path.expanduser("~/umpnet/mobility_dataset/split-full.json"))
+            open(
+                os.path.expanduser(
+                    "./taxpose/datasets/pm_data/goal_inf_dset/split-full.json"
+                )
+            )
         )
         res = []
         for mode in split_file:

@@ -12,6 +12,7 @@ from scipy.spatial.transform import Rotation as R
 from tqdm import tqdm
 
 from taxpose.datasets.pm_placement import (
+    ACTION_OBJS,
     SEEN_CATS,
     UNSEEN_CATS,
     get_category,
@@ -30,7 +31,7 @@ This file loads a trained goal inference model and tests the rollout using motio
 def get_ids(cat):
     if cat != "All":
         split_file = json.load(
-            open(os.path.expanduser("~/umpnet/mobility_dataset/split-full.json"))
+            open(os.path.expanduser("./taxpose/datasets/pm_data/split-full.json"))
         )
         res = []
         for mode in split_file:
@@ -75,9 +76,7 @@ def get_demo(goal_id: str, full_sem_dset: dict, object_dict: dict):
         goal_id_links_tomove = move_joints[goal_link_id]
         goal_env.articulate_specific_joints(goal_id_links_tomove, 0.9)
 
-    goal_block = os.path.expanduser(
-        "/home/harry/discriminative_embeddings/third_party/ravens/ravens/environments/assets/block/block.urdf"
-    )
+    goal_block = ACTION_OBJS["block"].urdf
     goal_block_id = p.loadURDF(
         goal_block, physicsClientId=goal_env.client_id, globalScaling=4
     )
@@ -200,7 +199,7 @@ if __name__ == "__main__":
     full_sem_dset = pickle.load(
         open(
             os.path.expanduser(
-                "~/discriminative_embeddings/goal_inf_dset/sem_class_transfer_dset_more.pkl"
+                "./taxpose/datasets/pm_data/goal_inf_dset/sem_class_transfer_dset_more.pkl"
             ),
             "rb",
         )
@@ -208,7 +207,7 @@ if __name__ == "__main__":
     object_dict_meta = pickle.load(
         open(
             os.path.expanduser(
-                f"~/discriminative_embeddings/goal_inf_dset/{objcat}_block_dset_multi.pkl"
+                f"./taxpose/datasets/pm_data/goal_inf_dset/{objcat}_block_dset_multi.pkl"
             ),
             "rb",
         )
@@ -218,7 +217,7 @@ if __name__ == "__main__":
     bc_model = load_model(method, expname)
 
     # Create result directory
-    result_dir = f"part_embedding/goal_inference/baselines_rotation/rollouts/{objcat}_{method}_{postfix}"
+    result_dir = f"./rollouts/{objcat}_{method}_{postfix}"
     if not os.path.exists(result_dir):
         print("Creating result directory for rollouts")
         os.makedirs(result_dir, exist_ok=True)

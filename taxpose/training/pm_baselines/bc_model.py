@@ -11,26 +11,35 @@ import torch_geometric.data as tgd
 from torch_geometric.data.batch import Batch
 from torch_geometric.data.data import Data
 
+from third_party.dcp.model import DGCNN
+
 
 class BCNet(pl.LightningModule):
     def __init__(self):
         super().__init__()
 
-        self.gfe_net_0 = pnp.PN2Encoder(in_dim=1, out_dim=128, p=pnp.PN2EncoderParams())
-        self.gfe_net_1 = pnp.PN2Encoder(in_dim=1, out_dim=128, p=pnp.PN2EncoderParams())
-        self.lin1 = torch.nn.Linear(256, 128)
-        self.lin2 = torch.nn.Linear(128, 64)
-        self.lin3 = torch.nn.Linear(64, 7)
+        self.dgcnn_0 = DGCNN(emb_dims=512)
+        self.dgcnn_1 = DGCNN(emb_dims=512)
+        self.lin = nn.Linear(512, 7)
         self.bc_loss = nn.MSELoss()
 
-    def forward(self, src_data, dst_data):  # type: ignore
-        src_embed = self.gfe_net_0(src_data)
-        dst_embed = self.gfe_net_1(dst_data)
-        embed = torch.concat([src_embed, dst_embed], axis=1)
-        out = F.relu(self.lin1(embed))
-        out = F.relu(self.lin2(out))
-        out = self.lin3(out)
+    @staticmethod
+    def norm_scale(pos):
+        mean = pos.mean(dim=1).unsqueeze(1)
+        pos = pos - mean
+        scale = pos.abs().max(dim=2)[0].max(dim=1)[0]
+        pos = pos / (scale.view(-1, 1, 1) + 1e-8)
+        return pos
 
+    def forward(self, src_data, dst_data):
+        dst_pos = self.norm_scale(dst_data.pos.view(-1, 2000, 3)).transpose(-1, -2)
+        src_pos = self.norm_scale(src_data.pos.view(-1, 2000, 3)).transpose(-1, -2)
+        out_0 = self.dgcnn_0(dst_pos.cuda())
+        out_1 = self.dgcnn_1(src_pos.cuda())
+        out = torch.multiply(out_0, out_1)
+        out = F.relu(out)
+        out = self.lin(out.transpose(1, 2))
+        out = out.mean(axis=1)
         return out
 
     def predict(
