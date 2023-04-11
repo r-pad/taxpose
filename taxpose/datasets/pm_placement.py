@@ -1,3 +1,4 @@
+import json
 import pickle
 from dataclasses import dataclass
 from enum import Enum
@@ -19,10 +20,13 @@ import taxpose.datasets.pm_splits as splits
 
 TAXPOSE_ROOT = Path(__file__).parent.parent.parent
 GOAL_DATA_PATH = TAXPOSE_ROOT / "taxpose" / "datasets" / "pm_data"
-GCOND_DSET_PATH = str(TAXPOSE_ROOT / "goalcond-pm-objs-split.json")
+GCOND_DSET_PATH = str(GOAL_DATA_PATH / "goalcond-pm-objs-split.json")
+GOAL_INF_DSET_PATH = GOAL_DATA_PATH / "goal_inf_dset"
 RAVENS_ASSETS = TAXPOSE_ROOT / "third_party/ravens/ravens/environments/assets"
 SNAPPED_GOAL_FILE = GOAL_DATA_PATH / "snapped_goals.pkl"
-SEM_CLASS_DSET_PATH = GOAL_DATA_PATH / "sem_class_transfer_dset_more.pkl"
+UMPNET_SPLIT_FULL_FILE = GOAL_DATA_PATH / "split-full.json"
+SEM_CLASS_DSET_PATH = GOAL_INF_DSET_PATH / "sem_class_transfer_dset_more.pkl"
+ALL_BLOCK_DSET_PATH = GOAL_INF_DSET_PATH / "all_block_dset_multi.pkl"
 ACTION_CLOUD_DIR = (
     TAXPOSE_ROOT / "taxpose" / "datasets" / "pm_data" / "action_point_clouds"
 )
@@ -87,6 +91,10 @@ def __id_to_cat():
 CATEGORIES = __id_to_cat()
 
 
+def get_category(obj_id):
+    return CATEGORIES[obj_id]
+
+
 def randomize_block_pose(seed: NPSeed = None):
     rng = np.random.default_rng(seed)
     randomized_pose = np.array(
@@ -126,7 +134,7 @@ def find_link_index_to_open(full_sem_dset, partsem, obj_id, object_dict, goal_id
     return links_tomove
 
 
-def is_action_pose_valid(block_id, sim: PMRenderEnv, n_valid_points=50):
+def is_action_pose_valid(block_id, sim: PMRenderEnv, n_valid_points=50) -> bool:
     # Valid only if the block is visible in the rendered image AND there's no collision.
     collision_counter = len(
         p.getClosestPoints(
@@ -185,6 +193,22 @@ def has_collisions(action_id, sim: PMRenderEnv):
         )
     )
     return collision_counter > 0
+
+
+def subsample_pcd(P_world, pc_seg_obj, seed: NPSeed = None):
+    rng = np.random.default_rng(seed)
+    subsample = np.where(pc_seg_obj == 99)[0]
+    rng.shuffle(subsample)
+    subsample = subsample[:200]
+    subsample_obj = np.where(pc_seg_obj != 99)[0]
+    rng.shuffle(subsample_obj)
+    subsample_obj = subsample_obj[:1800]
+    pc_seg_obj = np.concatenate([pc_seg_obj[subsample_obj], pc_seg_obj[subsample]])
+    P_world = np.concatenate([P_world[subsample_obj], P_world[subsample]])
+    while len(P_world) < 2000:
+        pc_seg_obj = np.concatenate([pc_seg_obj, pc_seg_obj[-1:]])
+        P_world = np.concatenate([P_world, P_world[-1:]])
+    return P_world, pc_seg_obj
 
 
 def find_valid_action_initial_pose(
@@ -281,6 +305,31 @@ def downsample_pcd_fps(pcd, n, use_dgl=True, seed=None):
         pcd = pcd[rng.permutation(len(pcd))]
         ixs = torch_cluster.fps(pcd, None, ratio, random_start=False)
     return ixs
+
+
+def get_dataset_ids_all(seen_cats, unseen_cats):
+    split_file = json.load(open(GCOND_DSET_PATH))
+    train_res = []
+    val_res = []
+    test_res = []
+    for cat in seen_cats:
+        cat = cat.capitalize()
+        for mode in split_file:
+            if cat in split_file[mode] and mode == "train":
+                train_res += split_file[mode][cat]["train"]
+    for cat in seen_cats:
+        cat = cat.capitalize()
+        for mode in split_file:
+            if cat in split_file[mode] and mode == "train":
+                val_res += split_file[mode][cat]["test"]
+    for cat in unseen_cats:
+        cat = cat.capitalize()
+        for mode in split_file:
+            if cat in split_file[mode] and mode == "test":
+                test_res += split_file[mode][cat]["test"]
+    if "7292" in train_res:
+        train_res.remove("7292")
+    return train_res, val_res, test_res
 
 
 class GIData(Protocol):

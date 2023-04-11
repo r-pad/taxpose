@@ -13,6 +13,7 @@ authors = [
   {email = "dheld@andrew.cmu.edu", name = "David Held"},
 ]
 dependencies = [
+  "chamferdist",
   "dgl ~= 1.0",
   "dglgo ~= 0.0.2",
   "h5py",
@@ -86,12 +87,14 @@ explicit_package_bases = true
 # Uncomment this when you have imports for mypy to ignore.
 [[tool.mypy.overrides]]
 module = [
+  "chamferdist.*",
   "cv2.*",
   "display.*",
   "dgl.*",
   "h5py.*",
   "matplotlib.*",
   "pandas.*",
+  "plotly.*",
   "pybullet.*",
   "pytorch3d.*",
   "scipy.*",

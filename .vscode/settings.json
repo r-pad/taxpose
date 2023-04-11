@@ -7,5 +7,24 @@
     ],
     "editor.codeActionsOnSave": {
         "source.organizeImports": true
+    },
+    "files.exclude": {
+        "data/*": true,
+    },
+    "python.linting.enabled": true,
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/*/**": true,
+        "**/.svn/**": true,
+        "**/dist/**": true,
+        "**/dist-prod/**": true,
+        "checkpoints/**": true,
+        "data/**": true,
+        "logs/**": true,
+        "outputs/**": true,
+        "rollouts/**": true,
+        "results/**": true,
+        "wandb/**": true,
     }
 }
