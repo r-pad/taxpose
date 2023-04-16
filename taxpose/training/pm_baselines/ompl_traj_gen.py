@@ -17,7 +17,11 @@ from rpad.partnet_mobility_utils.render.pybullet import PMRenderEnv
 from scipy.spatial.transform import Rotation as R
 from tqdm import tqdm
 
-from taxpose.datasets.pm_placement import ACTION_OBJS
+from taxpose.datasets.pm_placement import (
+    ACTION_OBJS,
+    ALL_BLOCK_DSET_PATH,
+    SEM_CLASS_DSET_PATH,
+)
 
 
 def render_input(block_id, sim: PMRenderEnv, render_floor=False):
@@ -111,19 +115,24 @@ def is_state_valid(state):
 
 if __name__ == "__main__":
     # Load relevant data
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--save_path", type=str)
+    parser.add_argument("pm_dir", type=str)
+    args = parser.parse_args()
+    usr_inp_result_dir = args.save_path
+    pm_raw_dir = args.pm_dir
+
     _dset = pickle.load(
         open(
-            os.path.expanduser(
-                f"./taxpose/datasets/pm_data/goal_inf_dset/all_block_dset_multi.pkl"
-            ),
+            ALL_BLOCK_DSET_PATH,
             "rb",
         )
     )
     full_sem_dset = pickle.load(
         open(
-            os.path.expanduser(
-                "./taxpose/datasets/pm_data/goal_inf_dset/sem_class_transfer_dset_more.pkl"
-            ),
+            SEM_CLASS_DSET_PATH,
             "rb",
         )
     )
@@ -146,9 +155,7 @@ if __name__ == "__main__":
         bounds.setLow(i, low)
 
     # Create directory for saving the data
-    result_dir = os.path.expanduser(
-        f"./taxpose/datasets/pm_data/free_floating_traj_interp_multigoals"
-    )
+    result_dir = os.path.expanduser(f"./taxpose/datasets/pm_data/{usr_inp_result_dir}")
     if not os.path.exists(result_dir):
         print("Creating dataset directory")
         os.makedirs(result_dir, exist_ok=True)
@@ -173,9 +180,7 @@ if __name__ == "__main__":
                     print("skippin")
                     trial += 1
                     continue
-                sim = PMRenderEnv(
-                    id.split("_")[0], os.path.expanduser("~/partnet-mobility/raw")
-                )
+                sim = PMRenderEnv(id.split("_")[0], os.path.expanduser(f"{pm_raw_dir}"))
 
                 # Open designated door according to dataset
                 if partsem != "none":

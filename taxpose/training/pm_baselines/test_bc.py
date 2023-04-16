@@ -26,6 +26,7 @@ from taxpose.datasets.pm_placement import (
 from taxpose.training.pm_baselines.bc_dataset import articulate_specific_joints
 from taxpose.training.pm_baselines.bc_model import BCNet as DaggerNet
 from taxpose.training.pm_baselines.flow_model import FlowNet as TrajFlowNet
+from taxpose.datasets.pm_placement import UMPNET_SPLIT_FULL_FILE
 
 """
 This file loads a trained BC model and tests the rollout in simulation.
@@ -78,13 +79,7 @@ def rigid_transform_3D(A, B):
 
 def get_ids(cat):
     if cat != "All":
-        split_file = json.load(
-            open(
-                os.path.expanduser(
-                    "./taxpose/datasets/pm_data/goal_inf_dset/split-full.json"
-                )
-            )
-        )
+        split_file = json.load(open(UMPNET_SPLIT_FULL_FILE))
         res = []
         for mode in split_file:
             if cat in split_file[mode]:
