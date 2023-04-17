@@ -22,6 +22,7 @@ from taxpose.datasets.pm_placement import (
     ALL_BLOCK_DSET_PATH,
     SEM_CLASS_DSET_PATH,
 )
+from taxpose.training.pm_baselines.bc_dataset import articulate_specific_joints
 
 
 def render_input(block_id, sim: PMRenderEnv, render_floor=False):
@@ -184,8 +185,8 @@ if __name__ == "__main__":
 
                 # Open designated door according to dataset
                 if partsem != "none":
-                    sim.articulate_specific_joints(
-                        move_joints[_dset[obj][id]["ind"]], 0.9
+                    articulate_specific_joints(
+                        sim, move_joints[_dset[obj][id]["ind"]], 0.9
                     )
                 block_id = p.loadURDF(
                     block, physicsClientId=sim.client_id, globalScaling=4
