@@ -324,11 +324,20 @@ TODO(beisner): Still need to add the code for this, although its performance is 
 
 #### Baselines
 
-TODO(harry): Add instructions for generating this bc dataset.
-
+We provide the following dataset for training the baselines methods mentioned in our paper.
 [free_floationg_traj_interp_multigoals.zip](https://drive.google.com/file/d/18aLo7PZ9wv58GO2kJxlS8ai8OKE5Pm1l/view?usp=share_link)
+In order to create the dataset on your own, please install OMPL on your machine following the instructions [here](https://ompl.kavrakilab.org/installation.html)
 
-TODO(harry): Add a script which synthesizes all the individual goal locations into different data frames.
+Then, you can run the following command:
+```python -m taxpose.training.pm_baselones.ompl_traj_gen```
+
+This will create and log the dataset to this directory: ```./taxpose/datasets/pm_data/free_floating_traj_interp_multigoals```
+
+Top reproduce Table 4 in the paper, simply run the provided Jupyter Notebook:
+
+```
+./taxpose/training/pm_baselines/baselines_results_agg.ipynb
+```
 
 
 NOTE: This uses wandb to log results and generate checkpoint structure.

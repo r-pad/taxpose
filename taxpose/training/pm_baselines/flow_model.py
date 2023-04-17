@@ -16,6 +16,7 @@ from torch_geometric.data.batch import Batch
 from torch_geometric.data.data import Data
 
 from taxpose.datasets.pm_placement import CATEGORIES
+from third_party.dcp.model import DGCNN
 
 
 def artflownet_loss(
@@ -266,8 +267,9 @@ class FlowNet(pl.LightningModule):
     def __init__(self, p: FlowNetParams = FlowNetParams()):
         super().__init__()
 
-        self.gfe_net = pnp.PN2Encoder(in_dim=1, out_dim=p.flow_embed_dim, p=p.gfe_net)
-        self.fr_net = FRNetCLIPort(p.fr_net)
+        self.dgcnn_0 = DGCNN(emb_dims=32)
+        self.dgcnn_1 = DGCNN(emb_dims=32)
+        self.lin = nn.Linear(32, 3)
 
     @staticmethod
     def flow_metrics(pred_flow, gt_flow):
@@ -287,10 +289,22 @@ class FlowNet(pl.LightningModule):
             )
         return rmse, cos_dist, mag_error
 
-    def forward(self, src_data, dst_data):  # type: ignore
-        flow_embedding = self.gfe_net(src_data)
+    @staticmethod
+    def norm_scale(pos):
+        mean = pos.mean(dim=1).unsqueeze(1)
+        pos = pos - mean
+        scale = pos.abs().max(dim=2)[0].max(dim=1)[0]
+        pos = pos / (scale.view(-1, 1, 1) + 1e-8)
+        return pos
 
-        pred_flow = self.fr_net(dst_data, flow_embedding)
+    def forward(self, src_data, dst_data):  # type: ignore
+        dst_pos = self.norm_scale(dst_data.pos.view(-1, 2000, 3)).transpose(-1, -2)
+        src_pos = self.norm_scale(src_data.pos.view(-1, 2000, 3)).transpose(-1, -2)
+        out_0 = self.dgcnn_0(dst_pos)
+        out_1 = self.dgcnn_1(src_pos)
+        out = torch.multiply(out_0, out_1)
+        out = F.relu(out)
+        pred_flow = self.lin(out.transpose(1, 2)).reshape(-1, 3)
 
         return pred_flow
 

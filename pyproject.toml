@@ -101,6 +101,7 @@ module = [
   "torch_cluster.*",
   "torch_geometric.*",
   "torchvision.*",
+  "ompl.*",
 ]
 ignore_missing_imports = true
 
