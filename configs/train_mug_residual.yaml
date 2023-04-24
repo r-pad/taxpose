@@ -5,12 +5,15 @@ hydra:
   sweep:
     dir: ${log_dir}/${experiment}/sweep/${now:%Y-%m-%d_%H%M%S}
     subdir: ${hydra.job.num}
+  job:
+    chdir: True
 
 log_dir: logs
 experiment: residual_flow_occlusion
 image_logging_period: 100
 # $task \in {mug_place, mug_grasp}
 defaults:
+  - _self_
   - task: mug_grasp
 
 # Dataset Settings
@@ -26,7 +29,7 @@ object_type: mug
 dataset_size: 1000
 rotation_variance: 180
 translation_variance: 0.5
-synthetic_occlusion: False
+synthetic_occlusion: True
 plane_occlusion: True
 plane_standoff: 0.04
 ball_occlusion: True
@@ -46,19 +49,15 @@ inital_sampling_ratio: 1
 flow_compute_type: 0
 residual_on: True
 pred_weight: True
-weight_normalize: softmax
 sigmoid_on: True
-softmax_temperature: 1
 return_flow_component: False
 mlp: False
 
 # Loss Settings
-flow_supervision: action2anchor
-point_loss_type: 0
-action_weight: 1
-rotation_weight: 0
-consistency_weight: 1
-smoothness_weight: 0.1
+flow_supervision: both
+displace_loss_weight: 1
+direct_correspondence_loss_weight: 1
+consistency_loss_weight: 0.1
 
 # Training Settings
 checkpoint_file: Null
@@ -67,3 +66,4 @@ checkpoint_file_action: ${checkpoint_dir}/pretraining_mug_embnn_weights.ckpt
 checkpoint_file_anchor: ${checkpoint_dir}/pretraining_rack_embnn_weights.ckpt
 freeze_embnn: False
 lr: 1e-4
+max_epochs: 1000

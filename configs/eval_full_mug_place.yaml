@@ -4,19 +4,24 @@ hydra:
   sweep:
     dir: ${log_dir}/${experiment}/sweep/${now:%Y-%m-%d_%H%M%S}
     subdir: ${hydra.job.num}
+  job:
+    chdir: True
 
 experiment: residual_flow_test_partial_cloud_initpose
 
 #### TO BE CHANGED ####
-
-checkpoint_file_grasp: ./trained_models/ndf/upright/grasp.ckpt
-checkpoint_file_place: ./trained_models/ndf/upright/place.ckpt
+defaults:
+  - _self_
+  - pose_dist: upright # {upright, arbitrary}
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/${pose_dist.name}/grasp.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/${pose_dist.name}/place.ckpt
+log_txt_file: '/home/exx/Documents/taxpose/test_results.txt' # abs path of file to log results
 # log saving dir
 log_dir: ./results/ndf/mug_place
-any_pose: False # arbitray pose or not
-num_iterations: 100
+num_iterations: 100 # number of trails
 object_class: mug
 data_dir: mug_place # directory name for data saved
+log_every_trial: False # True - log success rate at every trial; False - log only at the end of the # of trials
 #### TO BE CHANGED ####
 
 # Model Settings

@@ -49,7 +49,8 @@ def random_se3(
     constrained_axix_angle = rot_ratio * axis_angle_random  # max angle is rot_var
     R = axis_angle_to_matrix(constrained_axix_angle)
     random_translation = torch.randn(N, 3, device=device)
-    translation_ratio = trans_var / torch.norm(random_translation, dim=1).max().item()
+    translation_ratio = trans_var / \
+        torch.norm(random_translation, dim=1).max().item()
     t = torch.rand(1).item() * translation_ratio * random_translation
     return Rotate(R, device=device).translate(t)
 
@@ -119,55 +120,51 @@ def symmetric_orthogonalization(M):
     return R
 
 
-def flow2pose(
-    xyz,
-    flow,
-    weights=None,
-    return_transform3d=False,
-    normalization_scehme="l1",
-    x=None,
-    temperature=1,
-):
+def flow2pose(xyz,
+              flow,
+              weights=None,
+              return_transform3d=False,
+              normalization_scehme='l1',
+              temperature=1):
     """
     @param xyz: (batch, num_points, 3)
     @param flow: (batch, num_points,3)
     @param weights: (batch, num_points)
     @param normalization_scehme: {'l1, 'softmax'}
     @param x: flow prediction
+    @return pred_T_action: SE(3) transformation from xyz to the other point cloud
     """
+    xyz = xyz[:, :, :3]
     assert normalization_scehme in [
-        "l1",
-        "softmax",
-    ], "normalization_scehme: {} is not currently supported!".format(
-        normalization_scehme
-    )
-    if weights is None:
+        'l1', 'softmax'], "normalization_scehme: {} is not currently supported!".format(normalization_scehme)
+    if(weights is None):
         weights = torch.ones(xyz.shape[:-1], device=xyz.device)
-    if normalization_scehme == "l1":
-        w = F.normalize(weights, p=1.0, dim=-1).unsqueeze(-1)  # B, num_points, 1
-    elif normalization_scehme == "softmax":
+    if normalization_scehme == 'l1':
+        w = F.normalize(weights, p=1.0, dim=-
+                        1).unsqueeze(-1)  # B, num_points, 1
+    elif normalization_scehme == 'softmax':
         softmax_operator = torch.nn.Softmax(dim=-1)
         # B, num_points, 1
-        w = softmax_operator(weights / temperature).unsqueeze(-1)
+        w = softmax_operator(weights/temperature).unsqueeze(-1)
     # if not torch.allclose(w.sum(1), torch.ones(w.sum(1).shape).cuda()):
     #     import pdb
     #     pdb.set_trace()
-    assert torch.allclose(
-        w.sum(1), torch.ones(w.sum(1).shape).cuda()
-    ), "flow weights does not sum to 1 for each batch element"
+    assert torch.allclose(w.sum(1), torch.ones(w.sum(1).shape).cuda(
+    )), "flow weights does not sum to 1 for each batch element"
     xyz_mean = (w * xyz).sum(dim=1, keepdims=True)
-    xyz_demean = xyz - xyz_mean
+    xyz_centered = xyz - xyz_mean
 
     flow_mean = (w * flow).sum(dim=1, keepdims=True)
-    # xyz_trans = xyz_demean + flow - flow_mean
-    xyz_trans = ((xyz + flow) * w).sum(dim=1, keepdims=True)
+    flow_centered = flow - flow_mean
 
-    X = torch.bmm(xyz_demean.transpose(-2, -1), w * xyz_trans)
+    xyz_trans = xyz_centered + flow_centered
+    X = torch.bmm(xyz_centered.transpose(-2, -1),
+                  w*xyz_trans)
 
     R = symmetric_orthogonalization(X)
     t = (flow_mean + xyz_mean - torch.bmm(xyz_mean, R)).squeeze(1)
 
-    if return_transform3d:
+    if(return_transform3d):
         return Rotate(R).translate(t)
     return R, t
 
@@ -225,8 +222,10 @@ def dualflow2pose(
     flow_centered_tgt = flow_tgt - flow_mean_tgt
 
     w = torch.cat([w_src, w_tgt], dim=1)
-    xyz_1 = torch.cat([xyz_centered_src, xyz_centered_tgt + flow_centered_tgt], dim=1)
-    xyz_2 = torch.cat([xyz_centered_src + flow_centered_src, xyz_centered_tgt], dim=1)
+    xyz_1 = torch.cat(
+        [xyz_centered_src, xyz_centered_tgt + flow_centered_tgt], dim=1)
+    xyz_2 = torch.cat(
+        [xyz_centered_src + flow_centered_src, xyz_centered_tgt], dim=1)
 
     X = torch.bmm(xyz_1.transpose(-2, -1), w * xyz_2)
 
@@ -404,7 +403,8 @@ def dense_flow_loss(points, flow_pred, trans_gt):
 
 
 def svd_flow_loss(points, flow_pred, points_tgt, weights_pred=None):
-    T_pred = flow2pose(points, flow_pred, weights_pred, return_transform3d=True)
+    T_pred = flow2pose(points, flow_pred, weights_pred,
+                       return_transform3d=True)
     points_pred = T_pred.transform_points(points)
     induced_flow = (points_pred - points).detach()
 

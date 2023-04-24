@@ -2,4 +2,7 @@
 name: mug_grasp
 action_class: 2
 anchor_class: 0
-cloud_type: pre_grasp
+cloud_type: pre_grasp 
+softmax_temperature: 0.1
+weight_normalize: softmax
+# flow_supervision: action2anchor

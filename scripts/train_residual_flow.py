@@ -7,11 +7,18 @@ import torch
 from pytorch_lightning.loggers import WandbLogger
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
-from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
+from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer, CorrespondenceFlow_DiffEmbMLP
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
 from taxpose.utils.callbacks import SaverCallbackEmbnnActionAnchor, SaverCallbackModel
+
+
+def write_to_file(file_name, string):
+    with open(file_name, 'a') as f:
+        f.writelines(string)
+        f.write('\n')
+    f.close()
 
 
 @hydra.main(config_path="../configs", config_name="train_mug_residual")
@@ -25,8 +32,16 @@ def main(cfg):
         gpus=1,
         reload_dataloaders_every_n_epochs=1,
         callbacks=[SaverCallbackModel(), SaverCallbackEmbnnActionAnchor()],
+        max_epochs=cfg.max_epochs
     )
-
+    log_txt_file = '/home/exx/Documents/taxpose/train_new.txt'
+    write_to_file(log_txt_file, "working_dir: {}".format(os.getcwd()))
+    write_to_file(
+        log_txt_file, "flow_supervision: {}".format(cfg.flow_supervision))
+    write_to_file(log_txt_file, "ball_radius: {}".format(cfg.ball_radius))
+    write_to_file(
+        log_txt_file, "plane_standoff: {}".format(cfg.plane_standoff))
+    write_to_file(log_txt_file, "")
     dm = MultiviewDataModule(
         dataset_root=hydra.utils.to_absolute_path(cfg.train_data_dir),
         test_dataset_root=hydra.utils.to_absolute_path(cfg.test_data_dir),
@@ -43,9 +58,20 @@ def main(cfg):
         overfit=cfg.overfit,
         synthetic_occlusion=cfg.synthetic_occlusion,
         ball_radius=cfg.ball_radius,
+        ball_occlusion=cfg.ball_occlusion,
+        plane_standoff=cfg.plane_standoff,
+        plane_occlusion=cfg.plane_occlusion,
+        num_demo=cfg.num_demo,
+        occlusion_class=cfg.occlusion_class
     )
 
     dm.setup()
+
+    if cfg.variant.mlp:
+        network = CorrespondenceFlow_DiffEmbMLP(
+            emb_dims=cfg.emb_dims,
+            emb_nn=cfg.emb_nn,
+            center_feature=cfg.center_feature)
 
     network = ResidualFlow_DiffEmbTransformer(
         emb_dims=cfg.emb_dims,
@@ -59,13 +85,13 @@ def main(cfg):
         network,
         lr=cfg.lr,
         image_log_period=cfg.image_logging_period,
-        point_loss_type=cfg.point_loss_type,
-        rotation_weight=cfg.rotation_weight,
-        weight_normalize=cfg.weight_normalize,
-        consistency_weight=cfg.consistency_weight,
-        smoothness_weight=cfg.smoothness_weight,
+        displace_loss_weight=cfg.displace_loss_weight,
+        consistency_loss_weight=cfg.consistency_loss_weight,
+        direct_correspondence_loss_weight=cfg.direct_correspondence_loss_weight,
+        weight_normalize=cfg.task.weight_normalize,
         sigmoid_on=cfg.sigmoid_on,
-        softmax_temperature=cfg.softmax_temperature,
+        softmax_temperature=cfg.task.softmax_temperature,
+        flow_supervision=cfg.flow_supervision
     )
 
     model.cuda()
@@ -74,7 +100,8 @@ def main(cfg):
         print("loaded checkpoint from")
         print(cfg.checkpoint_file)
         model.load_state_dict(
-            torch.load(hydra.utils.to_absolute_path(cfg.checkpoint_file))["state_dict"]
+            torch.load(hydra.utils.to_absolute_path(
+                cfg.checkpoint_file))["state_dict"]
         )
 
     else:

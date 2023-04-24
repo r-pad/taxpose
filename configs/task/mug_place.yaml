@@ -3,3 +3,6 @@ name: mug_place
 action_class: 0
 anchor_class: 1
 cloud_type: teleport
+softmax_temperature: 1
+weight_normalize: l1
+# flow_supervision: both
