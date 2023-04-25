@@ -176,7 +176,7 @@ bash download_trained_mug_models.sh
 ```
 
 This will download the pre-trained models for NDF mug and save them at:
-* `trained_models/`
+* `trained_models`
     * `ndf`
         * `arbitrary`
             * `place.ckpt`
