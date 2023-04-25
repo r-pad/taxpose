@@ -34,7 +34,7 @@ def main(cfg):
         callbacks=[SaverCallbackModel(), SaverCallbackEmbnnActionAnchor()],
         max_epochs=cfg.max_epochs
     )
-    log_txt_file = '/home/exx/Documents/taxpose/train_new.txt'
+    log_txt_file = cfg.log_txt_file
     write_to_file(log_txt_file, "working_dir: {}".format(os.getcwd()))
     write_to_file(
         log_txt_file, "flow_supervision: {}".format(cfg.flow_supervision))
@@ -66,12 +66,6 @@ def main(cfg):
     )
 
     dm.setup()
-
-    if cfg.variant.mlp:
-        network = CorrespondenceFlow_DiffEmbMLP(
-            emb_dims=cfg.emb_dims,
-            emb_nn=cfg.emb_nn,
-            center_feature=cfg.center_feature)
 
     network = ResidualFlow_DiffEmbTransformer(
         emb_dims=cfg.emb_dims,

@@ -11,13 +11,16 @@ hydra:
 log_dir: logs
 experiment: residual_flow_occlusion
 image_logging_period: 100
-# $task \in {mug_place, mug_grasp}
+
+### TO BE CHANGED ###
+log_txt_file:  ${hydra:runtime.cwd}/train_new.txt # absolute path for text file for logging
 defaults:
   - _self_
-  - task: mug_grasp
+  - task: mug_grasp # $task \in {mug_place, mug_grasp}
+### TO BE CHANGED ###
 
 # Dataset Settings
-dataset_root: ./data
+dataset_root: ./data 
 train_data_dir: ${dataset_root}/${task.name}/train_data/renders
 test_data_dir: ${dataset_root}/${task.name}/test_data/renders
 num_workers: 52

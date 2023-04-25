@@ -1215,54 +1215,54 @@ def main(hydra_cfg):
             grasp_fail_list.append(iteration)
         log_str = "Iteration: %d, " % iteration
         kvs = {}
-        kvs["Place [teleport] Success"] = place_success_teleport_list[-1]
-        kvs["Grasp Success"] = grasp_success_list[-1]
+        # kvs["Place [teleport] Success"] = place_success_teleport_list[-1]
+        # kvs["Grasp Success"] = grasp_success_list[-1]
 
         overall_success_num = 0
         for i in range(len(grasp_success_list)):
             if place_success_teleport_list[i] == 1 and grasp_success_list[i] == 1:
                 overall_success_num += 1
-        kvs["Place [teleport] Success Rate"] = sum(place_success_teleport_list) / float(
-            len(place_success_teleport_list)
-        )
         kvs["Grasp Success Rate"] = sum(grasp_success_list) / float(
             len(grasp_success_list)
+        )
+        kvs["Place [teleport] Success Rate"] = sum(place_success_teleport_list) / float(
+            len(place_success_teleport_list)
         )
         kvs["overall success Rate"] = overall_success_num / float(
             len(grasp_success_list)
         )
-
+        if iteration == 0:
+            write_to_file(log_txt_file, "\n")
+            write_to_file(log_txt_file, "cwd:" + os.getcwd())
+            write_to_file(log_txt_file, "pose_distribution: {}".format('arbitrary' if
+                                                                       hydra_cfg.pose_dist.any_pose else 'upright'))
+            write_to_file(log_txt_file, "seed: {}".format(hydra_cfg.seed))
+            log_info("checkpoint_file_grasp: " +
+                     hydra_cfg.checkpoint_file_grasp)
+            write_to_file(log_txt_file, "checkpoint_file_grasp: " +
+                          hydra_cfg.checkpoint_file_grasp)
+            log_info("checkpoint_file_place: " +
+                     hydra_cfg.checkpoint_file_place)
+            write_to_file(log_txt_file, "checkpoint_file_place: " +
+                          hydra_cfg.checkpoint_file_place)
         if hydra_cfg.log_every_trial:
-            if iteration == 0:
-                write_to_file(log_txt_file, "cwd:" + os.getcwd())
-                write_to_file(log_txt_file, "any_pose? {}".format(
-                    hydra_cfg.pose_dist.any_pose))
-                write_to_file(log_txt_file, "seed: {}".format(hydra_cfg.seed))
-                log_info("checkpoint_file_grasp: " +
-                         hydra_cfg.checkpoint_file_grasp)
-                write_to_file(log_txt_file, "checkpoint_file_grasp: " +
-                              hydra_cfg.checkpoint_file_grasp)
-                log_info("checkpoint_file_place: " +
-                         hydra_cfg.checkpoint_file_place)
-                write_to_file(log_txt_file, "checkpoint_file_place: " +
-                              hydra_cfg.checkpoint_file_place)
             for k, v in kvs.items():
                 log_str += "%s: %.3f, " % (k, v)
-            id_str = ", shapenet_id: %s" % obj_shapenet_id
-            log_info(log_str + id_str)
-            write_to_file(log_txt_file, log_str + id_str)
+            # id_str = ", shapenet_id: %s" % obj_shapenet_id
+            log_info(log_str)
+            write_to_file(log_txt_file, log_str)
 
         else:
             if iteration == hydra_cfg.num_iterations-1:
                 write_to_file(log_txt_file, "cwd:" + os.getcwd())
-                write_to_file(log_txt_file, "any_pose? {}".format(
-                    hydra_cfg.pose_dist.any_pose))
+                write_to_file(log_txt_file, "pose_distribution: {}".format('arbitrary' if
+                                                                           hydra_cfg.pose_dist.any_pose else 'upright'))
                 write_to_file(log_txt_file, "seed: {}".format(hydra_cfg.seed))
                 for k, v in kvs.items():
                     log_str += "%s: %.3f, " % (k, v)
-                id_str = ", shapenet_id: %s" % obj_shapenet_id
-                log_info(log_str + id_str)
-                write_to_file(log_txt_file, log_str + id_str)
+                # id_str = ", shapenet_id: %s" % obj_shapenet_id
+                log_info(log_str)
+                write_to_file(log_txt_file, log_str)
                 log_info("checkpoint_file_grasp: " +
                          hydra_cfg.checkpoint_file_grasp)
                 write_to_file(log_txt_file, "checkpoint_file_grasp: " +

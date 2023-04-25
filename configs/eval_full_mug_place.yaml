@@ -13,9 +13,9 @@ experiment: residual_flow_test_partial_cloud_initpose
 defaults:
   - _self_
   - pose_dist: upright # {upright, arbitrary}
-checkpoint_file_grasp: /home/exx/Documents/taxpose/trained_models/ndf/mug/${pose_dist.name}/grasp.ckpt
-checkpoint_file_place: /home/exx/Documents/taxpose/trained_models/ndf/mug/${pose_dist.name}/place.ckpt
-log_txt_file: '/home/exx/Documents/taxpose/test_results.txt' # abs path of file to log results
+checkpoint_file_grasp: ${hydra:runtime.cwd}/trained_models/ndf/mug/${pose_dist.name}/grasp.ckpt
+checkpoint_file_place: ${hydra:runtime.cwd}/trained_models/ndf/mug/${pose_dist.name}/place.ckpt
+log_txt_file: ${hydra:runtime.cwd}/test_results.txt # abs path of file to log results
 # log saving dir
 log_dir: ./results/ndf/mug_place
 num_iterations: 100 # number of trails
