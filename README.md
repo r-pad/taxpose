@@ -210,9 +210,9 @@ NDF_SOURCE_DIR=$PWD/src/ndf_robot ./scripts/download_training_data.sh
 ```
 
 Then train embeddings for: 
-* 1) mug, `cloud_class=0`;
-* 2) rack, `cloud_class=1`; 
-* 3) gripper, `cloud_class=2`.
+* mug, `cloud_class=0`
+* rack, `cloud_class=1`
+* gripper, `cloud_class=2`
 
 These embeddings will be used across anything that uses pre-trained embeddings.
 
@@ -278,7 +278,7 @@ To use custom-trained models, add the following flags to the above commands:
 checkpoint_file_grasp=<upright grasp path>
 checkpoint_file_place=<upright place path>
 ```
-substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above
+Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above
 
 You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`. 
 
@@ -301,24 +301,19 @@ python scripts/train_residual_flow.py task=mug_grasp pose_dist=upright num_demo=
 python scripts/train_residual_flow.py task=mug_place pose_dist=upright num_demo=5
 ```
 
+Each of these scripts generates a **model checkpoint** file. You can find the path to the **model checkpoint** file in the output of the script `taxpose/train_new.txt`, under `working_dir: <model checkpoint>`.
+
 ### Run evaluation.
-
-To use custom-trained models trained on less demos, add the following flags to the above commands:
-
-```
-checkpoint_file_grasp=<upright grasp path>
-checkpoint_file_place=<upright place path>
-```
-substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with 1/5 demos
 
 Run evaluation on these models 
 ```
 # Mug, upright
-python scripts/evaluate_ndf_mug.py pose_dist=upright
+python scripts/evaluate_ndf_mug.py pose_dist=upright checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
 
 # Mug, arbitrary
-python scripts/evaluate_ndf_mug.py pose_dist=arbitrary
+python scripts/evaluate_ndf_mug.py pose_dist=arbitrary checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
 ```
+Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with 1/5 demos
 
 You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`. 
 
@@ -332,39 +327,40 @@ Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **P
 ### Train models.
 
 ```
-# No residuals.
-TODO(chuer): Add upright grasp.
-TODO(chuer): Add upright place.
+# No residuals. 
+python scripts/train_residual_flow_ablation.py ablation=4_no_residuals task=mug_grasp
+python scripts/train_residual_flow_ablation.py ablation=4_no_residuals task=mug_place
 
 # Unweighted SVD.
-TODO(chuer): Add upright grasp.
-TODO(chuer): Add upright place.
+python scripts/train_residual_flow_ablation.py ablation=5_unweighted_svd task=mug_grasp
+python scripts/train_residual_flow_ablation.py ablation=5_unweighted_svd task=mug_place
 
 # No attention.
-TODO(chuer): Add upright grasp.
-TODO(chuer): Add upright place.
+python scripts/train_residual_flow_ablation.py ablation=8_mlp task=mug_grasp
+python scripts/train_residual_flow_ablation.py ablation=8_mlp task=mug_place
 ```
+
+Each of these scripts generates a **model checkpoint** file. You can find the path to the **model checkpoint** file in the output of the script `taxpose/train_ablation.txt`, under `working_dir: <model checkpoint>`.
 
 ### Evaluate.
-
-To use custom-trained models trained on less demos, add the following flags to the above commands:
-
-```
-checkpoint_file_grasp=<upright grasp path>
-checkpoint_file_place=<upright place path>
-```
-substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with ablation options
 
 Run evaluation on these models 
 ```
 # Mug, upright
-python scripts/evaluate_ndf_mug.py pose_dist=upright
+python scripts/evaluate_ndf_mug_ablation.py ablation=<ablation type> pose_dist=upright checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
 
 # Mug, arbitrary
-python scripts/evaluate_ndf_mug.py pose_dist=arbitrary
+python scripts/evaluate_ndf_mug_ablation.py ablation=<ablation type> pose_dist=arbitrary checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
 ```
 
-You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`. 
+Substitute `<ablation type>` with:
+* `4_no_residuals` for no residuals
+* `5_unweighted_svd` for unweighted SVD
+* `8_mlp` for no attention
+
+Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with ablation options
+
+You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results_ablation.txt`. 
 
 The success rate for **Grasp**, **Place**, **Overall** as seen in Table 3 as: 
 ```
@@ -510,11 +506,67 @@ This is based on a specific real-world experiment we ran, and so can't be reprod
 
 ## Supplement Table 6: Mug-hanging ablations
 
-TODO(chuer): Add mug-hanging ablations.
+### Train Ablation Models
+
+```
+# For each <ablation type>, grasp
+python scripts/train_residual_flow_ablation.py ablation=<ablation type> task=mug_grasp
+# For each <ablation type>, place
+python scripts/train_residual_flow_ablation.py ablation=<ablation type> task=mug_place
+```
+
+Substitute `<ablation type>` with:
+* `0_no_disp_loss`: No L_disp
+* `1_no_corr_loss`: No L_corr
+* `2_no_cons_loss`: No L_cons
+* `3_no_disp_loss_combined`: Scaled Combination: 1.1*L_cons + L_corr
+* `4_no_residuals`: No Adjustment via Correspondence Residuals
+* `5_unweighted_svd`: Unweighted SVD
+* `6_no_finetuning`: No Finetuning for Embedding Network
+* `7_no_pretraining`: No Pretraining for Embedding Network
+* `8_mlp`: 3-Layer MLP In Place of Transformer
+* `9_low_dim_embedding`: Embedding Network Feature Dim = 16
+
+### Evaluate Ablation Models
+Run evaluation on these models 
+```
+# Mug, upright
+python scripts/evaluate_ndf_mug_ablation.py ablation=<ablation type> pose_dist=upright checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
+
+# Mug, arbitrary
+python scripts/evaluate_ndf_mug_ablation.py ablation=<ablation type> pose_dist=arbitrary checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
+```
+Substitute `<ablation type>` with the corresponding ablation type
+Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with ablation options
+
+You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results_ablation.txt`. 
+
+The success rate for **Grasp**, **Place**, **Overall** as seen in Table 6 as: 
+```
+Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
+```
 
 ## Supplement Table 7: Pre-training ablations
 
-TODO(chuer): Add pre-training ablations.
+
+Train models for line 1 trained for 26K steps
+```
+python scripts/train_residual_flow_ablation.py ablation=7_no_pretraining task=mug_grasp max_epochs=200
+python scripts/train_residual_flow_ablation.py ablation=7_no_pretraining task=mug_place max_epochs=200
+```
+
+Train models for line 2 trained for 15K steps:
+```
+python scripts/train_residual_flow_ablation.py ablation=7_no_pretraining task=mug_grasp max_epochs=120
+python scripts/train_residual_flow_ablation.py ablation=7_no_pretraining task=mug_place max_epochs=120
+```
+
+Evaluate these models
+```
+# Mug, upright
+python scripts/evaluate_ndf_mug_ablation.py ablation=7_no_pretraining pose_dist=upright checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
+```
+Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with ablation options
 
 ## Supplement Table 8: Additional simulation experiments
 

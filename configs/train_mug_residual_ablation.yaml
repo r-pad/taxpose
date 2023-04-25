@@ -11,16 +11,28 @@ hydra:
 log_dir: logs
 experiment: residual_flow_occlusion
 image_logging_period: 100
-
-### TO BE CHANGED ###
-log_txt_file:  ${hydra:runtime.cwd}/train_new.txt # absolute path for text file for logging
+log_txt_file:  ${hydra:runtime.cwd}/train_ablation.txt
+# $task \in {mug_place, mug_grasp}
 defaults:
   - _self_
-  - task: mug_place # $task \in {mug_place, mug_grasp}
-### TO BE CHANGED ###
+  - task: mug_place
+  - ablation: 0_no_disp_loss
+
+  # $ablation \in {
+  # 0_no_disp_loss,
+  # 1_no_corr_loss,
+  # 2_no_cons_loss,
+  # 3_no_disp_loss_combined,
+  # 4_no_residuals,
+  # 5_unweighted_svd,
+  # 6_no_finetuning,
+  # 7_no_pretraining,
+  # 8_mlp,
+  # 9_low_dim_embedding
+  #}
 
 # Dataset Settings
-dataset_root: ${hydra:runtime.cwd}/data 
+dataset_root:  ${hydra:runtime.cwd}/data
 train_data_dir: ${dataset_root}/${task.name}/train_data/renders
 test_data_dir: ${dataset_root}/${task.name}/test_data/renders
 num_workers: 52
@@ -28,7 +40,7 @@ batch_size: 8
 num_points: 1024
 num_demo: 10
 dataset_index: None
-object_type: mug
+object_type: mug # 
 dataset_size: 1000
 rotation_variance: 180
 translation_variance: 0.5
@@ -37,33 +49,23 @@ plane_occlusion: True
 plane_standoff: 0.04
 ball_occlusion: True
 ball_radius: 0.1
-gripper_lr_label: False
+gripper_lr_label: False #
 occlusion_class: 0
 overfit: False
 seed: 0
 
 # Network Settings
 center_feature: True
-diff_emb: True
-diff_transformer: True
 emb_nn: dgcnn
-emb_dims: 512
-inital_sampling_ratio: 1
-flow_compute_type: 0
-residual_on: True
-pred_weight: True
 sigmoid_on: True
 return_flow_component: False
-mlp: False
 
 # Loss Settings
 flow_supervision: both
-displace_loss_weight: 1
-direct_correspondence_loss_weight: 1
-consistency_loss_weight: 0.1
 
 # Training Settings
 checkpoint_file: Null
-freeze_embnn: False
+checkpoint_file_action: ${hydra:runtime.cwd}/trained_models/pretraining_mug_embnn_weights.ckpt
+checkpoint_file_anchor: ${hydra:runtime.cwd}/trained_models/pretraining_rack_embnn_weights.ckpt
 lr: 1e-4
 max_epochs: 1000

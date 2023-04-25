@@ -1,0 +1,12 @@
+name: 7_no_pretraining
+checkpoint_file_action: Null
+checkpoint_file_anchor: Null
+
+residual_on: True
+displace_loss_weight: 1
+direct_correspondence_loss_weight: 1
+consistency_loss_weight: 0.1
+pred_weight: True
+freeze_embnn: False
+mlp: False
+emb_dims: 512
