@@ -20,7 +20,7 @@ defaults:
 ### TO BE CHANGED ###
 
 # Dataset Settings
-dataset_root: ${hydra:runtime.cwd}/data 
+dataset_root: ${hydra:runtime.cwd}/data
 train_data_dir: ${dataset_root}/${task.name}/train_data/renders
 test_data_dir: ${dataset_root}/${task.name}/test_data/renders
 num_workers: 52

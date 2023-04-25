@@ -206,10 +206,10 @@ First, download the training data for NDF objects (~150GB for 3 object classes)
 
 ```
 cd third_party/ndf_robot
-NDF_SOURCE_DIR=$PWD/src/ndf_robot ./scripts/download_training_data.sh 
+NDF_SOURCE_DIR=$PWD/src/ndf_robot ./scripts/download_training_data.sh
 ```
 
-Then train embeddings for: 
+Then train embeddings for:
 * mug, `cloud_class=0`
 * rack, `cloud_class=1`
 * gripper, `cloud_class=2`
@@ -222,11 +222,11 @@ python scripts/pretrain_embedding.py cloud_class=1
 python scripts/pretrain_embedding.py cloud_class=2
 ```
 
-We also provide pre-trained embeddings for the NDF tasks here: 
+We also provide pre-trained embeddings for the NDF tasks here:
 * `trained_models`
     * `pretraining_mug_embnn_weights.ckpt`: pretrained embedding for mug
-    * `pretraining_rack_embnn_weights.ckpt`: pretrained embedding for rack 
-    * `pretraining_gripper_embnn_weights.ckpt`: pretrained embedding for gripper 
+    * `pretraining_rack_embnn_weights.ckpt`: pretrained embedding for rack
+    * `pretraining_gripper_embnn_weights.ckpt`: pretrained embedding for gripper
 
 ### Download the training data
 Run this command to download pre-generated training data for NDF mug task.
@@ -256,7 +256,7 @@ To use custom pre-trained embeddings, add the following flag to the above comman
 checkpoint_file_action=<path to action embeddings>
 checkpoint_file_anchor=<path to anchor embeddings>
 ```
-If not specified, by default it will uses the provided pre-trained embeddings in `taxpose/trained_models`. 
+If not specified, by default it will uses the provided pre-trained embeddings in `taxpose/trained_models`.
 
 Each of these scripts generates a **model checkpoint** file. You can find the path to the **model checkpoint** file in the output of the script `taxpose/train_new.txt`, under `working_dir: <model checkpoint>`.
 
@@ -280,9 +280,9 @@ checkpoint_file_place=<upright place path>
 ```
 Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above
 
-You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`. 
+You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`.
 
-The success rate for **Grasp**, **Place**, **Overall** as seen in Table 1 as: 
+The success rate for **Grasp**, **Place**, **Overall** as seen in Table 1 as:
 ```
 Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
 ```
@@ -305,7 +305,7 @@ Each of these scripts generates a **model checkpoint** file. You can find the pa
 
 ### Run evaluation.
 
-Run evaluation on these models 
+Run evaluation on these models
 ```
 # Mug, upright
 python scripts/evaluate_ndf_mug.py pose_dist=upright checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
@@ -315,9 +315,9 @@ python scripts/evaluate_ndf_mug.py pose_dist=arbitrary checkpoint_file_grasp=<up
 ```
 Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with 1/5 demos
 
-You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`. 
+You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`.
 
-The success rate for **Grasp**, **Place**, **Overall** as seen in Table 2 as: 
+The success rate for **Grasp**, **Place**, **Overall** as seen in Table 2 as:
 ```
 Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
 ```
@@ -327,7 +327,7 @@ Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **P
 ### Train models.
 
 ```
-# No residuals. 
+# No residuals.
 python scripts/train_residual_flow_ablation.py ablation=4_no_residuals task=mug_grasp
 python scripts/train_residual_flow_ablation.py ablation=4_no_residuals task=mug_place
 
@@ -344,7 +344,7 @@ Each of these scripts generates a **model checkpoint** file. You can find the pa
 
 ### Evaluate.
 
-Run evaluation on these models 
+Run evaluation on these models
 ```
 # Mug, upright
 python scripts/evaluate_ndf_mug_ablation.py ablation=<ablation type> pose_dist=upright checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
@@ -360,9 +360,9 @@ Substitute `<ablation type>` with:
 
 Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with ablation options
 
-You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results_ablation.txt`. 
+You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results_ablation.txt`.
 
-The success rate for **Grasp**, **Place**, **Overall** as seen in Table 3 as: 
+The success rate for **Grasp**, **Place**, **Overall** as seen in Table 3 as:
 ```
 Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
 ```
@@ -528,7 +528,7 @@ Substitute `<ablation type>` with:
 * `9_low_dim_embedding`: Embedding Network Feature Dim = 16
 
 ### Evaluate Ablation Models
-Run evaluation on these models 
+Run evaluation on these models
 ```
 # Mug, upright
 python scripts/evaluate_ndf_mug_ablation.py ablation=<ablation type> pose_dist=upright checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
@@ -539,9 +539,9 @@ python scripts/evaluate_ndf_mug_ablation.py ablation=<ablation type> pose_dist=a
 Substitute `<ablation type>` with the corresponding ablation type
 Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with ablation options
 
-You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results_ablation.txt`. 
+You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results_ablation.txt`.
 
-The success rate for **Grasp**, **Place**, **Overall** as seen in Table 6 as: 
+The success rate for **Grasp**, **Place**, **Overall** as seen in Table 6 as:
 ```
 Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
 ```

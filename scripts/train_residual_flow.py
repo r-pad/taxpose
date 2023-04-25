@@ -7,7 +7,7 @@ import torch
 from pytorch_lightning.loggers import WandbLogger
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
-from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer, CorrespondenceFlow_DiffEmbMLP
+from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
@@ -15,9 +15,9 @@ from taxpose.utils.callbacks import SaverCallbackEmbnnActionAnchor, SaverCallbac
 
 
 def write_to_file(file_name, string):
-    with open(file_name, 'a') as f:
+    with open(file_name, "a") as f:
         f.writelines(string)
-        f.write('\n')
+        f.write("\n")
     f.close()
 
 
@@ -32,7 +32,7 @@ def main(cfg):
         gpus=1,
         reload_dataloaders_every_n_epochs=1,
         callbacks=[SaverCallbackModel(), SaverCallbackEmbnnActionAnchor()],
-        max_epochs=cfg.max_epochs
+        max_epochs=cfg.max_epochs,
     )
     log_txt_file = cfg.log_txt_file
     write_to_file(log_txt_file, "working_dir: {}".format(os.getcwd()))
@@ -57,7 +57,7 @@ def main(cfg):
         plane_standoff=cfg.plane_standoff,
         plane_occlusion=cfg.plane_occlusion,
         num_demo=cfg.num_demo,
-        occlusion_class=cfg.occlusion_class
+        occlusion_class=cfg.occlusion_class,
     )
 
     dm.setup()
@@ -80,7 +80,7 @@ def main(cfg):
         weight_normalize=cfg.task.weight_normalize,
         sigmoid_on=cfg.sigmoid_on,
         softmax_temperature=cfg.task.softmax_temperature,
-        flow_supervision=cfg.flow_supervision
+        flow_supervision=cfg.flow_supervision,
     )
 
     model.cuda()
@@ -89,33 +89,38 @@ def main(cfg):
         print("loaded checkpoint from")
         print(cfg.checkpoint_file)
         model.load_state_dict(
-            torch.load(hydra.utils.to_absolute_path(
-                cfg.checkpoint_file))["state_dict"]
+            torch.load(hydra.utils.to_absolute_path(cfg.checkpoint_file))["state_dict"]
         )
 
     else:
         if cfg.task.checkpoint_file_action is not None:
             model.model.emb_nn_action.load_state_dict(
-                torch.load(hydra.utils.to_absolute_path(cfg.task.checkpoint_file_action))[
-                    "embnn_state_dict"
-                ]
+                torch.load(
+                    hydra.utils.to_absolute_path(cfg.task.checkpoint_file_action)
+                )["embnn_state_dict"]
             )
             print(
                 "-----------------------Pretrained EmbNN Action Model Loaded!-----------------------"
             )
-            print("Loaded Pretrained EmbNN Action: {}".format(
-                cfg.task.checkpoint_file_action))
+            print(
+                "Loaded Pretrained EmbNN Action: {}".format(
+                    cfg.task.checkpoint_file_action
+                )
+            )
         if cfg.task.checkpoint_file_anchor is not None:
             model.model.emb_nn_anchor.load_state_dict(
-                torch.load(hydra.utils.to_absolute_path(cfg.task.checkpoint_file_anchor))[
-                    "embnn_state_dict"
-                ]
+                torch.load(
+                    hydra.utils.to_absolute_path(cfg.task.checkpoint_file_anchor)
+                )["embnn_state_dict"]
             )
             print(
                 "-----------------------Pretrained EmbNN Anchor Model Loaded!-----------------------"
             )
-            print("Loaded Pretrained EmbNN Anchor: {}".format(
-                cfg.task.checkpoint_file_anchor))
+            print(
+                "Loaded Pretrained EmbNN Anchor: {}".format(
+                    cfg.task.checkpoint_file_anchor
+                )
+            )
 
     trainer.fit(model, dm)
 
