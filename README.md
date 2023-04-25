@@ -223,7 +223,7 @@ python scripts/pretrain_embedding.py cloud_class=2
 ```
 
 We also provide pre-trained embeddings for the NDF tasks here: 
-* `trained_models/`
+* `trained_models`
     * `pretraining_mug_embnn_weights.ckpt`: pretrained embedding for mug
     * `pretraining_rack_embnn_weights.ckpt`: pretrained embedding for rack 
     * `pretraining_gripper_embnn_weights.ckpt`: pretrained embedding for gripper 
