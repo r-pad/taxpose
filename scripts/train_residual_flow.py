@@ -99,24 +99,28 @@ def main(cfg):
         )
 
     else:
-        if cfg.checkpoint_file_action is not None:
+        if cfg.task.checkpoint_file_action is not None:
             model.model.emb_nn_action.load_state_dict(
-                torch.load(hydra.utils.to_absolute_path(cfg.checkpoint_file_action))[
+                torch.load(hydra.utils.to_absolute_path(cfg.task.checkpoint_file_action))[
                     "embnn_state_dict"
                 ]
             )
             print(
                 "-----------------------Pretrained EmbNN Action Model Loaded!-----------------------"
             )
-        if cfg.checkpoint_file_anchor is not None:
+            print("Loaded Pretrained EmbNN Action: {}".format(
+                cfg.task.checkpoint_file_action))
+        if cfg.task.checkpoint_file_anchor is not None:
             model.model.emb_nn_anchor.load_state_dict(
-                torch.load(hydra.utils.to_absolute_path(cfg.checkpoint_file_anchor))[
+                torch.load(hydra.utils.to_absolute_path(cfg.task.checkpoint_file_anchor))[
                     "embnn_state_dict"
                 ]
             )
             print(
                 "-----------------------Pretrained EmbNN Anchor Model Loaded!-----------------------"
             )
+            print("Loaded Pretrained EmbNN Anchor: {}".format(
+                cfg.task.checkpoint_file_anchor))
 
     trainer.fit(model, dm)
 

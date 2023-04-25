@@ -4,13 +4,13 @@ experiment: embedding_pretraining_mug
 image_logging_period: 1000
 
 # Dataset Settings
-dataset_root: data/train_data/renders
-pretraining_data_path: data/pretraining
+dataset_root: ${hydra:runtime.cwd}/data/mug_place/train_data/renders
+pretraining_data_path: ${hydra:runtime.cwd}/third_party/ndf_robot/src/ndf_robot/data
 num_workers: 4
 batch_size: 8
 num_points: 1024
 dataset_index: None
-cloud_class: 0
+cloud_class: 0 # 0 for mug, 1 for rack, 2 for gripper
 cloud_type: init
 overfit: false
 seed: 0

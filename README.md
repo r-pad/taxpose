@@ -170,6 +170,21 @@ TODO(beisner): Add instructions.
 
 Here are links to pre-trained models:
 
+#### Download the pre-trained models for NDF mug.
+```
+bash download_trained_mug_models.sh
+```
+
+This will download the pre-trained models for NDF mug and save them at:
+* `trained_models/`
+    * `ndf`
+        * `arbitrary`
+            * `place.ckpt`
+            * `grasp.ckpt`
+        * `upright`
+            * `place.ckpt`
+            * `grasp.ckpt`
+
 TODO(beisner, chuer): Add links.
 
 * NDF-Mug
@@ -187,22 +202,40 @@ Original code can be found here: https://github.com/anthonysimeonov/ndf_robot
 
 ### Pretrain the embeddings.
 
+First, download the training data for NDF objects (~150GB for 3 object classes)
+
+```
+cd third_party/ndf_robot
+NDF_SOURCE_DIR=$PWD/src/ndf_robot ./scripts/download_training_data.sh 
+```
+
+Then train embeddings for: 
+* 1) mug, `cloud_class=0`;
+* 2) rack, `cloud_class=1`; 
+* 3) gripper, `cloud_class=2`.
+
 These embeddings will be used across anything that uses pre-trained embeddings.
 
 ```
-TODO(chuer): Add this.
+python scripts/pretrain_embedding.py cloud_class=0
+python scripts/pretrain_embedding.py cloud_class=1
+python scripts/pretrain_embedding.py cloud_class=2
 ```
 
-We provide pre-trained embeddings for the NDF tasks here: TODO(chuer): Add links (inside one big folder).
+We also provide pre-trained embeddings for the NDF tasks here: 
+* `trained_models/`
+    * `pretraining_mug_embnn_weights.ckpt`: pretrained embedding for mug
+    * `pretraining_rack_embnn_weights.ckpt`: pretrained embedding for rack 
+    * `pretraining_gripper_embnn_weights.ckpt`: pretrained embedding for gripper 
 
 ### Train models.
 
 ```
 # Mug, upright, grasp
-python scripts/train_residual_flow.py task=mug_grasp
+python scripts/train_residual_flow.py task=mug_grasp pose_dist=upright
 
 # Mug, upright, place
-python scripts/train_residual_flow.py task=mug_place
+python scripts/train_residual_flow.py task=mug_place pose_dist=upright
 
 # Mug, arbitrary, grasp
 python scripts/train_residual_flow.py task=mug_grasp pose_dist=arbitrary
@@ -240,8 +273,11 @@ checkpoint_file_place=<upright place path>
 ```
 
 You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`. 
-You can find the success rate for **Grasp**, **Place**, **Overall** as: 
-'Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**'
+
+The success rate for **Grasp**, **Place**, **Overall** as: 
+```
+Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
+```
 
 ## Table 2: NDF # of Demos.
 
@@ -249,12 +285,12 @@ You can find the success rate for **Grasp**, **Place**, **Overall** as:
 
 ```
 # 1 demo
-TODO(chuer): Add upright grasp.
-TODO(chuer): Add upright place.
+python scripts/train_residual_flow.py task=mug_grasp pose_dist=upright num_demo=1
+python scripts/train_residual_flow.py task=mug_place pose_dist=upright num_demo=1
 
 # 5 demos
-TODO(chuer): Add upright grasp.
-TODO(chuer): Add upright place.
+python scripts/train_residual_flow.py task=mug_grasp pose_dist=upright num_demo=5
+python scripts/train_residual_flow.py task=mug_place pose_dist=upright num_demo=5
 ```
 
 ### Run evaluation.

@@ -16,7 +16,7 @@ image_logging_period: 100
 log_txt_file:  ${hydra:runtime.cwd}/train_new.txt # absolute path for text file for logging
 defaults:
   - _self_
-  - task: mug_grasp # $task \in {mug_place, mug_grasp}
+  - task: mug_place # $task \in {mug_place, mug_grasp}
 ### TO BE CHANGED ###
 
 # Dataset Settings
@@ -64,9 +64,6 @@ consistency_loss_weight: 0.1
 
 # Training Settings
 checkpoint_file: Null
-checkpoint_dir: ./trained_models
-checkpoint_file_action: ${checkpoint_dir}/pretraining_mug_embnn_weights.ckpt
-checkpoint_file_anchor: ${checkpoint_dir}/pretraining_rack_embnn_weights.ckpt
 freeze_embnn: False
 lr: 1e-4
 max_epochs: 1000
