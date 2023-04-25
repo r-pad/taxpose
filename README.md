@@ -228,6 +228,12 @@ We also provide pre-trained embeddings for the NDF tasks here:
     * `pretraining_rack_embnn_weights.ckpt`: pretrained embedding for rack 
     * `pretraining_gripper_embnn_weights.ckpt`: pretrained embedding for gripper 
 
+### Download the training data
+Run this command to download pre-generated training data for NDF mug task.
+
+```
+bash download_mug_train_data.sh
+```
 ### Train models.
 
 ```
