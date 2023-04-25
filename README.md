@@ -250,16 +250,17 @@ To use custom pre-trained embeddings, add the following flag to the above comman
 checkpoint_file_action=<path to action embeddings>
 checkpoint_file_anchor=<path to anchor embeddings>
 ```
+If not specified, by default it will uses the provided pre-trained embeddings in `taxpose/trained_models`. 
 
-If not specified, by default it will uses the provided pre-trained embeddings in `taxpose/trained_models`
-
-Each of these scripts generates a checkpoint file. You can find the path to the checkpoint file in the output of the script.
+Each of these scripts generates a **model checkpoint** file. You can find the path to the **model checkpoint** file in the output of the script `taxpose/train_new.txt`, under `working_dir: <model checkpoint>`.
 
 ### Evaluate models.
 
+To evaluate the models we provided, run the following
+
 ```
 # Mug, upright
-python scripts/evaluate_ndf_mug.py
+python scripts/evaluate_ndf_mug.py pose_dist=upright
 
 # Mug, arbitrary
 python scripts/evaluate_ndf_mug.py pose_dist=arbitrary
@@ -271,10 +272,11 @@ To use custom-trained models, add the following flags to the above commands:
 checkpoint_file_grasp=<upright grasp path>
 checkpoint_file_place=<upright place path>
 ```
+substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above
 
 You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`. 
 
-The success rate for **Grasp**, **Place**, **Overall** as: 
+The success rate for **Grasp**, **Place**, **Overall** as seen in Table 1 as: 
 ```
 Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
 ```
@@ -295,13 +297,29 @@ python scripts/train_residual_flow.py task=mug_place pose_dist=upright num_demo=
 
 ### Run evaluation.
 
+To use custom-trained models trained on less demos, add the following flags to the above commands:
+
 ```
-TODO(chuer): Add 1 demo eval.
-TODO(chuer): Add 5 demo eval.
+checkpoint_file_grasp=<upright grasp path>
+checkpoint_file_place=<upright place path>
+```
+substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with 1/5 demos
+
+Run evaluation on these models 
+```
+# Mug, upright
+python scripts/evaluate_ndf_mug.py pose_dist=upright
+
+# Mug, arbitrary
+python scripts/evaluate_ndf_mug.py pose_dist=arbitrary
 ```
 
-TODO(chuer): Write instructions on how to actually generate the lines of Table 2...
+You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`. 
 
+The success rate for **Grasp**, **Place**, **Overall** as seen in Table 2 as: 
+```
+Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
+```
 
 ## Table 3: NDF Ablations.
 
@@ -323,13 +341,29 @@ TODO(chuer): Add upright place.
 
 ### Evaluate.
 
+To use custom-trained models trained on less demos, add the following flags to the above commands:
+
 ```
-TODO(chuer): Add no residuals eval.
-TODO(chuer): Add unweighted SVD eval.
-TODO(chuer): Add no attention eval.
+checkpoint_file_grasp=<upright grasp path>
+checkpoint_file_place=<upright place path>
+```
+substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with ablation options
+
+Run evaluation on these models 
+```
+# Mug, upright
+python scripts/evaluate_ndf_mug.py pose_dist=upright
+
+# Mug, arbitrary
+python scripts/evaluate_ndf_mug.py pose_dist=arbitrary
 ```
 
-TODO(chuer): Write instructions on how to actually generate the lines of Table 3...
+You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`. 
+
+The success rate for **Grasp**, **Place**, **Overall** as seen in Table 3 as: 
+```
+Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
+```
 
 ## Table 4: PM Placement
 
