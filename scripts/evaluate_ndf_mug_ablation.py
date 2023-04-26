@@ -1,14 +1,29 @@
 """This is a fork of https://github.com/anthonysimeonov/ndf_robot/blob/master/src/ndf_robot/eval/evaluate_ndf.py"""
 
-from taxpose.utils.se3 import pure_translation_se3
-from taxpose.utils.ndf_sim_utils import get_clouds, get_object_clouds
-from taxpose.training.flow_equivariance_training_module_nocentering_eval_init import (
-    EquivarianceTestingModule,
+import os
+import os.path as osp
+import random
+import signal
+import time
+from pathlib import Path
+
+import hydra
+import numpy as np
+import pybullet as p
+import pytorch_lightning as pl
+import torch
+from airobot import Robot, log_info, log_warn, set_log_level
+from airobot.utils import common
+from airobot.utils.common import euler2quat
+from ndf_robot.config.default_eval_cfg import get_eval_cfg_defaults
+from ndf_robot.config.default_obj_cfg import get_obj_cfg_defaults
+from ndf_robot.robot.multicam import MultiCams
+from ndf_robot.share.globals import (
+    bad_shapenet_bottles_ids_list,
+    bad_shapenet_bowls_ids_list,
+    bad_shapenet_mug_ids_list,
 )
-from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer, CorrespondenceFlow_DiffEmbMLP
-from pytorch3d.ops import sample_farthest_points
-from ndf_robot.utils.util import np2img
-from ndf_robot.utils.franka_ik import FrankaIK
+from ndf_robot.utils import path_util, util
 from ndf_robot.utils.eval_gen_utils import (
     constraint_grasp_close,
     constraint_grasp_open,
@@ -23,29 +38,18 @@ from ndf_robot.utils.eval_gen_utils import (
     safeRemoveConstraint,
     soft_grasp_close,
 )
-from ndf_robot.utils import path_util, util
-from ndf_robot.share.globals import (
-    bad_shapenet_bottles_ids_list,
-    bad_shapenet_bowls_ids_list,
-    bad_shapenet_mug_ids_list,
+from ndf_robot.utils.franka_ik import FrankaIK
+from ndf_robot.utils.util import np2img
+from pytorch3d.ops import sample_farthest_points
+
+from taxpose.nets.transformer_flow import (
+    CorrespondenceFlow_DiffEmbMLP,
+    ResidualFlow_DiffEmbTransformer,
 )
-from ndf_robot.robot.multicam import MultiCams
-from ndf_robot.config.default_obj_cfg import get_obj_cfg_defaults
-from ndf_robot.config.default_eval_cfg import get_eval_cfg_defaults
-from airobot.utils.common import euler2quat
-from airobot.utils import common
-from airobot import Robot, log_info, log_warn, set_log_level
-import torch
-import pytorch_lightning as pl
-import pybullet as p
-import numpy as np
-import hydra
-import os
-import os.path as osp
-import random
-import signal
-import time
-from pathlib import Path
+from taxpose.training.flow_equivariance_training_module_nocentering_eval_init import (
+    EquivarianceTestingModule,
+)
+from taxpose.utils.ndf_sim_utils import get_clouds, get_object_clouds
 
 # Gotta do some path hacking to convince ndf_robot to work.
 NDF_ROOT = Path(__file__).parent.parent / "third_party" / "ndf_robot"
@@ -73,8 +77,7 @@ def get_world_transform(pred_T_action_mat, obj_start_pose, point_cloud, invert=F
     centered_pose = util.transform_pose(
         pose_source=obj_start_pose, pose_transform=centering_pose
     )  # obj_start_pose: stamped_pose
-    trans_pose = util.transform_pose(
-        pose_source=centered_pose, pose_transform=pose)
+    trans_pose = util.transform_pose(pose_source=centered_pose, pose_transform=pose)
     final_pose = util.transform_pose(
         pose_source=trans_pose, pose_transform=uncentering_pose
     )
@@ -101,8 +104,7 @@ def load_data(num_points, clouds, classes, action_class, anchor_class):
     points_action = torch.from_numpy(points_action_np).float().unsqueeze(0)
     points_anchor = torch.from_numpy(points_anchor_np).float().unsqueeze(0)
 
-    points_action, points_anchor = subsample(
-        num_points, points_action, points_anchor)
+    points_action, points_anchor = subsample(num_points, points_action, points_anchor)
 
     return points_action.cuda(), points_anchor.cuda()
 
@@ -118,8 +120,7 @@ def load_data_raw(num_points, clouds, classes, action_class, anchor_class):
     points_action = torch.from_numpy(points_action_np).float().unsqueeze(0)
     points_anchor = torch.from_numpy(points_anchor_np).float().unsqueeze(0)
 
-    points_action, points_anchor = subsample(
-        num_points, points_action, points_anchor)
+    points_action, points_anchor = subsample(num_points, points_action, points_anchor)
     if points_action is None:
         return None, None
 
@@ -155,9 +156,9 @@ def subsample(num_points, points_action, points_anchor):
 
 
 def write_to_file(file_name, string):
-    with open(file_name, 'a') as f:
+    with open(file_name, "a") as f:
         f.writelines(string)
-        f.write('\n')
+        f.write("\n")
     f.close()
     log_info("file dir: {}".format(os.getcwd()))
 
@@ -263,8 +264,7 @@ def main(hydra_cfg):
     util.safe_makedirs(eval_teleport_imgs_dir)
 
     test_shapenet_ids = np.loadtxt(
-        osp.join(path_util.get_ndf_share(),
-                 "%s_test_object_split.txt" % obj_class),
+        osp.join(path_util.get_ndf_share(), "%s_test_object_split.txt" % obj_class),
         dtype=str,
     ).tolist()
     if obj_class == "mug":
@@ -289,8 +289,7 @@ def main(hydra_cfg):
     table_z = cfg.TABLE_Z
 
     preplace_horizontal_tf_list = cfg.PREPLACE_HORIZONTAL_OFFSET_TF
-    preplace_horizontal_tf = util.list2pose_stamped(
-        cfg.PREPLACE_HORIZONTAL_OFFSET_TF)
+    preplace_horizontal_tf = util.list2pose_stamped(cfg.PREPLACE_HORIZONTAL_OFFSET_TF)
     preplace_offset_tf = util.list2pose_stamped(cfg.PREPLACE_OFFSET_TF)
 
     if cfg.DEMOS.PLACEMENT_SURFACE == "shelf":
@@ -480,13 +479,15 @@ def main(hydra_cfg):
     def show_link(obj_id, link_id, color):
         if link_id is not None:
             p.changeVisualShape(obj_id, link_id, rgbaColor=color)
+
     pl.seed_everything(hydra_cfg.seed)
 
     if hydra_cfg.ablation.mlp:
         network = CorrespondenceFlow_DiffEmbMLP(
             emb_dims=hydra_cfg.ablation.emb_dims,
             emb_nn=hydra_cfg.emb_nn,
-            center_feature=hydra_cfg.center_feature)
+            center_feature=hydra_cfg.center_feature,
+        )
 
     network = ResidualFlow_DiffEmbTransformer(
         emb_dims=hydra_cfg.ablation.emb_dims,
@@ -496,7 +497,7 @@ def main(hydra_cfg):
         residual_on=hydra_cfg.ablation.residual_on,
         return_flow_component=hydra_cfg.return_flow_component,
         freeze_embnn=hydra_cfg.ablation.freeze_embnn,
-        return_attn=hydra_cfg.return_attn
+        return_attn=hydra_cfg.return_attn,
     )
 
     place_model = EquivarianceTestingModule(
@@ -556,8 +557,7 @@ def main(hydra_cfg):
         scale_high, scale_low = cfg.MESH_SCALE_HIGH, cfg.MESH_SCALE_LOW
         scale_default = cfg.MESH_SCALE_DEFAULT
         if hydra_cfg.rand_mesh_scale:
-            mesh_scale = [np.random.random() * (scale_high -
-                                                scale_low) + scale_low] * 3
+            mesh_scale = [np.random.random() * (scale_high - scale_low) + scale_low] * 3
         else:
             mesh_scale = [scale_default] * 3
 
@@ -595,8 +595,7 @@ def main(hydra_cfg):
             rand_yaw_T = util.rand_body_yaw_transform(
                 pos, min_theta=-np.pi, max_theta=np.pi
             )
-            pose_w_yaw = util.transform_pose(
-                pose, util.pose_from_matrix(rand_yaw_T))
+            pose_w_yaw = util.transform_pose(pose, util.pose_from_matrix(rand_yaw_T))
             pos, ori = (
                 util.pose_stamped2list(pose_w_yaw)[:3],
                 util.pose_stamped2list(pose_w_yaw)[3:],
@@ -695,8 +694,7 @@ def main(hydra_cfg):
 
         time.sleep(1.5)
         teleport_rgb = robot.cam.get_images(get_rgb=True)[0]
-        teleport_img_fname = osp.join(
-            eval_teleport_imgs_dir, "%d_init.png" % iteration)
+        teleport_img_fname = osp.join(eval_teleport_imgs_dir, "%d_init.png" % iteration)
         np2img(teleport_rgb.astype(np.uint8), teleport_img_fname)
         cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
         obj_points, obj_colors, obj_classes = get_object_clouds(cams)
@@ -728,8 +726,7 @@ def main(hydra_cfg):
         ans = place_model.get_transform(points_mug, points_rack)  # 1, 4, 4
 
         pred_T_action_init = ans["pred_T_action"]
-        pred_T_action_mat = pred_T_action_init.get_matrix()[
-            0].T.detach().cpu().numpy()
+        pred_T_action_mat = pred_T_action_init.get_matrix()[0].T.detach().cpu().numpy()
         obj_pose_world = p.getBasePositionAndOrientation(obj_id)  # list
         obj_pose_world = util.list2pose_stamped(
             list(obj_pose_world[0]) + list(obj_pose_world[1])
@@ -754,12 +751,10 @@ def main(hydra_cfg):
             action_class=2,
             anchor_class=0,
         )
-        ans_grasp = grasp_model.get_transform(
-            points_gripper, points_mug)  # 1, 4, 4
+        ans_grasp = grasp_model.get_transform(points_gripper, points_mug)  # 1, 4, 4
         pred_T_action_init_gripper2mug = ans_grasp["pred_T_action"]
         pred_T_action_mat_gripper2mug = (
-            pred_T_action_init_gripper2mug.get_matrix()[
-                0].T.detach().cpu().numpy()
+            pred_T_action_init_gripper2mug.get_matrix()[0].T.detach().cpu().numpy()
         )
         pred_T_action_mat_gripper2mug[2, -1] -= 0.001
 
@@ -806,15 +801,13 @@ def main(hydra_cfg):
         )
 
         # reset object to placement pose to detect placement success
-        safeCollisionFilterPair(
-            obj_id, table_id, -1, -1, enableCollision=False)
+        safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=False)
         safeCollisionFilterPair(
             obj_id, table_id, -1, placement_link_id, enableCollision=False
         )
         robot.pb_client.set_step_sim(True)
         safeRemoveConstraint(o_cid)
-        robot.pb_client.reset_body(
-            obj_id, obj_end_pose_list[:3], obj_end_pose_list[3:])
+        robot.pb_client.reset_body(obj_id, obj_end_pose_list[:3], obj_end_pose_list[3:])
 
         cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
         obj_points, obj_colors, obj_classes = get_object_clouds(cams)
@@ -873,8 +866,7 @@ def main(hydra_cfg):
         )
         np2img(teleport_rgb.astype(np.uint8), teleport_img_fname)
 
-        obj_surf_contacts = p.getContactPoints(
-            obj_id, table_id, -1, placement_link_id)
+        obj_surf_contacts = p.getContactPoints(obj_id, table_id, -1, placement_link_id)
         touching_surf = len(obj_surf_contacts) > 0
         place_success_teleport = touching_surf
         place_success_teleport_list.append(place_success_teleport)
@@ -891,8 +883,7 @@ def main(hydra_cfg):
         for g_idx in range(2):
             # reset everything
             robot.pb_client.set_step_sim(False)
-            safeCollisionFilterPair(
-                obj_id, table_id, -1, -1, enableCollision=True)
+            safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
             if hydra_cfg.pose_dist.any_pose:
                 robot.pb_client.set_step_sim(True)
             safeRemoveConstraint(o_cid)
@@ -953,10 +944,8 @@ def main(hydra_cfg):
                         eval_grasp_imgs_dir, "pre_grasp_%d.png" % iteration
                     )
                     np2img(grasp_rgb.astype(np.uint8), grasp_img_fname)
-                    cloud_points, cloud_colors, cloud_classes = get_clouds(
-                        cams)
-                    obj_points, obj_colors, obj_classes = get_object_clouds(
-                        cams)
+                    cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
+                    obj_points, obj_colors, obj_classes = get_object_clouds(cams)
 
                     np.savez(
                         f"{save_dir}/{iteration}_pre_grasp_all_points.npz",
@@ -978,12 +967,8 @@ def main(hydra_cfg):
 
                 ########################### planning to pre_pre_grasp and pre_grasp ##########################
                 if grasp_plan is None:
-                    plan1 = ik_helper.plan_joint_motion(
-                        robot.arm.get_jpos(), jnt_pos
-                    )
-                    plan2 = ik_helper.plan_joint_motion(
-                        jnt_pos, grasp_jnt_pos
-                    )
+                    plan1 = ik_helper.plan_joint_motion(robot.arm.get_jpos(), jnt_pos)
+                    plan2 = ik_helper.plan_joint_motion(jnt_pos, grasp_jnt_pos)
 
                     if plan1 is not None and plan2 is not None:
                         grasp_plan = plan1 + plan2
@@ -1001,16 +986,14 @@ def main(hydra_cfg):
                         # get pose that's straight up
                         offset_pose = util.transform_pose(
                             pose_source=util.list2pose_stamped(
-                                np.concatenate(
-                                    robot.arm.get_ee_pose()[:2]).tolist()
+                                np.concatenate(robot.arm.get_ee_pose()[:2]).tolist()
                             ),
                             pose_transform=util.list2pose_stamped(
                                 [0, 0, 0.15, 0, 0, 0, 1]
                             ),
                         )
                         offset_pose_list = util.pose_stamped2list(offset_pose)
-                        offset_jnts = ik_helper.get_feasible_ik(
-                            offset_pose_list)
+                        offset_jnts = ik_helper.get_feasible_ik(offset_pose_list)
 
                         # turn ON collisions between robot and object, and close fingers
                         for i in range(p.getNumJoints(robot.arm.robot_id)):
@@ -1048,10 +1031,8 @@ def main(hydra_cfg):
                             eval_grasp_imgs_dir, "post_grasp_%d.png" % iteration
                         )
                         np2img(grasp_rgb.astype(np.uint8), grasp_img_fname)
-                        cloud_points, cloud_colors, cloud_classes = get_clouds(
-                            cams)
-                        obj_points, obj_colors, obj_classes = get_object_clouds(
-                            cams)
+                        cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
+                        obj_points, obj_colors, obj_classes = get_object_clouds(cams)
 
                         np.savez(
                             f"{save_dir}/{iteration}_post_grasp_all_points.npz",
@@ -1083,8 +1064,7 @@ def main(hydra_cfg):
                                 p.resetBasePositionAndOrientation(
                                     obj_id, obj_pos_before_grasp, ori
                                 )
-                                soft_grasp_close(
-                                    robot, finger_joint_id, force=40)
+                                soft_grasp_close(robot, finger_joint_id, force=40)
                                 robot.arm.set_jpos(
                                     jnt_pos_before_grasp, ignore_physics=True
                                 )
@@ -1136,10 +1116,8 @@ def main(hydra_cfg):
 
             ####################################### get place pose ###########################################
 
-            pre_place_jnt_pos1 = ik_helper.get_feasible_ik(
-                pre_ee_end_pose1_list)
-            pre_place_jnt_pos2 = ik_helper.get_feasible_ik(
-                pre_ee_end_pose2_list)
+            pre_place_jnt_pos1 = ik_helper.get_feasible_ik(pre_ee_end_pose1_list)
+            pre_place_jnt_pos2 = ik_helper.get_feasible_ik(pre_ee_end_pose2_list)
             place_jnt_pos = ik_helper.get_feasible_ik(ee_end_pose_list)
 
             if (
@@ -1153,8 +1131,7 @@ def main(hydra_cfg):
                 plan2 = ik_helper.plan_joint_motion(
                     pre_place_jnt_pos1, pre_place_jnt_pos2
                 )
-                plan3 = ik_helper.plan_joint_motion(
-                    pre_place_jnt_pos2, place_jnt_pos)
+                plan3 = ik_helper.plan_joint_motion(pre_place_jnt_pos2, place_jnt_pos)
 
                 if plan1 is not None and plan2 is not None and plan3 is not None:
                     place_plan = plan1 + plan2
@@ -1179,8 +1156,7 @@ def main(hydra_cfg):
                         time.sleep(0.075)
                     robot.arm.set_jpos(plan3[-1], wait=True)
 
-                    p.changeDynamics(
-                        obj_id, -1, linearDamping=5, angularDamping=5)
+                    p.changeDynamics(obj_id, -1, linearDamping=5, angularDamping=5)
                     constraint_grasp_open(cid)
                     robot.arm.eetool.open()
 
@@ -1240,17 +1216,23 @@ def main(hydra_cfg):
         if iteration == 0:
             write_to_file(log_txt_file, "\n")
             write_to_file(log_txt_file, "cwd:" + os.getcwd())
-            write_to_file(log_txt_file, "pose_distribution: {}".format('arbitrary' if
-                                                                       hydra_cfg.pose_dist.any_pose else 'upright'))
+            write_to_file(
+                log_txt_file,
+                "pose_distribution: {}".format(
+                    "arbitrary" if hydra_cfg.pose_dist.any_pose else "upright"
+                ),
+            )
             write_to_file(log_txt_file, "seed: {}".format(hydra_cfg.seed))
-            log_info("checkpoint_file_grasp: " +
-                     hydra_cfg.checkpoint_file_grasp)
-            write_to_file(log_txt_file, "checkpoint_file_grasp: " +
-                          hydra_cfg.checkpoint_file_grasp)
-            log_info("checkpoint_file_place: " +
-                     hydra_cfg.checkpoint_file_place)
-            write_to_file(log_txt_file, "checkpoint_file_place: " +
-                          hydra_cfg.checkpoint_file_place)
+            log_info("checkpoint_file_grasp: " + hydra_cfg.checkpoint_file_grasp)
+            write_to_file(
+                log_txt_file,
+                "checkpoint_file_grasp: " + hydra_cfg.checkpoint_file_grasp,
+            )
+            log_info("checkpoint_file_place: " + hydra_cfg.checkpoint_file_place)
+            write_to_file(
+                log_txt_file,
+                "checkpoint_file_place: " + hydra_cfg.checkpoint_file_place,
+            )
         if hydra_cfg.log_every_trial:
             for k, v in kvs.items():
                 log_str += "%s: %.3f, " % (k, v)
@@ -1259,31 +1241,36 @@ def main(hydra_cfg):
             write_to_file(log_txt_file, log_str)
 
         else:
-            if iteration == hydra_cfg.num_iterations-1:
+            if iteration == hydra_cfg.num_iterations - 1:
                 write_to_file(log_txt_file, "cwd:" + os.getcwd())
-                write_to_file(log_txt_file, "pose_distribution: {}".format('arbitrary' if
-                                                                           hydra_cfg.pose_dist.any_pose else 'upright'))
+                write_to_file(
+                    log_txt_file,
+                    "pose_distribution: {}".format(
+                        "arbitrary" if hydra_cfg.pose_dist.any_pose else "upright"
+                    ),
+                )
                 write_to_file(log_txt_file, "seed: {}".format(hydra_cfg.seed))
                 for k, v in kvs.items():
                     log_str += "%s: %.3f, " % (k, v)
                 # id_str = ", shapenet_id: %s" % obj_shapenet_id
                 log_info(log_str)
                 write_to_file(log_txt_file, log_str)
-                log_info("checkpoint_file_grasp: " +
-                         hydra_cfg.checkpoint_file_grasp)
-                write_to_file(log_txt_file, "checkpoint_file_grasp: " +
-                              hydra_cfg.checkpoint_file_grasp)
-                log_info("checkpoint_file_place: " +
-                         hydra_cfg.checkpoint_file_place)
-                write_to_file(log_txt_file, "checkpoint_file_place: " +
-                              hydra_cfg.checkpoint_file_place)
+                log_info("checkpoint_file_grasp: " + hydra_cfg.checkpoint_file_grasp)
+                write_to_file(
+                    log_txt_file,
+                    "checkpoint_file_grasp: " + hydra_cfg.checkpoint_file_grasp,
+                )
+                log_info("checkpoint_file_place: " + hydra_cfg.checkpoint_file_place)
+                write_to_file(
+                    log_txt_file,
+                    "checkpoint_file_place: " + hydra_cfg.checkpoint_file_place,
+                )
                 write_to_file(log_txt_file, "\n")
 
         eval_iter_dir = osp.join(eval_save_dir, "trial_%d" % iteration)
         if not osp.exists(eval_iter_dir):
             os.makedirs(eval_iter_dir)
-        sample_fname = osp.join(
-            eval_iter_dir, "success_rate_eval_implicit.npz")
+        sample_fname = osp.join(eval_iter_dir, "success_rate_eval_implicit.npz")
         np.savez(
             sample_fname,
             obj_shapenet_id=obj_shapenet_id,
