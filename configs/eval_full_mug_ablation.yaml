@@ -76,7 +76,7 @@ softmax_temperature_grasp: 0.1
 #### TO BE CHANGED ####
 
 return_attn: True
-rand_mesh_scale: False
+rand_mesh_scale: True
 loop: 1
 init_distribution_tranform_file: Null
 
@@ -92,7 +92,7 @@ only_test_ids: True
 demo_exp: grasp_rim_hang_handle_gaussian_precise_w_shelf
 exp: debug_eval
 num_demo: 12
-config: base_cfg
+config: eval_mug_gen
 model_path: multi_category_weights
 n_demos: 0
 single_instance: False
