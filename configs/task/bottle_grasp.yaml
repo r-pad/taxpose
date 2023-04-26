@@ -2,7 +2,7 @@
 name: bottle_grasp
 action_class: 2
 anchor_class: 0
-cloud_type: pre_grasp 
+cloud_type: pre_grasp
 softmax_temperature: 0.1
 weight_normalize: softmax
 checkpoint_file_action: ${hydra:runtime.cwd}/trained_models/pretraining_gripper_embnn_weights.ckpt

@@ -243,10 +243,10 @@ bash download_all_ndf_train_data.sh
 
 ```
 # Mug, grasp
-python scripts/train_residual_flow.py task=mug_grasp  
+python scripts/train_residual_flow.py task=mug_grasp
 
 # Mug, place
-python scripts/train_residual_flow.py task=mug_place  
+python scripts/train_residual_flow.py task=mug_place
 ```
 
 To use custom pre-trained embeddings, add the following flag to the above commands:
@@ -577,20 +577,20 @@ bash download_bottle_bowl_train_data.sh
 Train models for *bottle*
 ```
 # Bottle, grasp
-python scripts/train_residual_flow.py task=bottle_grasp  
+python scripts/train_residual_flow.py task=bottle_grasp
 
 # Bottle, place
-python scripts/train_residual_flow.py task=bottle_place  
+python scripts/train_residual_flow.py task=bottle_place
 
 ```
 
 Train models for *bowl*
 ```
 # Bowl, grasp
-python scripts/train_residual_flow.py task=bowl_grasp  
+python scripts/train_residual_flow.py task=bowl_grasp
 
 # Bowl, place
-python scripts/train_residual_flow.py task=bowl_place  
+python scripts/train_residual_flow.py task=bowl_place
 ```
 
 Each of these scripts generates a **model checkpoint** file. You can find the path to the **model checkpoint** file in the output of the script `taxpose/train_new.txt`, under `working_dir: <model checkpoint>`.

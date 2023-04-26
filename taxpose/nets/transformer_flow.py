@@ -33,7 +33,7 @@ class EquivariantFeatureEmbeddingNetwork(nn.Module):
 
 
 class CorrespondenceFlow_DiffEmbMLP(nn.Module):
-    def __init__(self, emb_dims=512, cycle=True, emb_nn='dgcnn', center_feature=True):
+    def __init__(self, emb_dims=512, cycle=True, emb_nn="dgcnn", center_feature=True):
         super(CorrespondenceFlow_DiffEmbMLP, self).__init__()
         self.emb_dims = emb_dims
         self.cycle = cycle
@@ -46,20 +46,16 @@ class CorrespondenceFlow_DiffEmbMLP(nn.Module):
 
         self.center_feature = center_feature
 
-        self.transformer_action = MLP(
-            emb_dims=emb_dims)
-        self.transformer_anchor = MLP(
-            emb_dims=emb_dims)
+        self.transformer_action = MLP(emb_dims=emb_dims)
+        self.transformer_anchor = MLP(emb_dims=emb_dims)
         self.head_action = CorrespondenceMLPHead(emb_dims=emb_dims)
         self.head_anchor = CorrespondenceMLPHead(emb_dims=emb_dims)
 
     def forward(self, *input):
         action_points = input[0].permute(0, 2, 1)[:, :3]  # B,3,num_points
         anchor_points = input[1].permute(0, 2, 1)[:, :3]
-        action_points_dmean = action_points - \
-            action_points.mean(dim=2, keepdim=True)
-        anchor_points_dmean = anchor_points - \
-            anchor_points.mean(dim=2, keepdim=True)
+        action_points_dmean = action_points - action_points.mean(dim=2, keepdim=True)
+        anchor_points_dmean = anchor_points - anchor_points.mean(dim=2, keepdim=True)
         # mean center point cloud before DGCNN
         if not self.center_feature:
             action_points_dmean = action_points
@@ -68,23 +64,30 @@ class CorrespondenceFlow_DiffEmbMLP(nn.Module):
         anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
 
         # tilde_phi, phi are both B,512,N
-        action_embedding_tf = \
-            self.transformer_action(
-                action_embedding)
+        action_embedding_tf = self.transformer_action(action_embedding)
         # action_embedding_tf: Batch, emb_dim, num_points
         # action_attn: Batch, 4, num_points, num_points
-        anchor_embedding_tf = \
-            self.transformer_anchor(anchor_embedding)
+        anchor_embedding_tf = self.transformer_anchor(anchor_embedding)
         action_embedding_tf = action_embedding + action_embedding_tf
         anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
 
-        flow_action = self.head_action(action_embedding_tf, anchor_embedding_tf,
-                                       action_points, anchor_points, scores=None).permute(0, 2, 1)
+        flow_action = self.head_action(
+            action_embedding_tf,
+            anchor_embedding_tf,
+            action_points,
+            anchor_points,
+            scores=None,
+        ).permute(0, 2, 1)
 
-        if(self.cycle):
+        if self.cycle:
 
-            flow_anchor = self.head_anchor(anchor_embedding_tf, action_embedding_tf,
-                                           anchor_points, action_points, scores=None).permute(0, 2, 1)
+            flow_anchor = self.head_anchor(
+                anchor_embedding_tf,
+                action_embedding_tf,
+                anchor_points,
+                action_points,
+                scores=None,
+            ).permute(0, 2, 1)
             return flow_action, flow_anchor
         return flow_action
 
@@ -109,8 +112,8 @@ class CorrespondenceMLPHead(nn.Module):
         anchor_embedding = input[1]
         action_points = input[2]
         anchor_points = input[3]
-        if(scores is None):
-            if(len(input) <= 4):
+        if scores is None:
+            if len(input) <= 4:
                 action_query = action_embedding
                 anchor_key = anchor_embedding
             else:
@@ -118,13 +121,13 @@ class CorrespondenceMLPHead(nn.Module):
                 anchor_key = input[5]
 
             d_k = action_query.size(1)
-            scores = torch.matmul(action_query.transpose(
-                2, 1).contiguous(), anchor_key) / math.sqrt(d_k)
+            scores = torch.matmul(
+                action_query.transpose(2, 1).contiguous(), anchor_key
+            ) / math.sqrt(d_k)
             # W_i # B, N, N (N=number of points, 1024 cur)
             scores = torch.softmax(scores, dim=2)
 
-        corr_points = torch.matmul(
-            anchor_points, scores.transpose(2, 1).contiguous())
+        corr_points = torch.matmul(anchor_points, scores.transpose(2, 1).contiguous())
         # \tilde{y}_i = sum_{j}{w_ij,y_j}, - x_i  # B, 3, N
         corr_flow = corr_points - action_points
         weight = self.proj_flow(action_embedding)
@@ -211,8 +214,7 @@ class ResidualMLPHead(nn.Module):
             )
         else:
             self.proj_flow = nn.Sequential(
-                PointNet([emb_dims, emb_dims // 2,
-                         emb_dims // 4, emb_dims // 8]),
+                PointNet([emb_dims, emb_dims // 2, emb_dims // 4, emb_dims // 8]),
                 nn.Conv1d(emb_dims // 8, 3, kernel_size=1, bias=False),
             )
         self.pred_weight = pred_weight
@@ -247,8 +249,7 @@ class ResidualMLPHead(nn.Module):
             ) / math.sqrt(d_k)
             # W_i # B, N, N (N=number of points, 1024 cur)
             scores = torch.softmax(scores, dim=2)
-        corr_points = torch.matmul(
-            anchor_points, scores.transpose(2, 1).contiguous())
+        corr_points = torch.matmul(anchor_points, scores.transpose(2, 1).contiguous())
         # \tilde{y}_i = sum_{j}{w_ij,y_j}, - x_i  # B, 3, N
         corr_flow = corr_points - action_points
 
@@ -325,10 +326,8 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         action_points = input[0].permute(0, 2, 1)[:, :3]  # B,3,num_points
         anchor_points = input[1].permute(0, 2, 1)[:, :3]
 
-        action_points_dmean = action_points - \
-            action_points.mean(dim=2, keepdim=True)
-        anchor_points_dmean = anchor_points - \
-            anchor_points.mean(dim=2, keepdim=True)
+        action_points_dmean = action_points - action_points.mean(dim=2, keepdim=True)
+        anchor_points_dmean = anchor_points - anchor_points.mean(dim=2, keepdim=True)
         # mean center point cloud before DGCNN
         if not self.center_feature:
             action_points_dmean = action_points
@@ -374,8 +373,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 return_flow_component=self.return_flow_component,
             )
             flow_action = flow_output_action["full_flow"].permute(0, 2, 1)
-            residual_flow_action = flow_output_action["residual_flow"].permute(
-                0, 2, 1)
+            residual_flow_action = flow_output_action["residual_flow"].permute(0, 2, 1)
             corr_flow_action = flow_output_action["corr_flow"].permute(0, 2, 1)
         else:
             flow_action = self.head_action(
@@ -402,8 +400,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 residual_flow_anchor = flow_output_anchor["residual_flow"].permute(
                     0, 2, 1
                 )
-                corr_flow_anchor = flow_output_anchor["corr_flow"].permute(
-                    0, 2, 1)
+                corr_flow_anchor = flow_output_anchor["corr_flow"].permute(0, 2, 1)
             else:
                 flow_anchor = self.head_anchor(
                     anchor_embedding_tf,
