@@ -1,0 +1,539 @@
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_190935
+grasp_model: 3en3fbxe
+seed: 0
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_190944
+grasp_model: 3en3fbxe
+seed: 1
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_192026
+grasp_model: su58zs1b
+seed: 0
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_192034
+grasp_model: su58zs1b
+seed: 1
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_192149
+grasp_model: su58zs1b
+seed: 0
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_192236
+grasp_model: 3en3fbxe
+seed: 5
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_192244
+grasp_model: 3en3fbxe
+seed: 6
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_192251
+grasp_model: 3en3fbxe
+seed: 7
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_192300
+grasp_model: 3en3fbxe
+seed: 8
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_192307
+grasp_model: 3en3fbxe
+seed: 9
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_192315
+grasp_model: 3en3fbxe
+seed: 10
+Iteration: 99, Place Success Rate: 0.160, Place [teleport] Success Rate: 0.910, Grasp Success Rate: 0.740, Place Success: 0.000, Place [teleport] Success: 0.000, Grasp Success: 1.000, overall success Rate: 0.700, , shapenet_id: ff1a44e1c1785d618bca309f2c51966a
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_201559
+grasp_model: su58zs1b
+seed: 1
+Iteration: 99, Place Success Rate: 0.190, Place [teleport] Success Rate: 0.870, Grasp Success Rate: 0.750, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.640, , shapenet_id: ec846432f3ebedf0a6f32a8797e3b9e9
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_212109
+grasp_model: su58zs1b_127
+seed: 0
+Iteration: 99, Place Success Rate: 0.120, Place [teleport] Success Rate: 0.900, Grasp Success Rate: 0.630, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.570, , shapenet_id: f09e51579600cfbb88b651d2e4ea0846
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_231315
+grasp_model: kwl8hwnx_127
+seed: 0
+Iteration: 99, Place Success Rate: 0.090, Place [teleport] Success Rate: 0.800, Grasp Success Rate: 0.650, Place Success: 0.000, Place [teleport] Success: 0.000, Grasp Success: 1.000, overall success Rate: 0.500, , shapenet_id: f7d776fd68b126f23b67070c4a034f08
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_000240
+grasp_model: kwl8hwnx_127
+seed: 1
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_000621
+grasp_model: kwl8hwnx_250
+seed: 0
+Iteration: 99, Place Success Rate: 0.190, Place [teleport] Success Rate: 0.850, Grasp Success Rate: 0.670, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.550, , shapenet_id: ec846432f3ebedf0a6f32a8797e3b9e9
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+Iteration: 99, Place Success Rate: 0.110, Place [teleport] Success Rate: 0.890, Grasp Success Rate: 0.670, Place Success: 1.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.590, , shapenet_id: f1c5b9bb744afd96d6e1954365b10b52
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_005700
+grasp_model: kwl8hwnx_250
+seed: 1
+Iteration: 99, Place Success Rate: 0.090, Place [teleport] Success Rate: 0.950, Grasp Success Rate: 0.680, Place Success: 1.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.650, , shapenet_id: ec846432f3ebedf0a6f32a8797e3b9e9
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_023209
+grasp_model: su58zs1b
+seed: 2
+Iteration: 99, Place Success Rate: 0.160, Place [teleport] Success Rate: 0.890, Grasp Success Rate: 0.730, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.660, , shapenet_id: f7d776fd68b126f23b67070c4a034f08
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_032541
+grasp_model: su58zs1b
+seed: 3
+Iteration: 99, Place Success Rate: 0.220, Place [teleport] Success Rate: 0.860, Grasp Success Rate: 0.750, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.630, , shapenet_id: f7d776fd68b126f23b67070c4a034f08
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_041847
+grasp_model: su58zs1b
+seed: 4
+Iteration: 99, Place Success Rate: 0.170, Place [teleport] Success Rate: 0.930, Grasp Success Rate: 0.650, Place Success: 1.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.600, , shapenet_id: eecb13f61a93b4048f58d8b19de93f99
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_050821
+grasp_model: su58zs1b
+seed: 5
+Iteration: 99, Place Success Rate: 0.240, Place [teleport] Success Rate: 0.930, Grasp Success Rate: 0.800, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.750, , shapenet_id: eecb13f61a93b4048f58d8b19de93f99
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_060418
+grasp_model: su58zs1b
+seed: 6
+Iteration: 99, Place Success Rate: 0.190, Place [teleport] Success Rate: 0.920, Grasp Success Rate: 0.780, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.710, , shapenet_id: e9bd4ee553eb35c1d5ccc40b510e4bd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_065809
+grasp_model: su58zs1b
+seed: 7
+Iteration: 99, Place Success Rate: 0.150, Place [teleport] Success Rate: 0.940, Grasp Success Rate: 0.740, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.690, , shapenet_id: eecb13f61a93b4048f58d8b19de93f99
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_075208
+grasp_model: su58zs1b
+seed: 8
+Iteration: 99, Place Success Rate: 0.170, Place [teleport] Success Rate: 0.920, Grasp Success Rate: 0.700, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.670, , shapenet_id: f1c5b9bb744afd96d6e1954365b10b52
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_084454
+grasp_model: su58zs1b
+seed: 9
+Iteration: 99, Place Success Rate: 0.190, Place [teleport] Success Rate: 0.940, Grasp Success Rate: 0.690, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.640, , shapenet_id: fad118b32085f3f2c2c72e575af174cd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_093650
+grasp_model: su58zs1b
+seed: 10
+Iteration: 99, Place Success Rate: 0.230, Place [teleport] Success Rate: 0.880, Grasp Success Rate: 0.780, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.690, , shapenet_id: eecb13f61a93b4048f58d8b19de93f99
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_102923
+grasp_model: su58zs1b_127
+seed: 2
+Iteration: 99, Place Success Rate: 0.200, Place [teleport] Success Rate: 0.950, Grasp Success Rate: 0.710, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.670, , shapenet_id: eecb13f61a93b4048f58d8b19de93f99
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_112149
+grasp_model: su58zs1b_127
+seed: 3
+Iteration: 99, Place Success Rate: 0.170, Place [teleport] Success Rate: 0.930, Grasp Success Rate: 0.730, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.680, , shapenet_id: f09e51579600cfbb88b651d2e4ea0846
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_121156
+grasp_model: su58zs1b_127
+seed: 4
+Iteration: 99, Place Success Rate: 0.180, Place [teleport] Success Rate: 0.940, Grasp Success Rate: 0.630, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.600, , shapenet_id: f1c5b9bb744afd96d6e1954365b10b52
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_130114
+grasp_model: su58zs1b_127
+seed: 5
+Iteration: 99, Place Success Rate: 0.140, Place [teleport] Success Rate: 0.940, Grasp Success Rate: 0.680, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.650, , shapenet_id: f7d776fd68b126f23b67070c4a034f08
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_135138
+grasp_model: su58zs1b_127
+seed: 6
+Iteration: 99, Place Success Rate: 0.200, Place [teleport] Success Rate: 0.930, Grasp Success Rate: 0.690, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.640, , shapenet_id: f1c5b9bb744afd96d6e1954365b10b52
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_144037
+grasp_model: su58zs1b_127
+seed: 7
+Iteration: 99, Place Success Rate: 0.180, Place [teleport] Success Rate: 0.980, Grasp Success Rate: 0.740, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.720, , shapenet_id: fad118b32085f3f2c2c72e575af174cd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_152949
+grasp_model: su58zs1b_127
+seed: 8
+Iteration: 99, Place Success Rate: 0.130, Place [teleport] Success Rate: 0.950, Grasp Success Rate: 0.740, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.700, , shapenet_id: e94e46bc5833f2f5e57b873e4f3ef3a4
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_162059
+grasp_model: su58zs1b_127
+seed: 9
+Iteration: 99, Place Success Rate: 0.160, Place [teleport] Success Rate: 0.900, Grasp Success Rate: 0.560, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.530, , shapenet_id: fad118b32085f3f2c2c72e575af174cd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_170937
+grasp_model: su58zs1b_127
+seed: 10
+Iteration: 99, Place Success Rate: 0.220, Place [teleport] Success Rate: 0.940, Grasp Success Rate: 0.690, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.640, , shapenet_id: f1c5b9bb744afd96d6e1954365b10b52
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_160125
+grasp_model: kwl8hwnx_127
+seed: 2
+Iteration: 99, Place Success Rate: 0.160, Place [teleport] Success Rate: 0.830, Grasp Success Rate: 0.660, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.560, , shapenet_id: eecb13f61a93b4048f58d8b19de93f99
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_165113
+grasp_model: kwl8hwnx_127
+seed: 3
+Iteration: 99, Place Success Rate: 0.110, Place [teleport] Success Rate: 0.800, Grasp Success Rate: 0.660, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.510, , shapenet_id: e94e46bc5833f2f5e57b873e4f3ef3a4
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_174107
+grasp_model: kwl8hwnx_127
+seed: 4
+Iteration: 99, Place Success Rate: 0.170, Place [teleport] Success Rate: 0.850, Grasp Success Rate: 0.670, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.580, , shapenet_id: ff1a44e1c1785d618bca309f2c51966a
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_182913
+grasp_model: kwl8hwnx_127
+seed: 5
+Iteration: 99, Place Success Rate: 0.120, Place [teleport] Success Rate: 0.810, Grasp Success Rate: 0.680, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.540, , shapenet_id: e9bd4ee553eb35c1d5ccc40b510e4bd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_127.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_182936
+grasp_model: kwl8hwnx_250
+seed: 2
+Iteration: 99, Place Success Rate: 0.190, Place [teleport] Success Rate: 0.930, Grasp Success Rate: 0.750, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.710, , shapenet_id: e9bd4ee553eb35c1d5ccc40b510e4bd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_182936
+grasp_model: kwl8hwnx_250
+seed: 3
+Iteration: 99, Place Success Rate: 0.140, Place [teleport] Success Rate: 0.910, Grasp Success Rate: 0.650, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.580, , shapenet_id: e9bd4ee553eb35c1d5ccc40b510e4bd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_182936
+grasp_model: kwl8hwnx_250
+seed: 4
+Iteration: 99, Place Success Rate: 0.140, Place [teleport] Success Rate: 0.920, Grasp Success Rate: 0.700, Place Success: 1.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.630, , shapenet_id: f1e439307b834015770a0ff1161fa15a
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-21_182936
+grasp_model: kwl8hwnx_250
+seed: 5
+Iteration: 99, Place Success Rate: 0.100, Place [teleport] Success Rate: 0.880, Grasp Success Rate: 0.670, Place Success: 1.000, Place [teleport] Success: 0.000, Grasp Success: 1.000, overall success Rate: 0.590, , shapenet_id: edaf960fb6afdadc4cebc4b5998de5d0
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-22_005651
+any_pose? False
+grasp_model: su58zs1b
+seed: 6
+Iteration: 99, Place Success Rate: 0.390, Place [teleport] Success Rate: 0.950, Grasp Success Rate: 0.860, Place Success: 1.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.810, , shapenet_id: e984fd7e97c2be347eaeab1f0c9120b7
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-22_005651
+any_pose? False
+grasp_model: su58zs1b
+seed: 1
+Iteration: 99, Place Success Rate: 0.330, Place [teleport] Success Rate: 0.950, Grasp Success Rate: 0.810, Place Success: 1.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.770, , shapenet_id: f09e51579600cfbb88b651d2e4ea0846
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-22_005651
+any_pose? False
+grasp_model: su58zs1b
+seed: 2
+Iteration: 99, Place Success Rate: 0.390, Place [teleport] Success Rate: 0.990, Grasp Success Rate: 0.870, Place Success: 1.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.870, , shapenet_id: e94e46bc5833f2f5e57b873e4f3ef3a4
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-22_005651
+any_pose? False
+grasp_model: su58zs1b
+seed: 5
+Iteration: 99, Place Success Rate: 0.420, Place [teleport] Success Rate: 0.940, Grasp Success Rate: 0.930, Place Success: 1.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.870, , shapenet_id: fad118b32085f3f2c2c72e575af174cd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-22_123700
+any_pose? False
+grasp_model: su58zs1b
+seed: 6
+Iteration: 99, Place Success Rate: 0.410, Place [teleport] Success Rate: 0.960, Grasp Success Rate: 0.850, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.820, , shapenet_id: edaf960fb6afdadc4cebc4b5998de5d0
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-22_123700
+any_pose? False
+grasp_model: su58zs1b
+seed: 3
+Iteration: 99, Place Success Rate: 0.420, Place [teleport] Success Rate: 0.960, Grasp Success Rate: 0.870, Place Success: 1.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.830, , shapenet_id: f09e51579600cfbb88b651d2e4ea0846
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-22_123700
+any_pose? False
+grasp_model: su58zs1b
+seed: 4
+Iteration: 99, Place Success Rate: 0.310, Place [teleport] Success Rate: 0.970, Grasp Success Rate: 0.840, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.810, , shapenet_id: fad118b32085f3f2c2c72e575af174cd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-22_133900
+any_pose? False
+grasp_model: su58zs1b
+seed: 8
+Iteration: 99, Place Success Rate: 0.350, Place [teleport] Success Rate: 0.960, Grasp Success Rate: 0.890, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.850, , shapenet_id: f1c5b9bb744afd96d6e1954365b10b52
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-22_135116
+any_pose? False
+grasp_model: su58zs1b
+seed: 0
+Iteration: 99, Place Success Rate: 0.380, Place [teleport] Success Rate: 0.960, Grasp Success Rate: 0.890, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.850, , shapenet_id: edaf960fb6afdadc4cebc4b5998de5d0
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/su58zs1b.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-22_235137
+any_pose? False
+seed: 1
+Iteration: 99, Place Success Rate: 0.140, Place [teleport] Success Rate: 0.920, Grasp Success Rate: 0.960, Place Success: 1.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.880, , shapenet_id: e94e46bc5833f2f5e57b873e4f3ef3a4
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-22_235137
+any_pose? False
+seed: 0
+Iteration: 99, Place Success Rate: 0.140, Place [teleport] Success Rate: 0.930, Grasp Success Rate: 0.960, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.890, , shapenet_id: ff1a44e1c1785d618bca309f2c51966a
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-22_235137
+any_pose? False
+seed: 3
+Iteration: 99, Place Success Rate: 0.200, Place [teleport] Success Rate: 0.950, Grasp Success Rate: 0.960, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.910, , shapenet_id: ec846432f3ebedf0a6f32a8797e3b9e9
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-23_004655
+any_pose? False
+seed: 7
+Iteration: 99, Place Success Rate: 0.090, Place [teleport] Success Rate: 0.900, Grasp Success Rate: 0.970, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.870, , shapenet_id: ec846432f3ebedf0a6f32a8797e3b9e9
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-23_004655
+any_pose? False
+seed: 4
+Iteration: 99, Place Success Rate: 0.200, Place [teleport] Success Rate: 0.880, Grasp Success Rate: 0.980, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.860, , shapenet_id: ff1a44e1c1785d618bca309f2c51966a
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-23_004655
+any_pose? False
+seed: 6
+Iteration: 99, Place Success Rate: 0.180, Place [teleport] Success Rate: 0.920, Grasp Success Rate: 0.980, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.900, , shapenet_id: fad118b32085f3f2c2c72e575af174cd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-23_024426
+any_pose? False
+seed: 2
+Iteration: 99, Place Success Rate: 0.140, Place [teleport] Success Rate: 0.910, Grasp Success Rate: 0.970, Place Success: 1.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.880, , shapenet_id: ff1a44e1c1785d618bca309f2c51966a
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-23_024426
+any_pose? False
+seed: 9
+Iteration: 99, Place Success Rate: 0.140, Place [teleport] Success Rate: 0.910, Grasp Success Rate: 0.980, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.900, , shapenet_id: e9bd4ee553eb35c1d5ccc40b510e4bd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-23_041241
+any_pose? False
+seed: 11
+Iteration: 99, Place Success Rate: 0.150, Place [teleport] Success Rate: 0.910, Grasp Success Rate: 0.970, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.890, , shapenet_id: e94e46bc5833f2f5e57b873e4f3ef3a4
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/kwl8hwnx_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-23_230431
+any_pose? True
+seed: 1
+Iteration: 99, Place Success Rate: 0.000, Place [teleport] Success Rate: 0.010, Grasp Success Rate: 0.000, Place Success: 0.000, Place [teleport] Success: 0.000, Grasp Success: 0.000, overall success Rate: 0.000, , shapenet_id: edaf960fb6afdadc4cebc4b5998de5d0
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/7fiiadrg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-23_230620
+any_pose? True
+seed: 0
+Iteration: 99, Place Success Rate: 0.000, Place [teleport] Success Rate: 0.030, Grasp Success Rate: 0.000, Place Success: 0.000, Place [teleport] Success: 0.000, Grasp Success: 0.000, overall success Rate: 0.000, , shapenet_id: ec846432f3ebedf0a6f32a8797e3b9e9
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/7fiiadrg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-23_230431
+any_pose? True
+seed: 0
+Iteration: 99, Place Success Rate: 0.080, Place [teleport] Success Rate: 0.920, Grasp Success Rate: 0.670, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.630, , shapenet_id: ec846432f3ebedf0a6f32a8797e3b9e9
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/qr657ckg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-23_230431
+any_pose? True
+seed: 1
+Iteration: 99, Place Success Rate: 0.090, Place [teleport] Success Rate: 0.890, Grasp Success Rate: 0.700, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.620, , shapenet_id: fad118b32085f3f2c2c72e575af174cd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/qr657ckg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-24_000450
+any_pose? True
+seed: 2
+Iteration: 99, Place Success Rate: 0.070, Place [teleport] Success Rate: 0.870, Grasp Success Rate: 0.690, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.610, , shapenet_id: f1c5b9bb744afd96d6e1954365b10b52
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/qr657ckg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-24_000450
+any_pose? True
+seed: 3
+Iteration: 99, Place Success Rate: 0.100, Place [teleport] Success Rate: 0.850, Grasp Success Rate: 0.740, Place Success: 1.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.630, , shapenet_id: f7d776fd68b126f23b67070c4a034f08
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/qr657ckg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-24_000450
+any_pose? False
+seed: 0
+Iteration: 99, Place Success Rate: 0.060, Place [teleport] Success Rate: 0.940, Grasp Success Rate: 0.870, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.810, , shapenet_id: e984fd7e97c2be347eaeab1f0c9120b7
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/qr657ckg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-24_001051
+any_pose? False
+seed: 3
+Iteration: 99, Place Success Rate: 0.150, Place [teleport] Success Rate: 0.930, Grasp Success Rate: 0.930, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.880, , shapenet_id: f1c5b9bb744afd96d6e1954365b10b52
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/qr657ckg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-24_001051
+any_pose? False
+seed: 2
+Iteration: 99, Place Success Rate: 0.090, Place [teleport] Success Rate: 0.900, Grasp Success Rate: 0.900, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.800, , shapenet_id: f7d776fd68b126f23b67070c4a034f08
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/qr657ckg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-24_010723
+any_pose? False
+seed: 5
+Iteration: 99, Place Success Rate: 0.080, Place [teleport] Success Rate: 0.970, Grasp Success Rate: 0.940, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.910, , shapenet_id: ff1a44e1c1785d618bca309f2c51966a
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/qr657ckg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-24_010723
+any_pose? True
+seed: 5
+Iteration: 99, Place Success Rate: 0.050, Place [teleport] Success Rate: 0.950, Grasp Success Rate: 0.640, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 1.000, overall success Rate: 0.610, , shapenet_id: fad118b32085f3f2c2c72e575af174cd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/qr657ckg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-24_010723
+any_pose? True
+seed: 4
+Iteration: 99, Place Success Rate: 0.120, Place [teleport] Success Rate: 0.900, Grasp Success Rate: 0.680, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.610, , shapenet_id: f1c5b9bb744afd96d6e1954365b10b52
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/qr657ckg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-24_010722
+any_pose? True
+seed: 6
+Iteration: 99, Place Success Rate: 0.070, Place [teleport] Success Rate: 0.910, Grasp Success Rate: 0.720, Place Success: 0.000, Place [teleport] Success: 0.000, Grasp Success: 1.000, overall success Rate: 0.640, , shapenet_id: e94e46bc5833f2f5e57b873e4f3ef3a4
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/grasp_models/qr657ckg_250.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_new_arbit/place.ckpt
+
+

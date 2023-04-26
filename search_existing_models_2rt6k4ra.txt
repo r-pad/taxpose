@@ -1,0 +1,52 @@
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_171545
+grasp_model: 2rt6k4ra
+seed: 0
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_171603
+grasp_model: 2rt6k4ra
+seed: 1
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_171620
+grasp_model: 2rt6k4ra
+seed: 2
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_171717
+grasp_model: 2rt6k4ra
+seed: 0
+Iteration: 99, Place Success Rate: 0.280, Place [teleport] Success Rate: 0.910, Grasp Success Rate: 0.500, Place Success: 0.000, Place [teleport] Success: 0.000, Grasp Success: 0.000, overall success Rate: 0.470, , shapenet_id: fad118b32085f3f2c2c72e575af174cd
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_existing_arbit/grasp_models/2rt6k4ra.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_existing_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_180831
+grasp_model: 2rt6k4ra
+seed: 1
+Iteration: 99, Place Success Rate: 0.150, Place [teleport] Success Rate: 0.850, Grasp Success Rate: 0.540, Place Success: 0.000, Place [teleport] Success: 1.000, Grasp Success: 0.000, overall success Rate: 0.440, , shapenet_id: f1c5b9bb744afd96d6e1954365b10b52
+checkpoint_file_grasp: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_existing_arbit/grasp_models/2rt6k4ra.ckpt
+checkpoint_file_place: /home/exx/Documents/taxpose/pretrained_models/ndf/mug/test_existing_arbit/place.ckpt
+
+
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_185758
+grasp_model: 2rt6k4ra
+seed: 2
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_185806
+grasp_model: 2rt6k4ra
+seed: 3
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_185815
+grasp_model: 2rt6k4ra
+seed: 4
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_185824
+grasp_model: 2rt6k4ra
+seed: 5
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_185832
+grasp_model: 2rt6k4ra
+seed: 6
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_185840
+grasp_model: 2rt6k4ra
+seed: 7
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_185849
+grasp_model: 2rt6k4ra
+seed: 8
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_185858
+grasp_model: 2rt6k4ra
+seed: 9
+cwd:/home/exx/Documents/taxpose/results/ndf/mug_place/residual_flow_test_partial_cloud_initpose/2023-04-20_185906
+grasp_model: 2rt6k4ra
+seed: 10
