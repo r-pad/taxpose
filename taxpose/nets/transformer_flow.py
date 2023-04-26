@@ -80,7 +80,6 @@ class CorrespondenceFlow_DiffEmbMLP(nn.Module):
         ).permute(0, 2, 1)
 
         if self.cycle:
-
             flow_anchor = self.head_anchor(
                 anchor_embedding_tf,
                 action_embedding_tf,

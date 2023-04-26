@@ -175,7 +175,6 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
                 self.action_weight + self.anchor_weight
             )
         elif self.flow_supervision == "action2anchor":
-
             pred_T_action = flow2pose(
                 xyz=points_trans_action,
                 flow=pred_flow_action,
