@@ -125,7 +125,6 @@ def flow2pose(
     weights=None,
     return_transform3d=False,
     normalization_scehme="l1",
-    x=None,
     temperature=1,
 ):
     """
@@ -134,7 +133,9 @@ def flow2pose(
     @param weights: (batch, num_points)
     @param normalization_scehme: {'l1, 'softmax'}
     @param x: flow prediction
+    @return pred_T_action: SE(3) transformation from xyz to the other point cloud
     """
+    xyz = xyz[:, :, :3]
     assert normalization_scehme in [
         "l1",
         "softmax",
@@ -156,13 +157,13 @@ def flow2pose(
         w.sum(1), torch.ones(w.sum(1).shape).cuda()
     ), "flow weights does not sum to 1 for each batch element"
     xyz_mean = (w * xyz).sum(dim=1, keepdims=True)
-    xyz_demean = xyz - xyz_mean
+    xyz_centered = xyz - xyz_mean
 
     flow_mean = (w * flow).sum(dim=1, keepdims=True)
-    # xyz_trans = xyz_demean + flow - flow_mean
-    xyz_trans = ((xyz + flow) * w).sum(dim=1, keepdims=True)
+    flow_centered = flow - flow_mean
 
-    X = torch.bmm(xyz_demean.transpose(-2, -1), w * xyz_trans)
+    xyz_trans = xyz_centered + flow_centered
+    X = torch.bmm(xyz_centered.transpose(-2, -1), w * xyz_trans)
 
     R = symmetric_orthogonalization(X)
     t = (flow_mean + xyz_mean - torch.bmm(xyz_mean, R)).squeeze(1)

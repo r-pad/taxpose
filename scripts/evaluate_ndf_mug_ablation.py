@@ -42,7 +42,10 @@ from ndf_robot.utils.franka_ik import FrankaIK
 from ndf_robot.utils.util import np2img
 from pytorch3d.ops import sample_farthest_points
 
-from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
+from taxpose.nets.transformer_flow import (
+    CorrespondenceFlow_DiffEmbMLP,
+    ResidualFlow_DiffEmbTransformer,
+)
 from taxpose.training.flow_equivariance_training_module_nocentering_eval_init import (
     EquivarianceTestingModule,
 )
@@ -173,7 +176,7 @@ def write_to_file(file_name, string):
 
 
 #### TO BE CHANGED ####
-@hydra.main(config_path="../configs", config_name="eval_full_mug_place")
+@hydra.main(config_path="../configs", config_name="eval_full_mug_ablation")
 def main(hydra_cfg):
     data_dir = hydra_cfg.data_dir
     # '/home/exx/Documents/taxpose/search_existing_models.txt'
@@ -184,13 +187,13 @@ def main(hydra_cfg):
         os.makedirs(save_dir)
 
     eval_data_dir = hydra_cfg.data_dir
-    obj_class = hydra_cfg.object_class.name
+    obj_class = hydra_cfg.object_class
     shapenet_obj_dir = osp.join(
         path_util.get_ndf_obj_descriptions(), obj_class + "_centered_obj_normalized"
     )
 
     demo_load_dir = osp.join(
-        path_util.get_ndf_data(), "demos", obj_class, hydra_cfg.object_class.demo_exp
+        path_util.get_ndf_data(), "demos", obj_class, hydra_cfg.demo_exp
     )
 
     expstr = "exp--" + str(hydra_cfg.exp)
@@ -233,7 +236,7 @@ def main(hydra_cfg):
     # general experiment + environment setup/scene generation configs
     cfg = get_eval_cfg_defaults()
     config_fname = osp.join(
-        path_util.get_ndf_config(), "eval_cfgs", hydra_cfg.object_class.config + ".yaml"
+        path_util.get_ndf_config(), "eval_cfgs", hydra_cfg.config + ".yaml"
     )
     if osp.exists(config_fname):
         cfg.merge_from_file(config_fname)
@@ -246,7 +249,7 @@ def main(hydra_cfg):
     # object specific configs
     obj_cfg = get_obj_cfg_defaults()
     obj_config_name = osp.join(
-        path_util.get_ndf_config(), hydra_cfg.object_class.name + "_obj_cfg.yaml"
+        path_util.get_ndf_config(), hydra_cfg.object_class + "_obj_cfg.yaml"
     )
     obj_cfg.merge_from_file(obj_config_name)
     obj_cfg.freeze()
@@ -479,14 +482,21 @@ def main(hydra_cfg):
 
     pl.seed_everything(hydra_cfg.seed)
 
+    if hydra_cfg.ablation.mlp:
+        network = CorrespondenceFlow_DiffEmbMLP(
+            emb_dims=hydra_cfg.ablation.emb_dims,
+            emb_nn=hydra_cfg.emb_nn,
+            center_feature=hydra_cfg.center_feature,
+        )
+
     network = ResidualFlow_DiffEmbTransformer(
-        emb_dims=hydra_cfg.emb_dims,
+        emb_dims=hydra_cfg.ablation.emb_dims,
         emb_nn=hydra_cfg.emb_nn,
         center_feature=hydra_cfg.center_feature,
-        pred_weight=hydra_cfg.pred_weight,
-        residual_on=hydra_cfg.residual_on,
+        pred_weight=hydra_cfg.ablation.pred_weight,
+        residual_on=hydra_cfg.ablation.residual_on,
         return_flow_component=hydra_cfg.return_flow_component,
-        freeze_embnn=hydra_cfg.freeze_embnn,
+        freeze_embnn=hydra_cfg.ablation.freeze_embnn,
         return_attn=hydra_cfg.return_attn,
     )
 

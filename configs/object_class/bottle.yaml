@@ -1,0 +1,3 @@
+name: bottle
+demo_exp: grasp_side_place_shelf_start_upright_all_methods_multi_instance
+config: eval_bottle_gen

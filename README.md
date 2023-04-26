@@ -170,6 +170,21 @@ TODO(beisner): Add instructions.
 
 Here are links to pre-trained models:
 
+#### Download the pre-trained models for NDF mug.
+```
+bash download_trained_mug_models.sh
+```
+
+This will download the pre-trained models for NDF mug and save them at:
+* `trained_models`
+    * `ndf`
+        * `arbitrary`
+            * `place.ckpt`
+            * `grasp.ckpt`
+        * `upright`
+            * `place.ckpt`
+            * `grasp.ckpt`
+
 TODO(beisner, chuer): Add links.
 
 * NDF-Mug
@@ -187,28 +202,51 @@ Original code can be found here: https://github.com/anthonysimeonov/ndf_robot
 
 ### Pretrain the embeddings.
 
+First, download the training data for NDF objects (~150GB for 3 object classes)
+
+```
+cd third_party/ndf_robot
+NDF_SOURCE_DIR=$PWD/src/ndf_robot ./scripts/download_training_data.sh
+```
+
+Then train embeddings for:
+* mug, `cloud_class=0`
+* rack, `cloud_class=1`
+* gripper, `cloud_class=2`
+
 These embeddings will be used across anything that uses pre-trained embeddings.
 
 ```
-TODO(chuer): Add this.
+python scripts/pretrain_embedding.py cloud_class=0
+python scripts/pretrain_embedding.py cloud_class=1
+python scripts/pretrain_embedding.py cloud_class=2
 ```
 
-We provide pre-trained embeddings for the NDF tasks here: TODO(chuer): Add links (inside one big folder).
+We also provide pre-trained embeddings for the NDF tasks here:
+* `trained_models`
+    * `pretraining_mug_embnn_weights.ckpt`: pretrained embedding for mug
+    * `pretraining_rack_embnn_weights.ckpt`: pretrained embedding for rack
+    * `pretraining_gripper_embnn_weights.ckpt`: pretrained embedding for gripper
 
+### Download the training data
+Run this command to download pre-generated training data for NDF mug task.
+
+```
+bash download_mug_train_data.sh
+```
+
+If you want to download pre-generated training data for all three NDF tasks (mug, bottle, bowl), run this instead
+```
+bash download_all_ndf_train_data.sh
+```
 ### Train models.
 
 ```
-# Mug, upright, grasp
+# Mug, grasp
 python scripts/train_residual_flow.py task=mug_grasp
 
-# Mug, upright, place
+# Mug, place
 python scripts/train_residual_flow.py task=mug_place
-
-# Mug, arbitrary, grasp
-TODO(chuer): Add this.
-
-# Mug, arbitrary, place
-TODO(chuer): Add this.
 ```
 
 To use custom pre-trained embeddings, add the following flag to the above commands:
@@ -217,17 +255,20 @@ To use custom pre-trained embeddings, add the following flag to the above comman
 checkpoint_file_action=<path to action embeddings>
 checkpoint_file_anchor=<path to anchor embeddings>
 ```
+If not specified, by default it will uses the provided pre-trained embeddings in `taxpose/trained_models`.
 
-Each of these scripts generates a checkpoint file. You can find the path to the checkpoint file in the output of the script.
+Each of these scripts generates a **model checkpoint** file. You can find the path to the **model checkpoint** file in the output of the script `taxpose/train_new.txt`, under `working_dir: <model checkpoint>`.
 
 ### Evaluate models.
 
+To evaluate the models we provided, run the following
+
 ```
 # Mug, upright
-python scripts/evaluate_ndf_mug.py
+python scripts/evaluate_ndf_mug.py pose_dist=upright
 
 # Mug, arbitrary
-TODO(chuer): Add this.
+python scripts/evaluate_ndf_mug.py pose_dist=arbitrary
 ```
 
 To use custom-trained models, add the following flags to the above commands:
@@ -236,9 +277,14 @@ To use custom-trained models, add the following flags to the above commands:
 checkpoint_file_grasp=<upright grasp path>
 checkpoint_file_place=<upright place path>
 ```
+Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above
 
-TODO(chuer): Write instructions on how to actually generate the line of Table 1...
+You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`.
 
+The success rate for **Grasp**, **Place**, **Overall** as seen in Table 1 as:
+```
+Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
+```
 
 ## Table 2: NDF # of Demos.
 
@@ -246,23 +292,34 @@ TODO(chuer): Write instructions on how to actually generate the line of Table 1.
 
 ```
 # 1 demo
-TODO(chuer): Add upright grasp.
-TODO(chuer): Add upright place.
+python scripts/train_residual_flow.py task=mug_grasp num_demo=1
+python scripts/train_residual_flow.py task=mug_place num_demo=1
 
 # 5 demos
-TODO(chuer): Add upright grasp.
-TODO(chuer): Add upright place.
+python scripts/train_residual_flow.py task=mug_grasp num_demo=5
+python scripts/train_residual_flow.py task=mug_place num_demo=5
 ```
+
+Each of these scripts generates a **model checkpoint** file. You can find the path to the **model checkpoint** file in the output of the script `taxpose/train_new.txt`, under `working_dir: <model checkpoint>`.
 
 ### Run evaluation.
 
+Run evaluation on these models
 ```
-TODO(chuer): Add 1 demo eval.
-TODO(chuer): Add 5 demo eval.
+# Mug, upright
+python scripts/evaluate_ndf_mug.py pose_dist=upright checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
+
+# Mug, arbitrary
+python scripts/evaluate_ndf_mug.py pose_dist=arbitrary checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
 ```
+Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with 1/5 demos
 
-TODO(chuer): Write instructions on how to actually generate the lines of Table 2...
+You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results.txt`.
 
+The success rate for **Grasp**, **Place**, **Overall** as seen in Table 2 as:
+```
+Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
+```
 
 ## Table 3: NDF Ablations.
 
@@ -270,27 +327,44 @@ TODO(chuer): Write instructions on how to actually generate the lines of Table 2
 
 ```
 # No residuals.
-TODO(chuer): Add upright grasp.
-TODO(chuer): Add upright place.
+python scripts/train_residual_flow_ablation.py ablation=4_no_residuals task=mug_grasp
+python scripts/train_residual_flow_ablation.py ablation=4_no_residuals task=mug_place
 
 # Unweighted SVD.
-TODO(chuer): Add upright grasp.
-TODO(chuer): Add upright place.
+python scripts/train_residual_flow_ablation.py ablation=5_unweighted_svd task=mug_grasp
+python scripts/train_residual_flow_ablation.py ablation=5_unweighted_svd task=mug_place
 
 # No attention.
-TODO(chuer): Add upright grasp.
-TODO(chuer): Add upright place.
+python scripts/train_residual_flow_ablation.py ablation=8_mlp task=mug_grasp
+python scripts/train_residual_flow_ablation.py ablation=8_mlp task=mug_place
 ```
+
+Each of these scripts generates a **model checkpoint** file. You can find the path to the **model checkpoint** file in the output of the script `taxpose/train_ablation.txt`, under `working_dir: <model checkpoint>`.
 
 ### Evaluate.
 
+Run evaluation on these models
 ```
-TODO(chuer): Add no residuals eval.
-TODO(chuer): Add unweighted SVD eval.
-TODO(chuer): Add no attention eval.
+# Mug, upright
+python scripts/evaluate_ndf_mug_ablation.py ablation=<ablation type> pose_dist=upright checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
+
+# Mug, arbitrary
+python scripts/evaluate_ndf_mug_ablation.py ablation=<ablation type> pose_dist=arbitrary checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
 ```
 
-TODO(chuer): Write instructions on how to actually generate the lines of Table 3...
+Substitute `<ablation type>` with:
+* `4_no_residuals` for no residuals
+* `5_unweighted_svd` for unweighted SVD
+* `8_mlp` for no attention
+
+Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with ablation options
+
+You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results_ablation.txt`.
+
+The success rate for **Grasp**, **Place**, **Overall** as seen in Table 3 as:
+```
+Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
+```
 
 ## Table 4: PM Placement
 
@@ -440,15 +514,115 @@ This is based on a specific real-world experiment we ran, and so can't be reprod
 
 ## Supplement Table 6: Mug-hanging ablations
 
-TODO(chuer): Add mug-hanging ablations.
+### Train Ablation Models
+
+```
+# For each <ablation type>, grasp
+python scripts/train_residual_flow_ablation.py ablation=<ablation type> task=mug_grasp
+# For each <ablation type>, place
+python scripts/train_residual_flow_ablation.py ablation=<ablation type> task=mug_place
+```
+
+Substitute `<ablation type>` with:
+* `0_no_disp_loss`: No L_disp
+* `1_no_corr_loss`: No L_corr
+* `2_no_cons_loss`: No L_cons
+* `3_no_disp_loss_combined`: Scaled Combination: 1.1*L_cons + L_corr
+* `4_no_residuals`: No Adjustment via Correspondence Residuals
+* `5_unweighted_svd`: Unweighted SVD
+* `6_no_finetuning`: No Finetuning for Embedding Network
+* `7_no_pretraining`: No Pretraining for Embedding Network
+* `8_mlp`: 3-Layer MLP In Place of Transformer
+* `9_low_dim_embedding`: Embedding Network Feature Dim = 16
+
+### Evaluate Ablation Models
+Run evaluation on these models
+```
+# Mug, upright
+python scripts/evaluate_ndf_mug_ablation.py ablation=<ablation type> pose_dist=upright checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
+
+# Mug, arbitrary
+python scripts/evaluate_ndf_mug_ablation.py ablation=<ablation type> pose_dist=arbitrary checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
+```
+Substitute `<ablation type>` with the corresponding ablation type
+Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with ablation options
+
+You can find the evaluation results in the `log_txt_file`, currently defaulted to `taxpose/test_results_ablation.txt`.
+
+The success rate for **Grasp**, **Place**, **Overall** as seen in Table 6 as:
+```
+Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **Place**, overall success Rate: **Overall**
+```
 
 ## Supplement Table 7: Pre-training ablations
 
-TODO(chuer): Add pre-training ablations.
+
+Train models for line 1 trained for 26K steps
+```
+python scripts/train_residual_flow_ablation.py ablation=7_no_pretraining task=mug_grasp max_epochs=200
+python scripts/train_residual_flow_ablation.py ablation=7_no_pretraining task=mug_place max_epochs=200
+```
+
+Train models for line 2 trained for 15K steps:
+```
+python scripts/train_residual_flow_ablation.py ablation=7_no_pretraining task=mug_grasp max_epochs=120
+python scripts/train_residual_flow_ablation.py ablation=7_no_pretraining task=mug_place max_epochs=120
+```
+
+Evaluate these models
+```
+# Mug, upright
+python scripts/evaluate_ndf_mug_ablation.py ablation=7_no_pretraining pose_dist=upright checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
+```
+Substitute `<upright {grasp, place} path>` with the **model checkpoint** you trained above with ablation options
 
 ## Supplement Table 8: Additional simulation experiments
 
-TODO(chuer): Add additional simulation experiments (bowl, bottle).
+If you have only downloaded pre-generated the NDF mug training data, run this to download the training data for bottle and bowl
+```
+bash download_bottle_bowl_train_data.sh
+```
+
+Train models for *bottle*
+```
+# Bottle, grasp
+python scripts/train_residual_flow.py task=bottle_grasp
+
+# Bottle, place
+python scripts/train_residual_flow.py task=bottle_place
+
+```
+
+Train models for *bowl*
+```
+# Bowl, grasp
+python scripts/train_residual_flow.py task=bowl_grasp
+
+# Bowl, place
+python scripts/train_residual_flow.py task=bowl_place
+```
+
+Each of these scripts generates a **model checkpoint** file. You can find the path to the **model checkpoint** file in the output of the script `taxpose/train_new.txt`, under `working_dir: <model checkpoint>`.
+
+Run evaluation on trained *bottle* models
+```
+# Bottle, upright
+python scripts/evaluate_ndf_mug.py pose_dist=upright object_class=bottle checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
+
+# Bottle, arbitrary
+python scripts/evaluate_ndf_mug.py pose_dist=arbitrary object_class=bottle checkpoint_file_grasp=<uparbitraryright grasp path> checkpoint_file_place=<arbitrary place path>
+```
+
+Run evaluation on trained *bowl* models
+```
+# Bowl, upright
+python scripts/evaluate_ndf_mug.py pose_dist=upright object_class=bowl checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
+
+# Bowl, arbitrary
+python scripts/evaluate_ndf_mug.py pose_dist=arbitrary object_class=bowl checkpoint_file_grasp=<arbitrary grasp path> checkpoint_file_place=<arbitrary place path>
+```
+
+Substitute `<{arbitrary, upright} {grasp, place} path>` with the **model checkpoint** you trained above
 
 ## Supplement Table 9: Expanded results
 

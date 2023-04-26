@@ -32,6 +32,109 @@ class EquivariantFeatureEmbeddingNetwork(nn.Module):
         return points_embedding
 
 
+class CorrespondenceFlow_DiffEmbMLP(nn.Module):
+    def __init__(self, emb_dims=512, cycle=True, emb_nn="dgcnn", center_feature=True):
+        super(CorrespondenceFlow_DiffEmbMLP, self).__init__()
+        self.emb_dims = emb_dims
+        self.cycle = cycle
+
+        if emb_nn == "dgcnn":
+            self.emb_nn_action = DGCNN(emb_dims=self.emb_dims)
+            self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims)
+        else:
+            raise Exception("Not implemented")
+
+        self.center_feature = center_feature
+
+        self.transformer_action = MLP(emb_dims=emb_dims)
+        self.transformer_anchor = MLP(emb_dims=emb_dims)
+        self.head_action = CorrespondenceMLPHead(emb_dims=emb_dims)
+        self.head_anchor = CorrespondenceMLPHead(emb_dims=emb_dims)
+
+    def forward(self, *input):
+        action_points = input[0].permute(0, 2, 1)[:, :3]  # B,3,num_points
+        anchor_points = input[1].permute(0, 2, 1)[:, :3]
+        action_points_dmean = action_points - action_points.mean(dim=2, keepdim=True)
+        anchor_points_dmean = anchor_points - anchor_points.mean(dim=2, keepdim=True)
+        # mean center point cloud before DGCNN
+        if not self.center_feature:
+            action_points_dmean = action_points
+            anchor_points_dmean = anchor_points
+        action_embedding = self.emb_nn_action(action_points_dmean)
+        anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
+
+        # tilde_phi, phi are both B,512,N
+        action_embedding_tf = self.transformer_action(action_embedding)
+        # action_embedding_tf: Batch, emb_dim, num_points
+        # action_attn: Batch, 4, num_points, num_points
+        anchor_embedding_tf = self.transformer_anchor(anchor_embedding)
+        action_embedding_tf = action_embedding + action_embedding_tf
+        anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
+
+        flow_action = self.head_action(
+            action_embedding_tf,
+            anchor_embedding_tf,
+            action_points,
+            anchor_points,
+            scores=None,
+        ).permute(0, 2, 1)
+
+        if self.cycle:
+            flow_anchor = self.head_anchor(
+                anchor_embedding_tf,
+                action_embedding_tf,
+                anchor_points,
+                action_points,
+                scores=None,
+            ).permute(0, 2, 1)
+            return flow_action, flow_anchor
+        return flow_action
+
+
+class CorrespondenceMLPHead(nn.Module):
+    """
+    Output correspondence flow and weight
+    """
+
+    def __init__(self, emb_dims=512):
+        super(CorrespondenceMLPHead, self).__init__()
+
+        self.emb_dims = emb_dims
+        self.proj_flow = nn.Sequential(
+            PointNet([emb_dims, 64, 64, 64, 128, 512]),
+            # PointNet([emb_dims, emb_dims//2, emb_dims//4, emb_dims//8]),
+            nn.Conv1d(512, 1, kernel_size=1, bias=False),
+        )
+
+    def forward(self, *input, scores=None):
+        action_embedding = input[0]
+        anchor_embedding = input[1]
+        action_points = input[2]
+        anchor_points = input[3]
+        if scores is None:
+            if len(input) <= 4:
+                action_query = action_embedding
+                anchor_key = anchor_embedding
+            else:
+                action_query = input[4]
+                anchor_key = input[5]
+
+            d_k = action_query.size(1)
+            scores = torch.matmul(
+                action_query.transpose(2, 1).contiguous(), anchor_key
+            ) / math.sqrt(d_k)
+            # W_i # B, N, N (N=number of points, 1024 cur)
+            scores = torch.softmax(scores, dim=2)
+
+        corr_points = torch.matmul(anchor_points, scores.transpose(2, 1).contiguous())
+        # \tilde{y}_i = sum_{j}{w_ij,y_j}, - x_i  # B, 3, N
+        corr_flow = corr_points - action_points
+        weight = self.proj_flow(action_embedding)
+        corr_flow_weight = torch.concat([corr_flow, weight], dim=1)
+
+        return corr_flow_weight
+
+
 class MLP(nn.Module):
     def __init__(self, emb_dims=512):
         super(MLP, self).__init__()

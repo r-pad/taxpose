@@ -13,14 +13,30 @@ experiment: residual_flow_test_partial_cloud_initpose
 defaults:
   - _self_
   - pose_dist: upright # {upright, arbitrary}
-  - object_class: mug #{mug, bottle, bowl}
-checkpoint_file_grasp: ${hydra:runtime.cwd}/trained_models/ndf/${object_class.name}/${pose_dist.name}/grasp.ckpt
-checkpoint_file_place: ${hydra:runtime.cwd}/trained_models/ndf/${object_class.name}/${pose_dist.name}/place.ckpt
-log_txt_file: ${hydra:runtime.cwd}/test_results.txt # abs path of file to log results
+  - ablation: 0_no_disp_loss
+
+  # $ablation \in {
+  # 0_no_disp_loss,
+  # 1_no_corr_loss,
+  # 2_no_cons_loss,
+  # 3_no_disp_loss_combined,
+  # 4_no_residuals,
+  # 5_unweighted_svd,
+  # 6_no_finetuning,
+  # 7_no_pretraining,
+  # 8_mlp,
+  # 9_low_dim_embedding
+  #}
+checkpoint_file_grasp: Null # to be filled with trained model
+checkpoint_file_place: Null # to be filled with trained model
+# checkpoint_file_grasp: ${hydra:runtime.cwd}/trained_models/ndf/mug/${pose_dist.name}/grasp.ckpt
+# checkpoint_file_place: ${hydra:runtime.cwd}/trained_models/ndf/mug/${pose_dist.name}/place.ckpt
+log_txt_file: ${hydra:runtime.cwd}/test_results_ablation.txt # abs path of file to log results
 # log saving dir
-log_dir: ./results/ndf/${object_class.name}
+log_dir: ./results/ndf/mug_place
 num_iterations: 100 # number of trails
-data_dir: ${object_class.name} # directory name for data saved
+object_class: mug
+data_dir: mug_place # directory name for data saved
 log_every_trial: False # True - log success rate at every trial; False - log only at the end of the # of trials
 #### TO BE CHANGED ####
 
@@ -28,7 +44,6 @@ log_every_trial: False # True - log success rate at every trial; False - log onl
 flow_compute_type: 0
 emb_nn: dgcnn
 num_points: 1024
-emb_dims: 512
 
 # Dataset Settings
 dataset_index: None
@@ -55,15 +70,11 @@ sigmoid_on: True
 rotation_weight: 0
 consistency_weight: 1
 smoothness_weight: 0.1
-pred_weight: True
 softmax_temperature: 1
 weight_normalize_grasp: softmax
 softmax_temperature_grasp: 0.1
-residual_on: True
 #### TO BE CHANGED ####
 
-mlp: False
-freeze_embnn: False
 return_attn: True
 rand_mesh_scale: True
 loop: 1
@@ -78,8 +89,10 @@ debug: False
 seed: 10
 pybullet_viz: False
 only_test_ids: True
+demo_exp: grasp_rim_hang_handle_gaussian_precise_w_shelf
 exp: debug_eval
 num_demo: 12
+config: eval_mug_gen
 model_path: multi_category_weights
 n_demos: 0
 single_instance: False

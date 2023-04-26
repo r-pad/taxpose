@@ -43,9 +43,7 @@ def main(cfg):
 
     dm.setup()
     network = EquivariantFeatureEmbeddingNetwork(
-        emb_dims=cfg.emb_dims,
-        emb_nn=cfg.emb_nn,
-        inital_sampling_ratio=cfg.inital_sampling_ratio,
+        emb_dims=cfg.emb_dims, emb_nn=cfg.emb_nn
     )
     model = EquivariancePreTrainingModule(
         network,

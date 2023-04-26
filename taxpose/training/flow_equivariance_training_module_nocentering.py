@@ -9,6 +9,7 @@ from taxpose.utils.color_utils import get_color
 from taxpose.utils.se3 import (
     dense_flow_loss,
     dualflow2pose,
+    flow2pose,
     get_degree_angle,
     get_translation,
 )
@@ -25,15 +26,14 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         image_log_period=500,
         action_weight=1,
         anchor_weight=1,
-        smoothness_weight=0.1,
-        consistency_weight=1,
-        rotation_weight=0,
-        chamfer_weight=10000,
-        point_loss_type=0,
+        displace_loss_weight=1,
+        consistency_loss_weight=0.1,
+        direct_correspondence_loss_weight=1,
         return_flow_component=False,
         weight_normalize="l1",
         sigmoid_on=False,
         softmax_temperature=None,
+        flow_supervision="both",  # ('both', 'action2anchor', 'anchor2action')
     ):
         super().__init__(
             model=model,
@@ -43,102 +43,270 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         self.model = model
         self.lr = lr
         self.image_log_period = image_log_period
+        self.displace_loss_weight = displace_loss_weight
         self.action_weight = action_weight
         self.anchor_weight = anchor_weight
-        self.smoothness_weight = smoothness_weight
-        self.rotation_weight = rotation_weight
-        self.chamfer_weight = chamfer_weight
-        self.consistency_weight = consistency_weight
+        self.consistency_loss_weight = consistency_loss_weight
+        self.direct_correspondence_loss_weight = direct_correspondence_loss_weight
         self.display_action = True
         self.display_anchor = True
         self.weight_normalize = weight_normalize
-        # 0 for mse loss, 1 for chamfer distance, 2 for mse loss + chamfer distance
-        self.point_loss_type = point_loss_type
+
         self.return_flow_component = return_flow_component
         self.sigmoid_on = sigmoid_on
         self.softmax_temperature = softmax_temperature
+        self.flow_supervision = flow_supervision
         if self.weight_normalize == "l1":
             assert self.sigmoid_on, "l1 weight normalization need sigmoid on"
 
     def compute_loss(self, x_action, x_anchor, batch, log_values={}, loss_prefix=""):
-        points_action = batch["points_action"][:, :, :3]
-        points_anchor = batch["points_anchor"][:, :, :3]
+        points_action = batch["points_action"][:, :, :3]  # action point clouds
+        points_anchor = batch["points_anchor"][:, :, :3]  # anchor point clouds
+        # action point clouds transformed by T0
         points_trans_action = batch["points_action_trans"][:, :, :3]
+        # anchor point clouds transformed by T1
         points_trans_anchor = batch["points_anchor_trans"][:, :, :3]
 
+        # SE(3) transformation applied to points_action
         T0 = Transform3d(matrix=batch["T0"])
+        # SE(3) transformation applied to points_anchor
         T1 = Transform3d(matrix=batch["T1"])
 
-        R0_max, R0_min, R0_mean = get_degree_angle(T0)
-        R1_max, R1_min, R1_mean = get_degree_angle(T1)
-        t0_max, t0_min, t0_mean = get_translation(T0)
-        t1_max, t1_min, t1_mean = get_translation(T1)
+        R0_max, R0_min, R0_mean = get_degree_angle(
+            T0
+        )  # rotation component applied to points_action
+        R1_max, R1_min, R1_mean = get_degree_angle(
+            T1
+        )  # rotation component applied to points_anchor
+        t0_max, t0_min, t0_mean = get_translation(
+            T0
+        )  # translation component applied to points_action
+        t1_max, t1_min, t1_mean = get_translation(
+            T1
+        )  # translation component applied to points_anchor
 
-        pred_flow_action, pred_w_action = self.extract_flow_and_weight(x_action)
-        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(x_anchor)
+        pred_flow_action, pred_w_action = self.extract_flow_and_weight(
+            x_action
+        )  # flow predicted from action to anchor, per point importance weight for action points
+        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(
+            x_anchor
+        )  # flow predicted from anchor to action, per point importance weight for anchor points
 
-        pred_T_action = dualflow2pose(
-            xyz_src=points_trans_action,
-            xyz_tgt=points_trans_anchor,
-            flow_src=pred_flow_action,
-            flow_tgt=pred_flow_anchor,
-            weights_src=pred_w_action,
-            weights_tgt=pred_w_anchor,
-            return_transform3d=True,
-            normalization_scehme=self.weight_normalize,
-            temperature=self.softmax_temperature,
+        if self.flow_supervision == "both":
+            pred_T_action = dualflow2pose(
+                xyz_src=points_trans_action,
+                xyz_tgt=points_trans_anchor,
+                flow_src=pred_flow_action,
+                flow_tgt=pred_flow_anchor,
+                weights_src=pred_w_action,
+                weights_tgt=pred_w_anchor,
+                return_transform3d=True,
+                normalization_scehme=self.weight_normalize,
+                temperature=self.softmax_temperature,
+            )
+
+            induced_flow_action = (
+                pred_T_action.transform_points(points_trans_action)
+                - points_trans_action
+            ).detach()
+            pred_points_action = pred_T_action.transform_points(points_trans_action)
+
+            # pred_T_action=T1T0^-1
+            gt_T_action = T0.inverse().compose(T1)
+            points_action_target = T1.transform_points(points_action)
+
+            error_R_max, error_R_min, error_R_mean = get_degree_angle(
+                T0.inverse().compose(T1).compose(pred_T_action.inverse())
+            )
+
+            error_t_max, error_t_min, error_t_mean = get_translation(
+                T0.inverse().compose(T1).compose(pred_T_action.inverse())
+            )
+
+            # Loss associated with ground truth transform
+            point_loss_action = mse_criterion(
+                pred_points_action,
+                points_action_target,
+            )
+
+            # Loss associated flow vectors matching a consistent rigid transform
+            smoothness_loss_action = mse_criterion(
+                pred_flow_action,
+                induced_flow_action,
+            )
+            dense_loss_action = dense_flow_loss(
+                points=points_trans_action,
+                flow_pred=pred_flow_action,
+                trans_gt=gt_T_action,
+            )
+
+            pred_T_anchor = pred_T_action.inverse()
+
+            induced_flow_anchor = (
+                pred_T_anchor.transform_points(points_trans_anchor)
+                - points_trans_anchor
+            ).detach()
+            pred_points_anchor = pred_T_anchor.transform_points(points_trans_anchor)
+
+            # pred_T_action=T1T0^-1
+            gt_T_anchor = T1.inverse().compose(T0)
+            points_anchor_target = T0.transform_points(points_anchor)
+
+            # Loss associated with ground truth transform
+            point_loss_anchor = mse_criterion(
+                pred_points_anchor,
+                points_anchor_target,
+            )
+
+            # Loss associated flow vectors matching a consistent rigid transform
+            smoothness_loss_anchor = mse_criterion(
+                pred_flow_anchor,
+                induced_flow_anchor,
+            )
+            dense_loss_anchor = dense_flow_loss(
+                points=points_trans_anchor,
+                flow_pred=pred_flow_anchor,
+                trans_gt=gt_T_anchor,
+            )
+            self.action_weight = (self.action_weight) / (
+                self.action_weight + self.anchor_weight
+            )
+            self.anchor_weight = (self.anchor_weight) / (
+                self.action_weight + self.anchor_weight
+            )
+        elif self.flow_supervision == "action2anchor":
+            pred_T_action = flow2pose(
+                xyz=points_trans_action,
+                flow=pred_flow_action,
+                weights=pred_w_action,
+                return_transform3d=True,
+                normalization_scehme=self.weight_normalize,
+                temperature=self.softmax_temperature,
+            )
+            induced_flow_action = (
+                pred_T_action.transform_points(points_trans_action)
+                - points_trans_action
+            ).detach()
+            pred_points_action = pred_T_action.transform_points(points_trans_action)
+
+            # pred_T_action=T1T0^-1
+            gt_T_action = T0.inverse().compose(T1)
+            points_action_target = T1.transform_points(points_action)
+
+            error_R_max, error_R_min, error_R_mean = get_degree_angle(
+                T0.inverse().compose(T1).compose(pred_T_action.inverse())
+            )
+
+            error_t_max, error_t_min, error_t_mean = get_translation(
+                T0.inverse().compose(T1).compose(pred_T_action.inverse())
+            )
+
+            # Loss associated with ground truth transform
+            point_loss_action = mse_criterion(
+                pred_points_action,
+                points_action_target,
+            )
+
+            # Loss associated flow vectors matching a consistent rigid transform
+            smoothness_loss_action = mse_criterion(
+                pred_flow_action,
+                induced_flow_action,
+            )
+
+            dense_loss_action = dense_flow_loss(
+                points=points_trans_action,
+                flow_pred=pred_flow_action,
+                trans_gt=gt_T_action,
+            )
+
+            # Zero anchor terms
+            self.anchor_weight = 0
+            self.action_weight = (self.action_weight) / (
+                self.action_weight + self.anchor_weight
+            )
+            point_loss_anchor = 0
+            smoothness_loss_anchor = 0
+            dense_loss_anchor = 0
+        elif self.flow_supervision == "anchor2action":
+            pred_T_anchor = flow2pose(
+                xyz=points_trans_anchor,
+                flow=pred_flow_anchor,
+                weights=pred_w_anchor,
+                return_transform3d=True,
+                normalization_scehme=self.weight_normalize,
+                temperature=self.softmax_temperature,
+            )
+            induced_flow_anchor = (
+                pred_T_anchor.transform_points(points_trans_anchor)
+                - points_trans_anchor
+            ).detach()
+            pred_points_anchor = pred_T_anchor.transform_points(points_trans_anchor)
+
+            # pred_T_action=T1T0^-1
+            gt_T_anchor = T1.inverse().compose(T0)
+            points_anchor_target = T0.transform_points(points_anchor)
+
+            error_R_max, error_R_min, error_R_mean = get_degree_angle(
+                T1.inverse().compose(T0).compose(pred_T_anchor.inverse())
+            )
+
+            error_t_max, error_t_min, error_t_mean = get_translation(
+                T1.inverse().compose(T0).compose(pred_T_anchor.inverse())
+            )
+
+            # Loss associated with ground truth transform
+            point_loss_anchor = mse_criterion(
+                pred_points_anchor,
+                points_anchor_target,
+            )
+
+            # Loss associated flow vectors matching a consistent rigid transform
+            smoothness_loss_anchor = mse_criterion(
+                pred_flow_anchor,
+                induced_flow_anchor,
+            )
+            dense_loss_anchor = dense_flow_loss(
+                points=points_trans_anchor,
+                flow_pred=pred_flow_anchor,
+                trans_gt=gt_T_anchor,
+            )
+            # Zero action terms
+            self.action_weight = 0
+            self.anchor_weight = (self.anchor_weight) / (
+                self.action_weight + self.anchor_weight
+            )
+            point_loss_action = 0
+            smoothness_loss_action = 0
+            dense_loss_action = 0
+
+        point_loss = (
+            self.action_weight * point_loss_action
+            + self.anchor_weight * point_loss_anchor
         )
 
-        induced_flow_action = (
-            pred_T_action.transform_points(points_trans_action) - points_trans_action
-        ).detach()
-        pred_points_action = pred_T_action.transform_points(points_trans_action)
-
-        # pred_T_action=T1T0^-1
-        gt_T_action = T0.inverse().compose(T1)
-        points_action_target = T1.transform_points(points_action)
-
-        error_R_max, error_R_min, error_R_mean = get_degree_angle(
-            T0.inverse().compose(T1).compose(pred_T_action.inverse())
+        dense_loss = (
+            self.action_weight * dense_loss_action
+            + self.anchor_weight * dense_loss_anchor
         )
 
-        error_t_max, error_t_min, error_t_mean = get_translation(
-            T0.inverse().compose(T1).compose(pred_T_action.inverse())
+        smoothness_loss = (
+            self.action_weight * smoothness_loss_action
+            + self.anchor_weight * smoothness_loss_anchor
         )
-
-        # Loss associated with ground truth transform
-        point_loss_action = mse_criterion(
-            pred_points_action,
-            points_action_target,
-        )
-
-        point_loss = self.action_weight * point_loss_action
-
-        dense_loss = dense_flow_loss(
-            points=points_trans_action, flow_pred=pred_flow_action, trans_gt=gt_T_action
-        )
-
-        # Loss associated flow vectors matching a consistent rigid transform
-        smoothness_loss_action = mse_criterion(
-            pred_flow_action,
-            induced_flow_action,
-        )
-
-        smoothness_loss = self.action_weight * smoothness_loss_action
 
         loss = (
-            point_loss
-            + self.smoothness_weight * smoothness_loss
-            + self.consistency_weight * dense_loss
+            self.displace_loss_weight * point_loss
+            + self.consistency_loss_weight * smoothness_loss
+            + self.direct_correspondence_loss_weight * dense_loss
         )
 
-        log_values[loss_prefix + "point_loss"] = point_loss
-        log_values[loss_prefix + "rotation_loss"] = self.rotation_weight * error_R_mean
-
+        log_values[loss_prefix + "point_loss"] = self.displace_loss_weight * point_loss
         log_values[loss_prefix + "smoothness_loss"] = (
-            self.smoothness_weight * smoothness_loss
+            self.consistency_loss_weight * smoothness_loss
         )
-        log_values[loss_prefix + "dense_loss"] = self.consistency_weight * dense_loss
+        log_values[loss_prefix + "dense_loss"] = (
+            self.direct_correspondence_loss_weight * dense_loss
+        )
 
         log_values[loss_prefix + "R0_mean"] = R0_mean
         log_values[loss_prefix + "R0_max"] = R0_max
@@ -239,18 +407,39 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
                 pred_w_anchor = x_anchor[:, :, 3]
         else:
             pred_w_anchor = None
+        if self.flow_supervision == "both":
+            pred_T_action = dualflow2pose(
+                xyz_src=points_trans_action,
+                xyz_tgt=points_trans_anchor,
+                flow_src=pred_flow_action,
+                flow_tgt=pred_flow_anchor,
+                weights_src=pred_w_action,
+                weights_tgt=pred_w_anchor,
+                return_transform3d=True,
+                normalization_scehme=self.weight_normalize,
+                temperature=self.softmax_temperature,
+            )
+        elif self.flow_supervision == "action2anchor":
+            pred_T_action = flow2pose(
+                xyz=points_trans_action,
+                flow=pred_flow_action,
+                weights=pred_w_action,
+                return_transform3d=True,
+                normalization_scehme=self.weight_normalize,
+                temperature=self.softmax_temperature,
+            )
+            pred_T_anchor = pred_T_action.inverse()
 
-        pred_T_action = dualflow2pose(
-            xyz_src=points_trans_action,
-            xyz_tgt=points_trans_anchor,
-            flow_src=pred_flow_action,
-            flow_tgt=pred_flow_anchor,
-            weights_src=pred_w_action,
-            weights_tgt=pred_w_anchor,
-            return_transform3d=True,
-            normalization_scehme=self.weight_normalize,
-            temperature=self.softmax_temperature,
-        )
+        elif self.flow_supervision == "anchor2action":
+            pred_T_anchor = flow2pose(
+                xyz=points_trans_anchor,
+                flow=pred_flow_anchor,
+                weights=pred_w_anchor,
+                return_transform3d=True,
+                normalization_scehme=self.weight_normalize,
+                temperature=self.softmax_temperature,
+            )
+            pred_T_action = pred_T_anchor.inverse()
 
         pred_points_action = pred_T_action.transform_points(points_trans_action)
         points_action_target = T1.transform_points(points_action)
