@@ -1,0 +1,3 @@
+name: mug
+demo_exp: grasp_rim_hang_handle_gaussian_precise_w_shelf
+config: eval_mug_gen

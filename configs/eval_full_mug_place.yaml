@@ -13,14 +13,14 @@ experiment: residual_flow_test_partial_cloud_initpose
 defaults:
   - _self_
   - pose_dist: upright # {upright, arbitrary}
-checkpoint_file_grasp: ${hydra:runtime.cwd}/trained_models/ndf/mug/${pose_dist.name}/grasp.ckpt
-checkpoint_file_place: ${hydra:runtime.cwd}/trained_models/ndf/mug/${pose_dist.name}/place.ckpt
+  - object_class: mug #{mug, bottle, bowl}
+checkpoint_file_grasp: ${hydra:runtime.cwd}/trained_models/ndf/${object_class.name}/${pose_dist.name}/grasp.ckpt
+checkpoint_file_place: ${hydra:runtime.cwd}/trained_models/ndf/${object_class.name}/${pose_dist.name}/place.ckpt
 log_txt_file: ${hydra:runtime.cwd}/test_results.txt # abs path of file to log results
 # log saving dir
-log_dir: ./results/ndf/mug_place
+log_dir: ./results/ndf/${object_class.name}
 num_iterations: 100 # number of trails
-object_class: mug
-data_dir: mug_place # directory name for data saved
+data_dir: ${object_class.name} # directory name for data saved
 log_every_trial: False # True - log success rate at every trial; False - log only at the end of the # of trials
 #### TO BE CHANGED ####
 
@@ -65,7 +65,7 @@ residual_on: True
 mlp: False
 freeze_embnn: False
 return_attn: True
-rand_mesh_scale: False
+rand_mesh_scale: True
 loop: 1
 init_distribution_tranform_file: Null
 
@@ -78,10 +78,8 @@ debug: False
 seed: 10
 pybullet_viz: False
 only_test_ids: True
-demo_exp: grasp_rim_hang_handle_gaussian_precise_w_shelf
 exp: debug_eval
 num_demo: 12
-config: base_cfg
 model_path: multi_category_weights
 n_demos: 0
 single_instance: False

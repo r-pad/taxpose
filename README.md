@@ -234,20 +234,19 @@ Run this command to download pre-generated training data for NDF mug task.
 ```
 bash download_mug_train_data.sh
 ```
+
+If you want to download pre-generated training data for all three NDF tasks (mug, bottle, bowl), run this instead
+```
+bash download_all_ndf_train_data.sh
+```
 ### Train models.
 
 ```
-# Mug, upright, grasp
-python scripts/train_residual_flow.py task=mug_grasp pose_dist=upright
+# Mug, grasp
+python scripts/train_residual_flow.py task=mug_grasp  
 
-# Mug, upright, place
-python scripts/train_residual_flow.py task=mug_place pose_dist=upright
-
-# Mug, arbitrary, grasp
-python scripts/train_residual_flow.py task=mug_grasp pose_dist=arbitrary
-
-# Mug, arbitrary, place
-python scripts/train_residual_flow.py task=mug_place pose_dist=arbitrary
+# Mug, place
+python scripts/train_residual_flow.py task=mug_place  
 ```
 
 To use custom pre-trained embeddings, add the following flag to the above commands:
@@ -293,12 +292,12 @@ Iteration: 99, Grasp Success Rate: **Grasp**, Place [teleport] Success Rate: **P
 
 ```
 # 1 demo
-python scripts/train_residual_flow.py task=mug_grasp pose_dist=upright num_demo=1
-python scripts/train_residual_flow.py task=mug_place pose_dist=upright num_demo=1
+python scripts/train_residual_flow.py task=mug_grasp num_demo=1
+python scripts/train_residual_flow.py task=mug_place num_demo=1
 
 # 5 demos
-python scripts/train_residual_flow.py task=mug_grasp pose_dist=upright num_demo=5
-python scripts/train_residual_flow.py task=mug_place pose_dist=upright num_demo=5
+python scripts/train_residual_flow.py task=mug_grasp num_demo=5
+python scripts/train_residual_flow.py task=mug_place num_demo=5
 ```
 
 Each of these scripts generates a **model checkpoint** file. You can find the path to the **model checkpoint** file in the output of the script `taxpose/train_new.txt`, under `working_dir: <model checkpoint>`.
@@ -570,7 +569,51 @@ Substitute `<upright {grasp, place} path>` with the **model checkpoint** you tra
 
 ## Supplement Table 8: Additional simulation experiments
 
-TODO(chuer): Add additional simulation experiments (bowl, bottle).
+If you have only downloaded pre-generated the NDF mug training data, run this to download the training data for bottle and bowl
+```
+bash download_bottle_bowl_train_data.sh
+```
+
+Train models for *bottle*
+```
+# Bottle, grasp
+python scripts/train_residual_flow.py task=bottle_grasp  
+
+# Bottle, place
+python scripts/train_residual_flow.py task=bottle_place  
+
+```
+
+Train models for *bowl*
+```
+# Bowl, grasp
+python scripts/train_residual_flow.py task=bowl_grasp  
+
+# Bowl, place
+python scripts/train_residual_flow.py task=bowl_place  
+```
+
+Each of these scripts generates a **model checkpoint** file. You can find the path to the **model checkpoint** file in the output of the script `taxpose/train_new.txt`, under `working_dir: <model checkpoint>`.
+
+Run evaluation on trained *bottle* models
+```
+# Bottle, upright
+python scripts/evaluate_ndf_mug.py pose_dist=upright object_class=bottle checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
+
+# Bottle, arbitrary
+python scripts/evaluate_ndf_mug.py pose_dist=arbitrary object_class=bottle checkpoint_file_grasp=<uparbitraryright grasp path> checkpoint_file_place=<arbitrary place path>
+```
+
+Run evaluation on trained *bowl* models
+```
+# Bowl, upright
+python scripts/evaluate_ndf_mug.py pose_dist=upright object_class=bowl checkpoint_file_grasp=<upright grasp path> checkpoint_file_place=<upright place path>
+
+# Bowl, arbitrary
+python scripts/evaluate_ndf_mug.py pose_dist=arbitrary object_class=bowl checkpoint_file_grasp=<arbitrary grasp path> checkpoint_file_place=<arbitrary place path>
+```
+
+Substitute `<{arbitrary, upright} {grasp, place} path>` with the **model checkpoint** you trained above
 
 ## Supplement Table 9: Expanded results
 

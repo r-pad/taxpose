@@ -186,13 +186,13 @@ def main(hydra_cfg):
         os.makedirs(save_dir)
 
     eval_data_dir = hydra_cfg.data_dir
-    obj_class = hydra_cfg.object_class
+    obj_class = hydra_cfg.object_class.name
     shapenet_obj_dir = osp.join(
         path_util.get_ndf_obj_descriptions(), obj_class + "_centered_obj_normalized"
     )
 
     demo_load_dir = osp.join(
-        path_util.get_ndf_data(), "demos", obj_class, hydra_cfg.demo_exp
+        path_util.get_ndf_data(), "demos", obj_class, hydra_cfg.object_class.demo_exp
     )
 
     expstr = "exp--" + str(hydra_cfg.exp)
@@ -235,7 +235,7 @@ def main(hydra_cfg):
     # general experiment + environment setup/scene generation configs
     cfg = get_eval_cfg_defaults()
     config_fname = osp.join(
-        path_util.get_ndf_config(), "eval_cfgs", hydra_cfg.config + ".yaml"
+        path_util.get_ndf_config(), "eval_cfgs", hydra_cfg.object_class.config + ".yaml"
     )
     if osp.exists(config_fname):
         cfg.merge_from_file(config_fname)
@@ -248,7 +248,7 @@ def main(hydra_cfg):
     # object specific configs
     obj_cfg = get_obj_cfg_defaults()
     obj_config_name = osp.join(
-        path_util.get_ndf_config(), hydra_cfg.object_class + "_obj_cfg.yaml"
+        path_util.get_ndf_config(), hydra_cfg.object_class.name + "_obj_cfg.yaml"
     )
     obj_cfg.merge_from_file(obj_config_name)
     obj_cfg.freeze()
