@@ -62,6 +62,7 @@ pred_weight: True
 sigmoid_on: True
 return_flow_component: False
 mlp: False
+multilaterate: True
 
 # Loss Settings
 flow_supervision: both

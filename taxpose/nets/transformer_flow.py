@@ -4,12 +4,15 @@
 
 import math
 
+import functorch
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from taxpose.nets.pointnet import PointNet
 from taxpose.nets.transformer_flow_pm import CustomTransformer
+from taxpose.nets.tv_mlp import MLP as TVMLP
+from taxpose.utils.multilateration import estimate_p
 from third_party.dcp.model import DGCNN
 
 
@@ -276,6 +279,139 @@ class ResidualMLPHead(nn.Module):
         return corr_flow_weight
 
 
+class MLPKernel(nn.Module):
+    def __init__(self, feature_dim):
+        super().__init__()
+        self.feature_dim = feature_dim
+        self.mlp = TVMLP(2 * feature_dim, [300, 100, 1])
+
+    def forward(self, x1, x2):
+        # Make it symmetric.
+        # b = torch.stack(
+        #     [
+        #         torch.cat([x1, x2], axis=-1),
+        #         torch.cat([x2, x1], axis=-1),
+        #     ],
+        #     axis=0,
+        # )
+        v1 = self.mlp(torch.cat([x1, x2], axis=-1))
+        v2 = self.mlp(torch.cat([x2, x1], axis=-1))
+        return F.softplus((v1 + v2) / 2)
+
+
+class NormKernel(nn.Module):
+    def __init__(self, feature_dim):
+        super().__init__()
+        self.feature_dim = feature_dim
+
+    def forward(self, x1, x2):
+        return torch.norm(x1 - x2, dim=-1) / math.sqrt(len(x1))
+
+
+class DotProductKernel(nn.Module):
+    def __init__(self, feature_dim):
+        super().__init__()
+        self.feature_dim = feature_dim
+
+    def forward(self, x1, x2):
+        return torch.dot(x1, x2) / math.sqrt(len(x1))
+
+
+class MultilaterationHead(nn.Module):
+    def __init__(self, emb_dims=512, n_kps=100, pred_weight=True):
+        super().__init__()
+
+        self.emb_dims = emb_dims
+        self.n_kps = n_kps
+
+        self.kernel = MLPKernel(self.emb_dims)
+        # self.kernel = NormKernel(self.emb_dims)
+
+        self.pred_weight = pred_weight
+        if self.pred_weight:
+            self.proj_flow_weight = nn.Sequential(
+                PointNet([emb_dims, 64, 64, 64, 128, 512]),
+                nn.Conv1d(512, 1, kernel_size=1, bias=False),
+            )
+
+    def forward(
+        self, *input, scores=None, return_flow_component=False, return_embedding=False
+    ):
+        action_embedding = input[0]
+        anchor_embedding = input[1]
+        action_points = input[2]
+        anchor_points = input[3]
+
+        # Compute the radius matrix.
+        choice_v = functorch.vmap(
+            lambda x, n: torch.randperm(x.shape[-1])[:n],
+            in_dims=(0, None),
+            randomness="different",
+        )
+        # TODO: decide if we need to deal with weighting here? Could sample...
+        A_ixs = choice_v(action_points, self.n_kps).to(action_points.device)
+        B_ixs = choice_v(anchor_points, self.n_kps).to(anchor_points.device)
+        P_A = anchor_points.permute(0, 2, 1)
+        P_B = anchor_points.permute(0, 2, 1)
+
+        Phi_A = action_embedding.permute(0, 2, 1)
+        Phi_B = anchor_embedding.permute(0, 2, 1)
+
+        # P_A = torch.take_along_dim(P_A, A_ixs.unsqueeze(-1), dim=1)
+        # Phi_A = torch.take_along_dim(Phi_A, A_ixs.unsqueeze(-1), dim=1)
+        # P_B = torch.take_along_dim(P_B, B_ixs.unsqueeze(-1), dim=1)
+        # Phi_B = torch.take_along_dim(Phi_B, B_ixs.unsqueeze(-1), dim=1)
+
+        # compute_R = functorch.vmap(
+        #     functorch.vmap(
+        #         functorch.vmap(self.kernel, in_dims=(None, 0)), in_dims=(0, None)
+        #     ),
+        #     in_dims=(0, 0),
+        # )
+        # R_est = compute_R(Phi_A, Phi_B)
+        Phi_A_r = (
+            Phi_A.unsqueeze(2)
+            .repeat(1, 1, Phi_A.shape[1], 1)
+            .reshape(Phi_A.shape[0] * Phi_A.shape[1] * Phi_A.shape[1], Phi_A.shape[2])
+        )
+        Phi_B_r = (
+            Phi_B.unsqueeze(1)
+            .repeat(1, Phi_B.shape[1], 1, 1)
+            .reshape(Phi_B.shape[0] * Phi_B.shape[1] * Phi_B.shape[1], Phi_B.shape[2])
+        )
+        R_est = self.kernel(Phi_A_r, Phi_B_r).reshape(
+            Phi_A.shape[0], Phi_A.shape[1], Phi_B.shape[1]
+        )
+
+        # R_est = torch.cdist(Phi_A, Phi_B, p=2.0) / math.sqrt(self.emb_dims)
+
+        v_est_p = functorch.vmap(functorch.vmap(estimate_p, in_dims=(None, 0)))
+        P_A_B_pred = v_est_p(P_B[..., None], R_est)[..., 0]
+
+        # Use multilateration to compute the position of each point in the action.
+        corr_points = P_A_B_pred.permute(0, 2, 1)
+
+        # TODO: figure out how to downsample the points, and pass it all back up the stack.
+
+        # \tilde{y}_i = sum_{j}{w_ij,y_j}, - x_i  # B, 3, N
+        flow = corr_points - action_points
+
+        if self.pred_weight:
+            weight = self.proj_flow_weight(action_embedding)
+            corr_flow_weight = torch.concat([flow, weight], dim=1)
+        else:
+            corr_flow_weight = flow
+        if return_flow_component:
+            return {
+                "full_flow": corr_flow_weight,
+                "residual_flow": torch.zeros_like(flow).to(flow.device),
+                "corr_flow": flow,
+                "corr_points": corr_points,
+                "scores": scores,
+            }
+        return corr_flow_weight
+
+
 class ResidualFlow_DiffEmbTransformer(nn.Module):
     def __init__(
         self,
@@ -288,6 +424,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         residual_on=True,
         freeze_embnn=False,
         return_attn=True,
+        multilaterate=False,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.emb_dims = emb_dims
@@ -310,16 +447,24 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.transformer_anchor = CustomTransformer(
             emb_dims=emb_dims, return_attn=self.return_attn, bidirectional=False
         )
-        self.head_action = ResidualMLPHead(
-            emb_dims=emb_dims,
-            pred_weight=self.pred_weight,
-            residual_on=self.residual_on,
-        )
-        self.head_anchor = ResidualMLPHead(
-            emb_dims=emb_dims,
-            pred_weight=self.pred_weight,
-            residual_on=self.residual_on,
-        )
+        if multilaterate:
+            self.head_action = MultilaterationHead(
+                emb_dims=emb_dims, pred_weight=self.pred_weight
+            )
+            self.head_anchor = MultilaterationHead(
+                emb_dims=emb_dims, pred_weight=self.pred_weight
+            )
+        else:
+            self.head_action = ResidualMLPHead(
+                emb_dims=emb_dims,
+                pred_weight=self.pred_weight,
+                residual_on=self.residual_on,
+            )
+            self.head_anchor = ResidualMLPHead(
+                emb_dims=emb_dims,
+                pred_weight=self.pred_weight,
+                residual_on=self.residual_on,
+            )
 
     def forward(self, *input):
         action_points = input[0].permute(0, 2, 1)[:, :3]  # B,3,num_points

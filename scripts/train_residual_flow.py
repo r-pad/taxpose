@@ -72,6 +72,7 @@ def main(cfg):
         return_flow_component=cfg.return_flow_component,
         center_feature=cfg.center_feature,
         pred_weight=cfg.pred_weight,
+        multilaterate=cfg.multilaterate,
     )
 
     model = EquivarianceTrainingModule(

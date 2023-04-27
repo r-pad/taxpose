@@ -7,6 +7,11 @@ import signal
 import time
 from pathlib import Path
 
+# Gotta do some path hacking to convince ndf_robot to work.
+NDF_ROOT = Path(__file__).parent.parent / "third_party" / "ndf_robot"
+os.environ["NDF_SOURCE_DIR"] = str(NDF_ROOT / "src" / "ndf_robot")
+os.environ["PB_PLANNING_SOURCE_DIR"] = str(NDF_ROOT / "pybullet-planning")
+
 import hydra
 import numpy as np
 import pybullet as p
@@ -47,11 +52,6 @@ from taxpose.training.flow_equivariance_training_module_nocentering_eval_init im
     EquivarianceTestingModule,
 )
 from taxpose.utils.ndf_sim_utils import get_clouds, get_object_clouds
-
-# Gotta do some path hacking to convince ndf_robot to work.
-NDF_ROOT = Path(__file__).parent.parent / "third_party" / "ndf_robot"
-os.environ["NDF_SOURCE_DIR"] = str(NDF_ROOT / "src" / "ndf_robot")
-os.environ["PB_PLANNING_SOURCE_DIR"] = str(NDF_ROOT / "pybullet-planning")
 
 
 def get_world_transform(pred_T_action_mat, obj_start_pose, point_cloud, invert=False):
@@ -489,6 +489,7 @@ def main(hydra_cfg):
         return_flow_component=hydra_cfg.return_flow_component,
         freeze_embnn=hydra_cfg.freeze_embnn,
         return_attn=hydra_cfg.return_attn,
+        multilaterate=hydra_cfg.multilaterate,
     )
 
     place_model = EquivarianceTestingModule(
@@ -702,7 +703,7 @@ def main(hydra_cfg):
         obj_points, obj_colors, obj_classes = get_object_clouds(cams)
 
         points_mug_raw, points_rack_raw = load_data_raw(
-            num_points=1024,
+            num_points=hydra_cfg.num_points,
             clouds=obj_points,
             classes=obj_classes,
             action_class=0,
@@ -711,14 +712,14 @@ def main(hydra_cfg):
         if points_mug_raw is None:
             continue
         points_gripper_raw, points_mug_raw = load_data_raw(
-            num_points=1024,
+            num_points=hydra_cfg.num_points,
             clouds=obj_points,
             classes=obj_classes,
             action_class=2,
             anchor_class=0,
         )
         points_mug, points_rack = load_data(
-            num_points=1024,
+            num_points=hydra_cfg.num_points,
             clouds=obj_points,
             classes=obj_classes,
             action_class=0,
@@ -747,7 +748,7 @@ def main(hydra_cfg):
         )
         # Get Grasp Pose
         points_gripper, points_mug = load_data(
-            num_points=1024,
+            num_points=hydra_cfg.num_points,
             clouds=obj_points,
             classes=obj_classes,
             action_class=2,
