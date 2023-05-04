@@ -13,10 +13,17 @@ experiment: residual_flow_occlusion
 image_logging_period: 100
 
 ### TO BE CHANGED ###
-log_txt_file:  ${hydra:runtime.cwd}/train_new.txt # absolute path for text file for logging
+log_txt_file:  ${hydra:runtime.cwd}/recent_training_paths.txt # absolute path for text file for logging
 defaults:
   - _self_
-  - task: mug_place # $task \in {mug_place, mug_grasp, bottle_place, bottle_grasp, bowl_place, bowl_grasp}
+  - object_class: mug # {mug, bottle, bowl}
+  - pose_dist: upright # {upright, arbitrary}
+  - relationship: place # {place, grasp}
+  - model: release
+  - task: ${object_class}_${relationship}
+  - optional mode: train # $mode \in {train, train_val, validation}
+  - checkpoints: ndf/${object_class}/${pose_dist}/${model}/${relationship}
+
 ### TO BE CHANGED ###
 
 # Dataset Settings
@@ -63,7 +70,8 @@ direct_correspondence_loss_weight: 1
 consistency_loss_weight: 0.1
 
 # Training Settings
-checkpoint_file: Null
+load_from_checkpoint: False
+checkpoint_file: ${checkpoints.ckpt_file}
 freeze_embnn: False
 lr: 1e-4
 max_epochs: 1000
