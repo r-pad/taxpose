@@ -178,7 +178,8 @@ def main(hydra_cfg):
     data_dir = hydra_cfg.data_dir
     # '/home/exx/Documents/taxpose/search_existing_models.txt'
     log_txt_file = hydra_cfg.log_txt_file
-    save_dir = os.path.join(hydra.utils.get_original_cwd(), data_dir)
+    # save_dir = os.path.join(hydra.utils.get_original_cwd(), data_dir)
+    save_dir = data_dir
 
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
