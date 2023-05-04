@@ -1,6 +1,6 @@
 {
     "editor.formatOnSave": true,
-    "python.formatting.provider": "black",
+    "python.formatting.provider": "none",
     "python.linting.pylintArgs": [
         "--generated-members",
         "torch.*"
@@ -26,5 +26,8 @@
         "rollouts/**": true,
         "results/**": true,
         "wandb/**": true,
+    },
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
     }
 }

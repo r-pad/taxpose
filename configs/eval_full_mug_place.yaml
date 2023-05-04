@@ -7,20 +7,27 @@ hydra:
   job:
     chdir: True
 
-experiment: residual_flow_test_partial_cloud_initpose
+experiment: ${model.name}
 
 #### TO BE CHANGED ####
 defaults:
   - _self_
   - pose_dist: upright # {upright, arbitrary}
   - object_class: mug #{mug, bottle, bowl}
-checkpoint_file_grasp: ${hydra:runtime.cwd}/trained_models/ndf/${object_class.name}/${pose_dist.name}/grasp.ckpt
-checkpoint_file_place: ${hydra:runtime.cwd}/trained_models/ndf/${object_class.name}/${pose_dist.name}/place.ckpt
+
+  # Machinery to load the correct checkpoints.
+  - model: release
+  - checkpoints/ndf@checkpoints.grasp: ${object_class}/${pose_dist}/${model}/grasp
+  - checkpoints/ndf@checkpoints.place: ${object_class}/${pose_dist}/${model}/place
+
+checkpoint_file_grasp: ${checkpoints.grasp.ckpt_file}
+checkpoint_file_place: ${checkpoints.place.ckpt_file}
 log_txt_file: ${hydra:runtime.cwd}/test_results.txt # abs path of file to log results
+
 # log saving dir
-log_dir: ./results/ndf/${object_class.name}
+log_dir: ./results/ndf/${object_class.name}/${pose_dist.name}
 num_iterations: 100 # number of trails
-data_dir: ${object_class.name} # directory name for data saved
+data_dir: ./predictions # directory name for data saved
 log_every_trial: False # True - log success rate at every trial; False - log only at the end of the # of trials
 #### TO BE CHANGED ####
 

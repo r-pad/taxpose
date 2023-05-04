@@ -1,0 +1,1 @@
+ckpt_file: ${hydra:runtime.cwd}/trained_models/ndf/${object_class.name}/${pose_dist.name}/place.ckpt

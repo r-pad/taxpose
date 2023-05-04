@@ -368,7 +368,7 @@ cython_debug/
 
 .idea/
 
-checkpoints/
+/checkpoints/
 data/
 logs/
 mug_place/
@@ -376,3 +376,9 @@ outputs/
 results/
 rollouts/
 wandb/
+trained_models/ndf/
+recent_training_paths.txt
+
+# Ignore all checkpoint configs except for release files.
+configs/checkpoints/**/*.yaml
+!configs/checkpoints/**/release/*.yaml
