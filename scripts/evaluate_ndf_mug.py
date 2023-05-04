@@ -479,7 +479,7 @@ def main(hydra_cfg):
 
     pl.seed_everything(hydra_cfg.seed)
 
-    network = ResidualFlow_DiffEmbTransformer(
+    place_network = ResidualFlow_DiffEmbTransformer(
         emb_dims=hydra_cfg.emb_dims,
         emb_nn=hydra_cfg.emb_nn,
         center_feature=hydra_cfg.center_feature,
@@ -491,7 +491,7 @@ def main(hydra_cfg):
     )
 
     place_model = EquivarianceTestingModule(
-        network,
+        place_network,
         lr=hydra_cfg.lr,
         image_log_period=hydra_cfg.image_logging_period,
         weight_normalize=hydra_cfg.weight_normalize_place,
@@ -506,8 +506,19 @@ def main(hydra_cfg):
         )
         log_info("Model Loaded from " + str(hydra_cfg.checkpoint_file_place))
 
+    grasp_network = ResidualFlow_DiffEmbTransformer(
+        emb_dims=hydra_cfg.emb_dims,
+        emb_nn=hydra_cfg.emb_nn,
+        center_feature=hydra_cfg.center_feature,
+        pred_weight=hydra_cfg.pred_weight,
+        residual_on=hydra_cfg.residual_on,
+        return_flow_component=hydra_cfg.return_flow_component,
+        freeze_embnn=hydra_cfg.freeze_embnn,
+        return_attn=hydra_cfg.return_attn,
+    )
+
     grasp_model = EquivarianceTestingModule(
-        network,
+        grasp_network,
         lr=hydra_cfg.lr,
         image_log_period=hydra_cfg.image_logging_period,
         weight_normalize=hydra_cfg.weight_normalize_grasp,
