@@ -1510,8 +1510,8 @@ def dualflow2pose(
     xyz_src, batch, num_points, {3,4}
     """
     # DIFF: WEIRD! There are these pesky 2 extra lines...
-    xyz_src = xyz_src[:, :, :3]
-    xyz_tgt = xyz_tgt[:, :, :3]
+    # xyz_src = xyz_src[:, :, :3]
+    # xyz_tgt = xyz_tgt[:, :, :3]
     assert normalization_scehme in [
         "l1",
         "softmax",

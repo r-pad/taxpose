@@ -32,9 +32,10 @@ experiment: residual_flow_test_partial_cloud_initpose
 checkpoint_file_place_refinement: Null
 checkpoint_file_grasp_refinement: Null
 # checkpoint_file_grasp: /media/exx/data/media/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm_anypose/2022-06-13_045254/residual_flow_occlusion_gm_anypose/26ll28l4/checkpoints/epoch_535_global_step_67000.ckpt
-checkpoint_file_grasp: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/upright/grasp.ckpt
+
 # checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-11_170536/residual_flow_occlusion_mr/1e3tubl4/checkpoints/epoch=120-step=15125.ckpt
-checkpoint_file_place: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/upright/place.ckpt
+
+
 # checkpoint_file_place: /media/exx/data/media/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-11_170536/residual_flow_occlusion_mr/1e3tubl4/checkpoints/epoch=120-step=15125.ckpt
 # checkpoint_file_place: /home/exx/good_mug_models/rm/epoch=120-step=15125.ckpt
 # old
@@ -69,6 +70,16 @@ checkpoint_file_place: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/up
 # checkpoint_file_grasp_refinement: Null
 # checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow_no_pretraining/residual_flow_occlusion_gm/2022-08-25_032410/residual_flow_occlusion_gm/1asrqblu/checkpoints/epoch=140-step=17625.ckpt
 # checkpoint_file_place: /data/media/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-21_020904/residual_flow_occlusion_mr/1akx8ihc/checkpoints/epoch_95_global_step_12000.ckpt
+
+
+# Release models.
+# checkpoint_file_grasp: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/upright/grasp.ckpt
+# checkpoint_file_place: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/upright/place.ckpt
+
+# Re-trained models.
+checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_171304/residual_flow_occlusion/3050urah/checkpoints/epoch_359_global_step_45000.ckpt
+checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_171338/residual_flow_occlusion/ual5s3fl/checkpoints/epoch_359_global_step_45000.ckpt
+
 
 #TOBECANGED#
 
