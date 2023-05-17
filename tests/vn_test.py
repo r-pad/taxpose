@@ -4,7 +4,7 @@ import pytest
 import torch
 from scipy.spatial.transform import Rotation
 
-from third_party.vnn.vn_dgcnn_partseg import get_model as VN_DGCNN
+from taxpose.nets.vn_dgcnn import VN_DGCNN as VN_DGCNN
 
 
 @dataclass
@@ -13,6 +13,7 @@ class Args:
     pooling: str = "mean"
 
 
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
 @pytest.mark.parametrize("seed", [0, 1, 2, 3, 4])
 def test_vn_dgcnn_invariance(seed):
     torch.manual_seed(seed)
