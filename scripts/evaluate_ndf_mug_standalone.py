@@ -52,7 +52,7 @@ from torchvision.transforms import ToTensor
 from taxpose.nets.pointnet import PointNet
 from taxpose.nets.transformer_flow import MLP, CorrespondenceMLPHead
 from taxpose.nets.transformer_flow import CustomTransformer as Transformer
-from taxpose.nets.transformer_flow import ResidualMLPHead
+from taxpose.nets.transformer_flow import MultilaterationHead, ResidualMLPHead
 from taxpose.training.point_cloud_training_module import PointCloudTrainingModule
 from taxpose.utils.color_utils import get_color
 from taxpose.utils.ndf_sim_utils import get_clouds, get_object_clouds
@@ -735,6 +735,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         freeze_embnn=False,
         return_attn=True,
         input_dims=3,
+        multilaterate=False,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.emb_dims = emb_dims
@@ -778,16 +779,24 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.transformer_anchor = Transformer(
             emb_dims=emb_dims, return_attn=self.return_attn, bidirectional=False
         )
-        self.head_action = ResidualMLPHead(
-            emb_dims=emb_dims,
-            pred_weight=self.pred_weight,
-            residual_on=self.residual_on,
-        )
-        self.head_anchor = ResidualMLPHead(
-            emb_dims=emb_dims,
-            pred_weight=self.pred_weight,
-            residual_on=self.residual_on,
-        )
+        if multilaterate:
+            self.head_action = MultilaterationHead(
+                emb_dims=emb_dims, pred_weight=self.pred_weight
+            )
+            self.head_anchor = MultilaterationHead(
+                emb_dims=emb_dims, pred_weight=self.pred_weight
+            )
+        else:
+            self.head_action = ResidualMLPHead(
+                emb_dims=emb_dims,
+                pred_weight=self.pred_weight,
+                residual_on=self.residual_on,
+            )
+            self.head_anchor = ResidualMLPHead(
+                emb_dims=emb_dims,
+                pred_weight=self.pred_weight,
+                residual_on=self.residual_on,
+            )
 
     def forward(self, *input):
         action_points_input = input[0].permute(0, 2, 1)  # B,3,num_points
@@ -2324,6 +2333,7 @@ def main(hydra_cfg):
                         center_feature=hydra_cfg.center_feature,
                         inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
                         residual_on=hydra_cfg.residual_on,
+                        multilaterate=hydra_cfg.multilaterate,
                     )
             else:
                 network = ResidualFlow_DiffEmb(
@@ -2398,6 +2408,7 @@ def main(hydra_cfg):
                             center_feature=hydra_cfg.center_feature,
                             inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
                             residual_on=hydra_cfg.residual_on,
+                            multilaterate=hydra_cfg.multilaterate,
                         )
                 else:
                     network = ResidualFlow_DiffEmb(
@@ -2474,6 +2485,7 @@ def main(hydra_cfg):
                         center_feature=hydra_cfg.center_feature,
                         inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
                         residual_on=hydra_cfg.residual_on,
+                        multilaterate=hydra_cfg.multilaterate,
                     )
             else:
                 network = ResidualFlow_DiffEmb(
@@ -2549,6 +2561,7 @@ def main(hydra_cfg):
                             center_feature=hydra_cfg.center_feature,
                             inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
                             residual_on=hydra_cfg.residual_on,
+                            multilaterate=hydra_cfg.multilaterate,
                         )
                 else:
                     network = ResidualFlow_DiffEmb(
@@ -2783,7 +2796,7 @@ def main(hydra_cfg):
         obj_points, obj_colors, obj_classes = get_object_clouds(cams)
 
         points_mug_raw, points_rack_raw = load_data_raw(
-            num_points=1024,
+            num_points=hydra_cfg.num_points,
             clouds=obj_points,
             classes=obj_classes,
             action_class=0,
@@ -2792,14 +2805,14 @@ def main(hydra_cfg):
         if points_mug_raw is None:
             continue
         points_gripper_raw, points_mug_raw = load_data_raw(
-            num_points=1024,
+            num_points=hydra_cfg.num_points,
             clouds=obj_points,
             classes=obj_classes,
             action_class=2,
             anchor_class=0,
         )
         points_mug, points_rack = load_data(
-            num_points=1024,
+            num_points=hydra_cfg.num_points,
             clouds=obj_points,
             classes=obj_classes,
             action_class=0,
@@ -2850,7 +2863,7 @@ def main(hydra_cfg):
         )
         # Get Grasp Pose
         points_gripper, points_mug = load_data(
-            num_points=1024,
+            num_points=hydra_cfg.num_points,
             clouds=obj_points,
             classes=obj_classes,
             action_class=2,

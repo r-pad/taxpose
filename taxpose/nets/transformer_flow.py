@@ -318,19 +318,20 @@ class DotProductKernel(nn.Module):
 
 
 class MultilaterationHead(nn.Module):
-    def __init__(self, emb_dims=512, n_kps=100, pred_weight=True):
+    def __init__(self, emb_dims=512, n_kps=100, pred_weight=True, last_attn=False):
         super().__init__()
 
         self.emb_dims = emb_dims
         self.n_kps = n_kps
+        self.last_attn = last_attn
 
-        self.kernel = MLPKernel(self.emb_dims)
+        self.kernel = MLPKernel(self.emb_dims - int(last_attn))
         # self.kernel = NormKernel(self.emb_dims)
 
         self.pred_weight = pred_weight
         if self.pred_weight:
             self.proj_flow_weight = nn.Sequential(
-                PointNet([emb_dims, 64, 64, 64, 128, 512]),
+                PointNet([emb_dims - int(last_attn), 64, 64, 64, 128, 512]),
                 nn.Conv1d(512, 1, kernel_size=1, bias=False),
             )
 
@@ -339,6 +340,17 @@ class MultilaterationHead(nn.Module):
     ):
         action_embedding = input[0]
         anchor_embedding = input[1]
+
+        if self.last_attn:
+            action_embedding, action_attn = (
+                action_embedding[:, :-1],
+                action_embedding[:, -1:],
+            )
+            anchor_embedding, anchor_attn = (
+                anchor_embedding[:, :-1],
+                anchor_embedding[:, -1:],
+            )
+
         action_points = input[2]
         anchor_points = input[3]
 
@@ -356,6 +368,20 @@ class MultilaterationHead(nn.Module):
 
         Phi_A = action_embedding.permute(0, 2, 1)
         Phi_B = anchor_embedding.permute(0, 2, 1)
+
+        if self.last_attn:
+            A_weights = action_attn.permute(0, 2, 1)
+            B_weights = anchor_attn.permute(0, 2, 1)
+
+            A_weights = F.softmax(A_weights, dim=-1).squeeze(dim=-1)
+            B_weights = F.softmax(B_weights, dim=-1).squeeze(dim=-1)
+
+            # Should sum to N.
+            A_weights = A_weights * A_weights.shape[-1]
+            B_weights = B_weights * B_weights.shape[-1]
+        else:
+            A_weights = torch.ones(Phi_A.shape[:2], device=Phi_A.device)
+            B_weights = torch.ones(Phi_B.shape[:2], device=Phi_B.device)
 
         # P_A = torch.take_along_dim(P_A, A_ixs.unsqueeze(-1), dim=1)
         # Phi_A = torch.take_along_dim(Phi_A, A_ixs.unsqueeze(-1), dim=1)
@@ -385,8 +411,14 @@ class MultilaterationHead(nn.Module):
 
         # R_est = torch.cdist(Phi_A, Phi_B, p=2.0) / math.sqrt(self.emb_dims)
 
-        v_est_p = functorch.vmap(functorch.vmap(estimate_p, in_dims=(None, 0)))
-        P_A_B_pred = v_est_p(P_B[..., None], R_est)[..., 0]
+        # Normalize the scores.
+        # mlat_weights = (
+        #     scores / scores.detach().sum(dim=-1, keepdim=True) * scores.shape[-1]
+        # )
+        # mlat_weights = torch.ones_like(scores, device=scores.device)
+        v_est_p = functorch.vmap(functorch.vmap(estimate_p, in_dims=(None, 0, None)))
+        P_A_B_pred = v_est_p(P_B[..., None], R_est, B_weights)[..., 0]
+        # breakpoint()
 
         # Use multilateration to compute the position of each point in the action.
         corr_points = P_A_B_pred.permute(0, 2, 1)

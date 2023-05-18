@@ -23,6 +23,7 @@ def write_to_file(file_name, string):
 
 @hydra.main(config_path="../configs", config_name="train_mug_residual")
 def main(cfg):
+    # torch.set_float32_matmul_precision("medium")
     pl.seed_everything(cfg.seed)
     logger = WandbLogger(project=cfg.experiment)
     logger.log_hyperparams(cfg)

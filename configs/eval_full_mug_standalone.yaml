@@ -75,11 +75,17 @@ checkpoint_file_grasp_refinement: Null
 # Release models.
 # checkpoint_file_grasp: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/upright/grasp.ckpt
 # checkpoint_file_place: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/upright/place.ckpt
+# checkpoint_file_grasp: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/arbitrary/grasp.ckpt
+# checkpoint_file_place: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/arbitrary/place.ckpt
 
 # Re-trained models.
-checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_171304/residual_flow_occlusion/3050urah/checkpoints/epoch_359_global_step_45000.ckpt
-checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_171338/residual_flow_occlusion/ual5s3fl/checkpoints/epoch_359_global_step_45000.ckpt
+# checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_171304/residual_flow_occlusion/3050urah/checkpoints/epoch_359_global_step_45000.ckpt
+# checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_171338/residual_flow_occlusion/ual5s3fl/checkpoints/epoch_359_global_step_45000.ckpt
 
+
+# Multilateration models.
+checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_225115/residual_flow_occlusion/b20foq5r/checkpoints/epoch_999_global_step_250000.ckpt
+checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_225041/residual_flow_occlusion/c3gtthpp/checkpoints/epoch_999_global_step_250000.ckpt
 
 #TOBECANGED#
 
@@ -89,6 +95,9 @@ emb_nn: dgcnn
 num_points: 1024
 inital_sampling_ratio: 1
 emb_dims: 512
+# multilaterate: False
+multilaterate: True
+
 
 # Dataset Settings
 # dataset_root: /home/exx/Documents/ndf_robot/train_data_ndf_mug_place_0/renders
