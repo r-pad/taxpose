@@ -3,5 +3,5 @@
 	url = https://github.com/google-research/ravens.git
 [submodule "third_party/ndf_robot"]
 	path = third_party/ndf_robot
-	url = https://github.com/anthonysimeonov/ndf_robot.git
+	url = https://github.com/r-pad/ndf_robot.git
 	ignore = dirty
