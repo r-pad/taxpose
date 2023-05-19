@@ -19,7 +19,6 @@ from airobot.utils.arm_util import reach_jnt_goal
 from airobot.utils.common import euler2quat
 from ndf_robot.config.default_eval_cfg import get_eval_cfg_defaults
 from ndf_robot.config.default_obj_cfg import get_obj_cfg_defaults
-from ndf_robot.opt.optimizer import OccNetOptimizer
 from ndf_robot.robot.multicam import MultiCams
 from ndf_robot.share.globals import (
     bad_shapenet_bottles_ids_list,
@@ -1885,10 +1884,10 @@ def load_data(num_points, clouds, classes, action_class, anchor_class):
     points_action = torch.from_numpy(points_action_np).float().unsqueeze(0)
     points_anchor = torch.from_numpy(points_anchor_np).float().unsqueeze(0)
 
-    rng_state = torch.get_rng_state()
-    torch.manual_seed(123456)
+    # rng_state = torch.get_rng_state()
+    # torch.manual_seed(123456)
     points_action, points_anchor = subsample(num_points, points_action, points_anchor)
-    torch.set_rng_state(rng_state)
+    # torch.set_rng_state(rng_state)
 
     return points_action.cuda(), points_anchor.cuda()
 
@@ -1904,10 +1903,10 @@ def load_data_raw(num_points, clouds, classes, action_class, anchor_class):
     points_action = torch.from_numpy(points_action_np).float().unsqueeze(0)
     points_anchor = torch.from_numpy(points_anchor_np).float().unsqueeze(0)
 
-    rng_state = torch.get_rng_state()
-    torch.manual_seed(123456)
+    # rng_state = torch.get_rng_state()
+    # torch.manual_seed(123456)
     points_action, points_anchor = subsample(num_points, points_action, points_anchor)
-    torch.set_rng_state(rng_state)
+    # torch.set_rng_state(rng_state)
     if points_action is None:
         return None, None
 
@@ -1960,6 +1959,10 @@ def step_till_goal(robot, goal, max_duration=2.0):
         robot.pb_client.stepSimulation()
 
 
+MAX_MP_ITERATIONS = 500
+MAX_TIME = 5.0
+
+
 @hydra.main(
     config_path="../configs/",
     config_name="eval_full_mug_standalone",
@@ -2008,12 +2011,6 @@ def main(hydra_cfg):
     else:
         set_log_level("info")
 
-    robot = Robot(
-        "franka",
-        pb_cfg={"gui": hydra_cfg.pybullet_viz, "realtime": False},
-        arm_cfg={"self_collision": False, "seed": hydra_cfg.seed},
-    )
-    ik_helper = FrankaIK(gui=False)
     torch.manual_seed(hydra_cfg.seed)
     random.seed(hydra_cfg.seed)
     np.random.seed(hydra_cfg.seed)
@@ -2060,20 +2057,6 @@ def main(hydra_cfg):
         )
     else:
         test_shapenet_ids = []
-
-    finger_joint_id = 9
-    left_pad_id = 9
-    right_pad_id = 10
-    p.changeDynamics(robot.arm.robot_id, left_pad_id, lateralFriction=1.0)
-    p.changeDynamics(robot.arm.robot_id, right_pad_id, lateralFriction=1.0)
-
-    x_low, x_high = cfg.OBJ_SAMPLE_X_HIGH_LOW
-    y_low, y_high = cfg.OBJ_SAMPLE_Y_HIGH_LOW
-    table_z = cfg.TABLE_Z
-
-    preplace_horizontal_tf_list = cfg.PREPLACE_HORIZONTAL_OFFSET_TF
-    preplace_horizontal_tf = util.list2pose_stamped(cfg.PREPLACE_HORIZONTAL_OFFSET_TF)
-    preplace_offset_tf = util.list2pose_stamped(cfg.PREPLACE_OFFSET_TF)
 
     if hydra_cfg.dgcnn:
         model = vnn_occupancy_network.VNNOccNet(
@@ -2220,21 +2203,21 @@ def main(hydra_cfg):
         demo_rack_target_info_list.append(rack_target_info)
         demo_shapenet_ids.append(shapenet_id)
 
-    place_optimizer = OccNetOptimizer(
-        model,
-        query_pts=place_optimizer_pts,
-        query_pts_real_shape=place_optimizer_pts_rs,
-        opt_iterations=hydra_cfg.opt_iterations,
-    )
+    # place_optimizer = OccNetOptimizer(
+    #     model,
+    #     query_pts=place_optimizer_pts,
+    #     query_pts_real_shape=place_optimizer_pts_rs,
+    #     opt_iterations=hydra_cfg.opt_iterations,
+    # )
 
-    grasp_optimizer = OccNetOptimizer(
-        model,
-        query_pts=optimizer_gripper_pts,
-        query_pts_real_shape=optimizer_gripper_pts_rs,
-        opt_iterations=hydra_cfg.opt_iterations,
-    )
-    grasp_optimizer.set_demo_info(demo_target_info_list)
-    place_optimizer.set_demo_info(demo_rack_target_info_list)
+    # grasp_optimizer = OccNetOptimizer(
+    #     model,
+    #     query_pts=optimizer_gripper_pts,
+    #     query_pts_real_shape=optimizer_gripper_pts_rs,
+    #     opt_iterations=hydra_cfg.opt_iterations,
+    # )
+    # grasp_optimizer.set_demo_info(demo_target_info_list)
+    # place_optimizer.set_demo_info(demo_rack_target_info_list)
 
     # get objects that we can use for testing
     test_object_ids = []
@@ -2255,28 +2238,6 @@ def main(hydra_cfg):
         test_object_ids = [demo_shapenet_ids[0]]
 
     # reset
-    robot.arm.reset(force_reset=True)
-    robot.cam.setup_camera(
-        focus_pt=[0.4, 0.0, table_z], dist=0.9, yaw=45, pitch=-25, roll=0
-    )
-
-    cams = MultiCams(cfg.CAMERA, robot.pb_client, n_cams=cfg.N_CAMERAS)
-    cam_info = {}
-    cam_info["pose_world"] = []
-    for cam in cams.cams:
-        cam_info["pose_world"].append(util.pose_from_matrix(cam.cam_ext_mat))
-
-    # put table at right spot
-    table_ori = euler2quat([0, 0, np.pi / 2])
-
-    # this is the URDF that was used in the demos -- make sure we load an identical one
-    tmp_urdf_fname = osp.join(
-        path_util.get_ndf_descriptions(), "hanging/table/table_rack_tmp.urdf"
-    )
-    open(tmp_urdf_fname, "w").write(grasp_data["table_urdf"].item())
-    table_id = robot.pb_client.load_urdf(
-        tmp_urdf_fname, cfg.TABLE_POS, table_ori, scaling=cfg.TABLE_SCALING
-    )
 
     if obj_class == "mug":
         rack_link_id = 0
@@ -2605,7 +2566,65 @@ def main(hydra_cfg):
                 + str(hydra_cfg.checkpoint_file_grasp_refinement)
             )
 
+    robot = Robot(
+        "franka",
+        pb_cfg={"gui": hydra_cfg.pybullet_viz, "realtime": False},
+        arm_cfg={"self_collision": False, "seed": hydra_cfg.seed},
+    )
+    ik_helper = FrankaIK(gui=False)
+
     for iteration in range(hydra_cfg.start_iteration, hydra_cfg.num_iterations):
+        torch.manual_seed(hydra_cfg.seed + iteration)
+        random.seed(hydra_cfg.seed + iteration)
+        np.random.seed(hydra_cfg.seed + iteration)
+
+        # tstart = time.time()
+
+        robot.pb_client.resetSimulation()
+
+        x_low, x_high = cfg.OBJ_SAMPLE_X_HIGH_LOW
+        y_low, y_high = cfg.OBJ_SAMPLE_Y_HIGH_LOW
+        table_z = cfg.TABLE_Z
+
+        preplace_horizontal_tf_list = cfg.PREPLACE_HORIZONTAL_OFFSET_TF
+        preplace_horizontal_tf = util.list2pose_stamped(
+            cfg.PREPLACE_HORIZONTAL_OFFSET_TF
+        )
+        preplace_offset_tf = util.list2pose_stamped(cfg.PREPLACE_OFFSET_TF)
+
+        robot.arm.reset(force_reset=True)
+
+        finger_joint_id = 9
+        left_pad_id = 9
+        right_pad_id = 10
+        p.changeDynamics(robot.arm.robot_id, left_pad_id, lateralFriction=1.0)
+        p.changeDynamics(robot.arm.robot_id, right_pad_id, lateralFriction=1.0)
+
+        robot.cam.setup_camera(
+            focus_pt=[0.4, 0.0, table_z], dist=0.9, yaw=45, pitch=-25, roll=0
+        )
+
+        cams = MultiCams(cfg.CAMERA, robot.pb_client, n_cams=cfg.N_CAMERAS)
+        cam_info = {}
+        cam_info["pose_world"] = []
+        for cam in cams.cams:
+            cam_info["pose_world"].append(util.pose_from_matrix(cam.cam_ext_mat))
+
+        # put table at right spot
+        table_ori = euler2quat([0, 0, np.pi / 2])
+
+        # this is the URDF that was used in the demos -- make sure we load an identical one
+        tmp_urdf_fname = osp.join(
+            path_util.get_ndf_descriptions(), "hanging/table/table_rack_tmp.urdf"
+        )
+        open(tmp_urdf_fname, "w").write(grasp_data["table_urdf"].item())
+        table_id = robot.pb_client.load_urdf(
+            tmp_urdf_fname, cfg.TABLE_POS, table_ori, scaling=cfg.TABLE_SCALING
+        )
+        # tend = time.time()
+        # log_info("Time to load table: %.3f" % (tend - tstart))
+        # breakpoint()
+
         # load a test object
         obj_shapenet_id = random.sample(test_object_ids, 1)[0]
         id_str = "Shapenet ID: %s" % obj_shapenet_id
@@ -2711,9 +2730,9 @@ def main(hydra_cfg):
         robot.arm.go_home(ignore_physics=True)
         step_for_time(robot, 5.0)
 
-        robot.pb_client.set_step_sim(False)
-        robot.arm.move_ee_xyz([0, 0, 0.2])
-        robot.pb_client.set_step_sim(True)
+        # robot.pb_client.set_step_sim(False)
+        # robot.arm.move_ee_xyz([0, 0, 0.2])
+        # robot.pb_client.set_step_sim(True)
 
         obj_id = robot.pb_client.load_geom(
             "mesh",
@@ -2976,7 +2995,7 @@ def main(hydra_cfg):
 
         obj_surf_contacts = p.getContactPoints(obj_id, table_id, -1, placement_link_id)
         touching_surf = len(obj_surf_contacts) > 0
-        include_penetration = True
+        include_penetration = hydra_cfg.include_penetration
         if include_penetration:
             print(
                 f"placed around rung: {touching_surf}, goal_has_penetration: {goal_has_penetration}"
@@ -3091,13 +3110,16 @@ def main(hydra_cfg):
                 if grasp_plan is None:
                     cur_jpos = robot.arm.get_jpos()
                     plan1 = ik_helper.plan_joint_motion(
-                        cur_jpos, jnt_pos, max_iterations=100000, max_time=float("inf")
+                        cur_jpos,
+                        jnt_pos,
+                        max_iterations=MAX_MP_ITERATIONS,
+                        max_time=MAX_TIME,
                     )
                     plan2 = ik_helper.plan_joint_motion(
                         jnt_pos,
                         grasp_jnt_pos,
-                        max_iterations=100000,
-                        max_time=float("inf"),
+                        max_iterations=MAX_MP_ITERATIONS,
+                        max_time=MAX_TIME,
                     )
 
                     if plan1 is not None and plan2 is not None:
@@ -3228,7 +3250,10 @@ def main(hydra_cfg):
 
                         if offset_jnts is not None:
                             offset_plan = ik_helper.plan_joint_motion(
-                                robot.arm.get_jpos(), offset_jnts
+                                robot.arm.get_jpos(),
+                                offset_jnts,
+                                max_iterations=MAX_MP_ITERATIONS,
+                                max_time=MAX_TIME,
                             )
 
                             if offset_plan is not None:
@@ -3278,12 +3303,23 @@ def main(hydra_cfg):
                 and pre_place_jnt_pos1 is not None
             ):
                 plan1 = ik_helper.plan_joint_motion(
-                    robot.arm.get_jpos(), pre_place_jnt_pos1
+                    robot.arm.get_jpos(),
+                    pre_place_jnt_pos1,
+                    max_iterations=MAX_MP_ITERATIONS,
+                    max_time=MAX_TIME,
                 )
                 plan2 = ik_helper.plan_joint_motion(
-                    pre_place_jnt_pos1, pre_place_jnt_pos2
+                    pre_place_jnt_pos1,
+                    pre_place_jnt_pos2,
+                    max_iterations=MAX_MP_ITERATIONS,
+                    max_time=MAX_TIME,
                 )
-                plan3 = ik_helper.plan_joint_motion(pre_place_jnt_pos2, place_jnt_pos)
+                plan3 = ik_helper.plan_joint_motion(
+                    pre_place_jnt_pos2,
+                    place_jnt_pos,
+                    max_iterations=MAX_MP_ITERATIONS,
+                    max_time=MAX_TIME,
+                )
 
                 if plan1 is not None and plan2 is not None and plan3 is not None:
                     place_plan = plan1 + plan2
@@ -3329,9 +3365,10 @@ def main(hydra_cfg):
                             enableCollision=False,
                             physicsClientId=robot.pb_client.get_client_id(),
                         )
-                    robot.pb_client.set_step_sim(False)
-                    robot.arm.move_ee_xyz([0, 0.075, 0.075])
-                    robot.pb_client.set_step_sim(True)
+                    # This causes nondeterminism. Since it's not really measured for the paper, we can just comment it out.
+                    # robot.pb_client.set_step_sim(False)
+                    # robot.arm.move_ee_xyz([0, 0.075, 0.075])
+                    # robot.pb_client.set_step_sim(True)
                     safeCollisionFilterPair(
                         obj_id, table_id, -1, -1, enableCollision=False
                     )

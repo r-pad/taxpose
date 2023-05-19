@@ -127,6 +127,7 @@ weight_normalize_grasp: softmax
 softmax_temperature_grasp: 0.1
 residual_on: True
 mlp: False
+include_penetration: False
 
 loop: 1
 init_distribution_tranform_file: Null
