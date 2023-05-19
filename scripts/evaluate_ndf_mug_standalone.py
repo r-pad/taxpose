@@ -2011,6 +2011,12 @@ def main(hydra_cfg):
     else:
         set_log_level("info")
 
+    robot = Robot(
+        "franka",
+        pb_cfg={"gui": hydra_cfg.pybullet_viz, "realtime": False},
+        arm_cfg={"self_collision": False, "seed": hydra_cfg.seed},
+    )
+    ik_helper = FrankaIK(gui=False)
     torch.manual_seed(hydra_cfg.seed)
     random.seed(hydra_cfg.seed)
     np.random.seed(hydra_cfg.seed)
@@ -2057,6 +2063,21 @@ def main(hydra_cfg):
         )
     else:
         test_shapenet_ids = []
+
+    # This seems to do nothing... since reset deletes everything.
+    finger_joint_id = 9
+    left_pad_id = 9
+    right_pad_id = 10
+    p.changeDynamics(robot.arm.robot_id, left_pad_id, lateralFriction=1.0)
+    p.changeDynamics(robot.arm.robot_id, right_pad_id, lateralFriction=1.0)
+
+    x_low, x_high = cfg.OBJ_SAMPLE_X_HIGH_LOW
+    y_low, y_high = cfg.OBJ_SAMPLE_Y_HIGH_LOW
+    table_z = cfg.TABLE_Z
+
+    preplace_horizontal_tf_list = cfg.PREPLACE_HORIZONTAL_OFFSET_TF
+    preplace_horizontal_tf = util.list2pose_stamped(cfg.PREPLACE_HORIZONTAL_OFFSET_TF)
+    preplace_offset_tf = util.list2pose_stamped(cfg.PREPLACE_OFFSET_TF)
 
     if hydra_cfg.dgcnn:
         model = vnn_occupancy_network.VNNOccNet(
@@ -2238,6 +2259,28 @@ def main(hydra_cfg):
         test_object_ids = [demo_shapenet_ids[0]]
 
     # reset
+    robot.arm.reset(force_reset=True)
+    robot.cam.setup_camera(
+        focus_pt=[0.4, 0.0, table_z], dist=0.9, yaw=45, pitch=-25, roll=0
+    )
+
+    cams = MultiCams(cfg.CAMERA, robot.pb_client, n_cams=cfg.N_CAMERAS)
+    cam_info = {}
+    cam_info["pose_world"] = []
+    for cam in cams.cams:
+        cam_info["pose_world"].append(util.pose_from_matrix(cam.cam_ext_mat))
+
+    # put table at right spot
+    table_ori = euler2quat([0, 0, np.pi / 2])
+
+    # this is the URDF that was used in the demos -- make sure we load an identical one
+    tmp_urdf_fname = osp.join(
+        path_util.get_ndf_descriptions(), "hanging/table/table_rack_tmp.urdf"
+    )
+    open(tmp_urdf_fname, "w").write(grasp_data["table_urdf"].item())
+    table_id = robot.pb_client.load_urdf(
+        tmp_urdf_fname, cfg.TABLE_POS, table_ori, scaling=cfg.TABLE_SCALING
+    )
 
     if obj_class == "mug":
         rack_link_id = 0
@@ -2566,64 +2609,10 @@ def main(hydra_cfg):
                 + str(hydra_cfg.checkpoint_file_grasp_refinement)
             )
 
-    robot = Robot(
-        "franka",
-        pb_cfg={"gui": hydra_cfg.pybullet_viz, "realtime": False},
-        arm_cfg={"self_collision": False, "seed": hydra_cfg.seed},
-    )
-    ik_helper = FrankaIK(gui=False)
-
     for iteration in range(hydra_cfg.start_iteration, hydra_cfg.num_iterations):
         torch.manual_seed(hydra_cfg.seed + iteration)
         random.seed(hydra_cfg.seed + iteration)
         np.random.seed(hydra_cfg.seed + iteration)
-
-        # tstart = time.time()
-
-        robot.pb_client.resetSimulation()
-
-        x_low, x_high = cfg.OBJ_SAMPLE_X_HIGH_LOW
-        y_low, y_high = cfg.OBJ_SAMPLE_Y_HIGH_LOW
-        table_z = cfg.TABLE_Z
-
-        preplace_horizontal_tf_list = cfg.PREPLACE_HORIZONTAL_OFFSET_TF
-        preplace_horizontal_tf = util.list2pose_stamped(
-            cfg.PREPLACE_HORIZONTAL_OFFSET_TF
-        )
-        preplace_offset_tf = util.list2pose_stamped(cfg.PREPLACE_OFFSET_TF)
-
-        # This seems to do nothing... since reset deletes everything.
-        finger_joint_id = 9
-        left_pad_id = 9
-        right_pad_id = 10
-        p.changeDynamics(robot.arm.robot_id, left_pad_id, lateralFriction=1.0)
-        p.changeDynamics(robot.arm.robot_id, right_pad_id, lateralFriction=1.0)
-
-        robot.arm.reset(force_reset=True)
-        robot.cam.setup_camera(
-            focus_pt=[0.4, 0.0, table_z], dist=0.9, yaw=45, pitch=-25, roll=0
-        )
-
-        cams = MultiCams(cfg.CAMERA, robot.pb_client, n_cams=cfg.N_CAMERAS)
-        cam_info = {}
-        cam_info["pose_world"] = []
-        for cam in cams.cams:
-            cam_info["pose_world"].append(util.pose_from_matrix(cam.cam_ext_mat))
-
-        # put table at right spot
-        table_ori = euler2quat([0, 0, np.pi / 2])
-
-        # this is the URDF that was used in the demos -- make sure we load an identical one
-        tmp_urdf_fname = osp.join(
-            path_util.get_ndf_descriptions(), "hanging/table/table_rack_tmp.urdf"
-        )
-        open(tmp_urdf_fname, "w").write(grasp_data["table_urdf"].item())
-        table_id = robot.pb_client.load_urdf(
-            tmp_urdf_fname, cfg.TABLE_POS, table_ori, scaling=cfg.TABLE_SCALING
-        )
-        # tend = time.time()
-        # log_info("Time to load table: %.3f" % (tend - tstart))
-        # breakpoint()
 
         # load a test object
         obj_shapenet_id = random.sample(test_object_ids, 1)[0]
