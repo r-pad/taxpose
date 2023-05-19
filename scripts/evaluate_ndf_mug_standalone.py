@@ -1960,6 +1960,7 @@ def step_till_goal(robot, goal, max_duration=2.0):
 
 
 MAX_MP_ITERATIONS = 500
+# MAX_TIME = float('inf')
 MAX_TIME = 5.0
 
 
@@ -2592,14 +2593,14 @@ def main(hydra_cfg):
         )
         preplace_offset_tf = util.list2pose_stamped(cfg.PREPLACE_OFFSET_TF)
 
-        robot.arm.reset(force_reset=True)
-
+        # This seems to do nothing... since reset deletes everything.
         finger_joint_id = 9
         left_pad_id = 9
         right_pad_id = 10
         p.changeDynamics(robot.arm.robot_id, left_pad_id, lateralFriction=1.0)
         p.changeDynamics(robot.arm.robot_id, right_pad_id, lateralFriction=1.0)
 
+        robot.arm.reset(force_reset=True)
         robot.cam.setup_camera(
             focus_pt=[0.4, 0.0, table_z], dist=0.9, yaw=45, pitch=-25, roll=0
         )
@@ -2730,9 +2731,9 @@ def main(hydra_cfg):
         robot.arm.go_home(ignore_physics=True)
         step_for_time(robot, 5.0)
 
-        # robot.pb_client.set_step_sim(False)
-        # robot.arm.move_ee_xyz([0, 0, 0.2])
-        # robot.pb_client.set_step_sim(True)
+        robot.pb_client.set_step_sim(False)
+        robot.arm.move_ee_xyz([0, 0, 0.2])
+        robot.pb_client.set_step_sim(True)
 
         obj_id = robot.pb_client.load_geom(
             "mesh",
@@ -3112,13 +3113,13 @@ def main(hydra_cfg):
                     plan1 = ik_helper.plan_joint_motion(
                         cur_jpos,
                         jnt_pos,
-                        max_iterations=MAX_MP_ITERATIONS,
+                        # max_iterations=MAX_MP_ITERATIONS,
                         max_time=MAX_TIME,
                     )
                     plan2 = ik_helper.plan_joint_motion(
                         jnt_pos,
                         grasp_jnt_pos,
-                        max_iterations=MAX_MP_ITERATIONS,
+                        # max_iterations=MAX_MP_ITERATIONS,
                         max_time=MAX_TIME,
                     )
 
@@ -3252,7 +3253,7 @@ def main(hydra_cfg):
                             offset_plan = ik_helper.plan_joint_motion(
                                 robot.arm.get_jpos(),
                                 offset_jnts,
-                                max_iterations=MAX_MP_ITERATIONS,
+                                # max_iterations=MAX_MP_ITERATIONS,
                                 max_time=MAX_TIME,
                             )
 
@@ -3305,19 +3306,19 @@ def main(hydra_cfg):
                 plan1 = ik_helper.plan_joint_motion(
                     robot.arm.get_jpos(),
                     pre_place_jnt_pos1,
-                    max_iterations=MAX_MP_ITERATIONS,
+                    # max_iterations=MAX_MP_ITERATIONS,
                     max_time=MAX_TIME,
                 )
                 plan2 = ik_helper.plan_joint_motion(
                     pre_place_jnt_pos1,
                     pre_place_jnt_pos2,
-                    max_iterations=MAX_MP_ITERATIONS,
+                    # max_iterations=MAX_MP_ITERATIONS,
                     max_time=MAX_TIME,
                 )
                 plan3 = ik_helper.plan_joint_motion(
                     pre_place_jnt_pos2,
                     place_jnt_pos,
-                    max_iterations=MAX_MP_ITERATIONS,
+                    # max_iterations=MAX_MP_ITERATIONS,
                     max_time=MAX_TIME,
                 )
 
@@ -3366,9 +3367,9 @@ def main(hydra_cfg):
                             physicsClientId=robot.pb_client.get_client_id(),
                         )
                     # This causes nondeterminism. Since it's not really measured for the paper, we can just comment it out.
-                    # robot.pb_client.set_step_sim(False)
-                    # robot.arm.move_ee_xyz([0, 0.075, 0.075])
-                    # robot.pb_client.set_step_sim(True)
+                    robot.pb_client.set_step_sim(False)
+                    robot.arm.move_ee_xyz([0, 0.075, 0.075])
+                    robot.pb_client.set_step_sim(True)
                     safeCollisionFilterPair(
                         obj_id, table_id, -1, -1, enableCollision=False
                     )
