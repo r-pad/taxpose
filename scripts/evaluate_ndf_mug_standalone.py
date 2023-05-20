@@ -3,7 +3,6 @@ import os
 import os.path as osp
 import random
 import signal
-import time
 
 import hydra
 import ndf_robot.model.vnn_occupancy_net_pointnet_dgcnn as vnn_occupancy_network
@@ -16,6 +15,7 @@ import torch.nn.functional as F
 import wandb
 from airobot import Robot, log_info, log_warn, set_log_level
 from airobot.utils import common
+from airobot.utils.arm_util import reach_jnt_goal
 from airobot.utils.common import euler2quat
 from ndf_robot.config.default_eval_cfg import get_eval_cfg_defaults
 from ndf_robot.config.default_obj_cfg import get_obj_cfg_defaults
@@ -1885,7 +1885,10 @@ def load_data(num_points, clouds, classes, action_class, anchor_class):
     points_action = torch.from_numpy(points_action_np).float().unsqueeze(0)
     points_anchor = torch.from_numpy(points_anchor_np).float().unsqueeze(0)
 
+    # rng_state = torch.get_rng_state()
+    # torch.manual_seed(123456)
     points_action, points_anchor = subsample(num_points, points_action, points_anchor)
+    # torch.set_rng_state(rng_state)
 
     return points_action.cuda(), points_anchor.cuda()
 
@@ -1901,7 +1904,10 @@ def load_data_raw(num_points, clouds, classes, action_class, anchor_class):
     points_action = torch.from_numpy(points_action_np).float().unsqueeze(0)
     points_anchor = torch.from_numpy(points_anchor_np).float().unsqueeze(0)
 
+    # rng_state = torch.get_rng_state()
+    # torch.manual_seed(123456)
     points_action, points_anchor = subsample(num_points, points_action, points_anchor)
+    # torch.set_rng_state(rng_state)
     if points_action is None:
         return None, None
 
@@ -1934,6 +1940,27 @@ def subsample(num_points, points_action, points_anchor):
         #     f'Anchor point cloud is smaller than cloud size ({points_anchor.shape[1]} < {num_points})')
 
     return points_action, points_anchor
+
+
+def step_for_time(robot, duration, frequency=240):
+    for _ in range(int(duration * frequency)):
+        robot.pb_client.stepSimulation()
+
+
+def step_till_goal(robot, goal, max_duration=2.0):
+    i = 0
+
+    while not reach_jnt_goal(
+        goal,
+        robot.arm.get_jpos,
+        joint_name=None,
+        max_error=robot.arm.cfgs.ARM.MAX_JOINT_ERROR,
+    ) and i < int(0.025 * 240):
+        i += 1
+        robot.pb_client.stepSimulation()
+
+
+MAX_TIME = 5.0
 
 
 @hydra.main(
@@ -1986,7 +2013,7 @@ def main(hydra_cfg):
 
     robot = Robot(
         "franka",
-        pb_cfg={"gui": hydra_cfg.pybullet_viz},
+        pb_cfg={"gui": hydra_cfg.pybullet_viz, "realtime": False},
         arm_cfg={"self_collision": False, "seed": hydra_cfg.seed},
     )
     ik_helper = FrankaIK(gui=False)
@@ -2037,6 +2064,7 @@ def main(hydra_cfg):
     else:
         test_shapenet_ids = []
 
+    # This seems to do nothing... since reset deletes everything.
     finger_joint_id = 9
     left_pad_id = 9
     right_pad_id = 10
@@ -2582,6 +2610,10 @@ def main(hydra_cfg):
             )
 
     for iteration in range(hydra_cfg.start_iteration, hydra_cfg.num_iterations):
+        torch.manual_seed(hydra_cfg.seed + iteration)
+        random.seed(hydra_cfg.seed + iteration)
+        np.random.seed(hydra_cfg.seed + iteration)
+
         # load a test object
         obj_shapenet_id = random.sample(test_object_ids, 1)[0]
         id_str = "Shapenet ID: %s" % obj_shapenet_id
@@ -2685,12 +2717,11 @@ def main(hydra_cfg):
             )
 
         robot.arm.go_home(ignore_physics=True)
-        robot.arm.move_ee_xyz([0, 0, 0.2])
+        step_for_time(robot, 5.0)
 
-        if hydra_cfg.any_pose:
-            robot.pb_client.set_step_sim(True)
-        if obj_class in ["bowl"]:
-            robot.pb_client.set_step_sim(True)
+        robot.pb_client.set_step_sim(False)
+        robot.arm.move_ee_xyz([0, 0, 0.2])
+        robot.pb_client.set_step_sim(True)
 
         obj_id = robot.pb_client.load_geom(
             "mesh",
@@ -2718,15 +2749,17 @@ def main(hydra_cfg):
                 linkIndexB=shelf_link_id,
                 enableCollision=False,
             )
-            robot.pb_client.set_step_sim(False)
+            # robot.pb_client.set_step_sim(False)
 
         o_cid = None
         if hydra_cfg.any_pose:
             o_cid = constraint_obj_world(obj_id, pos, ori)
-            robot.pb_client.set_step_sim(False)
+            # robot.pb_client.set_step_sim(False)
         safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
         p.changeDynamics(obj_id, -1, linearDamping=5, angularDamping=5)
-        time.sleep(1.5)
+
+        # time.sleep(1.5)
+        step_for_time(robot, 1.5)
 
         hide_link(table_id, rack_link_id)
 
@@ -2740,7 +2773,9 @@ def main(hydra_cfg):
             rack_color = p.getVisualShapeData(table_id)[rack_link_id][7]
             show_link(table_id, rack_link_id, rack_color)
 
-        time.sleep(1.5)
+        # time.sleep(1.5)
+        step_for_time(robot, 1.5)
+
         teleport_rgb = robot.cam.get_images(get_rgb=True)[0]
         teleport_img_fname = osp.join(eval_teleport_imgs_dir, "%d_init.png" % iteration)
         np2img(teleport_rgb.astype(np.uint8), teleport_img_fname)
@@ -2875,7 +2910,7 @@ def main(hydra_cfg):
         safeCollisionFilterPair(
             obj_id, table_id, -1, placement_link_id, enableCollision=False
         )
-        robot.pb_client.set_step_sim(True)
+        # robot.pb_client.set_step_sim(True)
         safeRemoveConstraint(o_cid)
         robot.pb_client.reset_body(obj_id, obj_end_pose_list[:3], obj_end_pose_list[3:])
 
@@ -2898,7 +2933,6 @@ def main(hydra_cfg):
             shapenet_id=obj_shapenet_id,
         )
 
-        time.sleep(1.0)
         teleport_rgb = robot.cam.get_images(get_rgb=True)[0]
         teleport_img_fname = osp.join(
             eval_teleport_imgs_dir, "teleport_%d.png" % iteration
@@ -2907,8 +2941,19 @@ def main(hydra_cfg):
         safeCollisionFilterPair(
             obj_id, table_id, -1, placement_link_id, enableCollision=True
         )
-        robot.pb_client.set_step_sim(False)
-        time.sleep(1.0)
+
+        # Detect penetration.
+        def detect_penetration():
+            p.performCollisionDetection()
+            contacts = p.getContactPoints(obj_id, table_id)
+            has_penetration = any([c[8] < -0.001 for c in contacts])
+            return has_penetration
+
+        goal_has_penetration = detect_penetration()
+
+        # robot.pb_client.set_step_sim(False)
+        # time.sleep(1.0)
+        step_for_time(robot, 1.0)
 
         cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
         obj_points, obj_colors, obj_classes = get_object_clouds(cams)
@@ -2929,7 +2974,9 @@ def main(hydra_cfg):
             shapenet_id=obj_shapenet_id,
         )
 
-        time.sleep(1.0)
+        # time.sleep(1.0)
+        step_for_time(robot, 1.0)
+
         teleport_rgb = robot.cam.get_images(get_rgb=True)[0]
         teleport_img_fname = osp.join(
             eval_teleport_imgs_dir, "post_teleport_%d.png" % iteration
@@ -2938,12 +2985,21 @@ def main(hydra_cfg):
 
         obj_surf_contacts = p.getContactPoints(obj_id, table_id, -1, placement_link_id)
         touching_surf = len(obj_surf_contacts) > 0
-        place_success_teleport = touching_surf
+        include_penetration = hydra_cfg.include_penetration
+        if include_penetration:
+            print(
+                f"placed around rung: {touching_surf}, goal_has_penetration: {goal_has_penetration}"
+            )
+            place_success_teleport = touching_surf and not goal_has_penetration
+        else:
+            place_success_teleport = touching_surf
         place_success_teleport_list.append(place_success_teleport)
         if not place_success_teleport:
             place_fail_teleport_list.append(iteration)
 
-        time.sleep(1.0)
+        # time.sleep(1.0)
+        step_for_time(robot, 1.0)
+
         safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
         robot.pb_client.reset_body(obj_id, pos, ori)
 
@@ -2952,19 +3008,22 @@ def main(hydra_cfg):
         place_success = grasp_success = False
         for g_idx in range(2):
             # reset everything
-            robot.pb_client.set_step_sim(False)
+            # robot.pb_client.set_step_sim(False)
             safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
-            if hydra_cfg.any_pose:
-                robot.pb_client.set_step_sim(True)
+            # if hydra_cfg.any_pose:
+            #   robot.pb_client.set_step_sim(True)
             safeRemoveConstraint(o_cid)
             p.resetBasePositionAndOrientation(obj_id, pos, ori)
-            print(p.getBasePositionAndOrientation(obj_id))
-            time.sleep(0.5)
+
+            # time.sleep(0.5)
+            step_for_time(robot, 0.5)
 
             if hydra_cfg.any_pose:
                 o_cid = constraint_obj_world(obj_id, pos, ori)
-                robot.pb_client.set_step_sim(False)
+                # robot.pb_client.set_step_sim(False)
+
             robot.arm.go_home(ignore_physics=True)
+            step_for_time(robot, 5.0)
 
             # turn OFF collisions between robot and object / table, and move to pre-grasp pose
             for i in range(p.getNumJoints(robot.arm.robot_id)):
@@ -2985,6 +3044,7 @@ def main(hydra_cfg):
                     physicsClientId=robot.pb_client.get_client_id(),
                 )
             robot.arm.eetool.open()
+            step_for_time(robot, 2.0)
 
             if jnt_pos is None or grasp_jnt_pos is None:
                 jnt_pos = ik_helper.get_feasible_ik(pre_pre_grasp_ee_pose)
@@ -3005,10 +3065,16 @@ def main(hydra_cfg):
 
             if grasp_jnt_pos is not None and jnt_pos is not None:
                 if g_idx == 0:
-                    robot.pb_client.set_step_sim(True)
+                    # robot.pb_client.set_step_sim(True)
                     robot.arm.set_jpos(grasp_jnt_pos, ignore_physics=True)
+                    step_till_goal(robot, grasp_jnt_pos, 2.0)
+
                     robot.arm.eetool.close(ignore_physics=True)
-                    time.sleep(0.2)
+                    step_for_time(robot, 2.0)
+
+                    # time.sleep(0.2)
+                    step_for_time(robot, 0.2)
+
                     grasp_rgb = robot.cam.get_images(get_rgb=True)[0]
                     grasp_img_fname = osp.join(
                         eval_grasp_imgs_dir, "pre_grasp_%d.png" % iteration
@@ -3037,21 +3103,33 @@ def main(hydra_cfg):
 
                 ########################### planning to pre_pre_grasp and pre_grasp ##########################
                 if grasp_plan is None:
-                    plan1 = ik_helper.plan_joint_motion(robot.arm.get_jpos(), jnt_pos)
-                    plan2 = ik_helper.plan_joint_motion(jnt_pos, grasp_jnt_pos)
+                    cur_jpos = robot.arm.get_jpos()
+                    plan1 = ik_helper.plan_joint_motion(
+                        cur_jpos, jnt_pos, max_time=MAX_TIME
+                    )
+                    plan2 = ik_helper.plan_joint_motion(
+                        jnt_pos, grasp_jnt_pos, max_time=MAX_TIME
+                    )
 
                     if plan1 is not None and plan2 is not None:
                         grasp_plan = plan1 + plan2
 
                         robot.arm.eetool.open()
+                        step_for_time(robot, 0.2)
+
                         for jnt in plan1:
                             robot.arm.set_jpos(jnt, wait=False)
-                            time.sleep(0.025)
+                            step_for_time(robot, 0.025)
+
                         robot.arm.set_jpos(plan1[-1], wait=True)
+                        step_till_goal(robot, plan1[-1], 1)
+
                         for jnt in plan2:
                             robot.arm.set_jpos(jnt, wait=False)
-                            time.sleep(0.04)
+                            step_for_time(robot, 0.04)
+
                         robot.arm.set_jpos(grasp_plan[-1], wait=True)
+                        step_till_goal(robot, grasp_plan[-1], 1)
 
                         # get pose that's straight up
                         offset_pose = util.transform_pose(
@@ -3084,18 +3162,26 @@ def main(hydra_cfg):
                                 physicsClientId=robot.pb_client.get_client_id(),
                             )
 
-                        time.sleep(0.8)
+                        # time.sleep(0.8)
+                        step_for_time(robot, 0.8)
+
                         obj_pos_before_grasp = p.getBasePositionAndOrientation(obj_id)[
                             0
                         ]
                         jnt_pos_before_grasp = robot.arm.get_jpos()
                         soft_grasp_close(robot, finger_joint_id, force=50)
+                        step_for_time(robot, 0.2)
+
                         safeRemoveConstraint(o_cid)
-                        time.sleep(0.8)
+                        # time.sleep(0.8)
+                        step_for_time(robot, 0.8)
+
                         safeCollisionFilterPair(
                             obj_id, table_id, -1, -1, enableCollision=False
                         )
-                        time.sleep(0.8)
+                        # time.sleep(0.8)
+                        step_for_time(robot, 0.8)
+
                         grasp_rgb = robot.cam.get_images(get_rgb=True)[0]
                         grasp_img_fname = osp.join(
                             eval_grasp_imgs_dir, "post_grasp_%d.png" % iteration
@@ -3131,14 +3217,22 @@ def main(hydra_cfg):
                                     obj_id, table_id, -1, -1, enableCollision=True
                                 )
                                 robot.arm.eetool.open()
+                                step_for_time(robot, 2)
+
                                 p.resetBasePositionAndOrientation(
                                     obj_id, obj_pos_before_grasp, ori
                                 )
+
                                 soft_grasp_close(robot, finger_joint_id, force=40)
+                                step_for_time(robot, 2.0)
+
                                 robot.arm.set_jpos(
                                     jnt_pos_before_grasp, ignore_physics=True
                                 )
+                                step_till_goal(robot, jnt_pos_before_grasp, 5.0)
+
                                 cid = constraint_grasp_close(robot, obj_id)
+                                step_for_time(robot, 1)
                                 # grasp_rgb = robot.cam.get_images(get_rgb=True)[
                                 #     0]
                                 # grasp_img_fname = osp.join(
@@ -3149,14 +3243,17 @@ def main(hydra_cfg):
 
                         if offset_jnts is not None:
                             offset_plan = ik_helper.plan_joint_motion(
-                                robot.arm.get_jpos(), offset_jnts
+                                robot.arm.get_jpos(), offset_jnts, max_time=MAX_TIME
                             )
 
                             if offset_plan is not None:
                                 for jnt in offset_plan:
                                     robot.arm.set_jpos(jnt, wait=False)
-                                    time.sleep(0.04)
+                                    # time.sleep(0.04)
+                                    step_for_time(robot, 0.04)
+
                                 robot.arm.set_jpos(offset_plan[-1], wait=True)
+                                step_till_goal(robot, offset_plan[-1], 5.0)
 
                         # turn OFF collisions between object / table and object / rack, and move to pre-place pose
                         safeCollisionFilterPair(
@@ -3165,7 +3262,8 @@ def main(hydra_cfg):
                         safeCollisionFilterPair(
                             obj_id, table_id, -1, rack_link_id, enableCollision=False
                         )
-                        time.sleep(1.0)
+                        # time.sleep(1.0)
+                        step_for_time(robot, 1.0)
 
         if grasp_success:
             # optimize placement pose
@@ -3196,20 +3294,25 @@ def main(hydra_cfg):
                 and pre_place_jnt_pos1 is not None
             ):
                 plan1 = ik_helper.plan_joint_motion(
-                    robot.arm.get_jpos(), pre_place_jnt_pos1
+                    robot.arm.get_jpos(), pre_place_jnt_pos1, max_time=MAX_TIME
                 )
                 plan2 = ik_helper.plan_joint_motion(
-                    pre_place_jnt_pos1, pre_place_jnt_pos2
+                    pre_place_jnt_pos1, pre_place_jnt_pos2, max_time=MAX_TIME
                 )
-                plan3 = ik_helper.plan_joint_motion(pre_place_jnt_pos2, place_jnt_pos)
+                plan3 = ik_helper.plan_joint_motion(
+                    pre_place_jnt_pos2, place_jnt_pos, max_time=MAX_TIME
+                )
 
                 if plan1 is not None and plan2 is not None and plan3 is not None:
                     place_plan = plan1 + plan2
 
                     for jnt in place_plan:
                         robot.arm.set_jpos(jnt, wait=False)
-                        time.sleep(0.035)
+                        # time.sleep(0.035)
+                        step_for_time(robot, 0.035)
+
                     robot.arm.set_jpos(place_plan[-1], wait=True)
+                    step_till_goal(robot, place_plan[-1], 5)
 
                     ################################################################################################################
 
@@ -3223,14 +3326,21 @@ def main(hydra_cfg):
 
                     for jnt in plan3:
                         robot.arm.set_jpos(jnt, wait=False)
-                        time.sleep(0.075)
+                        # time.sleep(0.075)
+                        step_for_time(robot, 0.075)
+
                     robot.arm.set_jpos(plan3[-1], wait=True)
+                    step_till_goal(robot, plan3[-1], 5)
 
                     p.changeDynamics(obj_id, -1, linearDamping=5, angularDamping=5)
                     constraint_grasp_open(cid)
-                    robot.arm.eetool.open()
+                    step_for_time(robot, 0.01)
 
-                    time.sleep(0.2)
+                    robot.arm.eetool.open()
+                    step_for_time(robot, 1)
+
+                    # time.sleep(0.2)
+                    step_for_time(robot, 0.2)
                     for i in range(p.getNumJoints(robot.arm.robot_id)):
                         safeCollisionFilterPair(
                             bodyUniqueIdA=robot.arm.robot_id,
@@ -3240,11 +3350,15 @@ def main(hydra_cfg):
                             enableCollision=False,
                             physicsClientId=robot.pb_client.get_client_id(),
                         )
+                    # This causes nondeterminism. Since it's not really measured for the paper, we can just comment it out.
+                    robot.pb_client.set_step_sim(False)
                     robot.arm.move_ee_xyz([0, 0.075, 0.075])
+                    robot.pb_client.set_step_sim(True)
                     safeCollisionFilterPair(
                         obj_id, table_id, -1, -1, enableCollision=False
                     )
-                    time.sleep(4.0)
+                    # time.sleep(4.0)
+                    step_for_time(robot, 4.0)
 
                     # observe and record outcome
                     obj_surf_contacts = p.getContactPoints(
@@ -3258,6 +3372,7 @@ def main(hydra_cfg):
                     place_success = touching_surf and not touching_floor
 
         robot.arm.go_home(ignore_physics=True)
+        step_for_time(robot, 5.0)
 
         place_success_list.append(place_success)
         grasp_success_list.append(grasp_success)

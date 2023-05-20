@@ -21,6 +21,16 @@ Questions? Open an Issue, or send an email to:
 ben [dot] a [dot] eisner [at] gmail [dot] com
 
 
+# Reproduciblilty
+
+Some of the eval scripts are not bit-for-bit reproducible even with random seeds. Some of the motion planning in the NDF repository depends on time elapsed, instead of number of steps. So predictions seem to be quite reproducible, but the exact motion planning trajectories are not (meaning that teleport scores are deterministic, but not the executed ones).
+
+Some things we could try to fully make it reproducible:
+* Make each trial fully independent (i.e. setup and teardown fully inside the loop).
+* Fork the motion planning stack to incorporate a step-based time counter instead of a real-time counter.
+* Recompile the IK with a random seed (this may not be necessary).
+* Implement `move_ee_xyz` without using the realtime mode in `airobot`. This would involve doing the same kind of following that we do when setting joint positons.
+
 
 # Installation.
 
