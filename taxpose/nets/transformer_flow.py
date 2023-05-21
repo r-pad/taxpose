@@ -268,15 +268,13 @@ class ResidualMLPHead(nn.Module):
             corr_flow_weight = torch.concat([flow, weight], dim=1)
         else:
             corr_flow_weight = flow
-        if return_flow_component:
-            return {
-                "full_flow": corr_flow_weight,
-                "residual_flow": residual_flow,
-                "corr_flow": corr_flow,
-                "corr_points": corr_points,
-                "scores": scores,
-            }
-        return corr_flow_weight
+        return {
+            "full_flow": corr_flow_weight,
+            "residual_flow": residual_flow,
+            "corr_flow": corr_flow,
+            "corr_points": corr_points,
+            "scores": scores,
+        }
 
 
 class MLPKernel(nn.Module):
@@ -433,15 +431,14 @@ class MultilaterationHead(nn.Module):
             corr_flow_weight = torch.concat([flow, weight], dim=1)
         else:
             corr_flow_weight = flow
-        if return_flow_component:
-            return {
-                "full_flow": corr_flow_weight,
-                "residual_flow": torch.zeros_like(flow).to(flow.device),
-                "corr_flow": flow,
-                "corr_points": corr_points,
-                "scores": scores,
-            }
-        return corr_flow_weight
+
+        return {
+            "full_flow": corr_flow_weight,
+            "residual_flow": torch.zeros_like(flow).to(flow.device),
+            "corr_flow": flow,
+            "corr_points": corr_points,
+            "scores": scores,
+        }
 
 
 class ResidualFlow_DiffEmbTransformer(nn.Module):
@@ -466,7 +463,6 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims)
         else:
             raise Exception("Not implemented")
-        self.return_flow_component = return_flow_component
         self.center_feature = center_feature
         self.pred_weight = pred_weight
         self.residual_on = residual_on
@@ -504,32 +500,33 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
 
         action_points_dmean = action_points - action_points.mean(dim=2, keepdim=True)
         anchor_points_dmean = anchor_points - anchor_points.mean(dim=2, keepdim=True)
+
         # mean center point cloud before DGCNN
         if not self.center_feature:
             action_points_dmean = action_points
             anchor_points_dmean = anchor_points
+
+        action_embedding = self.emb_nn_action(action_points_dmean)
+        anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
+
         if self.freeze_embnn:
-            action_embedding = self.emb_nn_action(action_points_dmean).detach()
-            anchor_embedding = self.emb_nn_anchor(anchor_points_dmean).detach()
-        else:
-            action_embedding = self.emb_nn_action(action_points_dmean)
-            anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
+            action_embedding = action_embedding.detach()
+            anchor_embedding = anchor_embedding.detach()
 
         # tilde_phi, phi are both B,512,N
-        if self.return_attn:
-            action_embedding_tf, action_attn = self.transformer_action(
-                action_embedding, anchor_embedding
-            )
-            anchor_embedding_tf, anchor_attn = self.transformer_anchor(
-                anchor_embedding, action_embedding
-            )
-        else:
-            action_embedding_tf = self.transformer_action(
-                action_embedding, anchor_embedding
-            )
-            anchor_embedding_tf = self.transformer_anchor(
-                anchor_embedding, action_embedding
-            )
+        # Get the new cross-attention embeddings.
+        transformer_action_outputs = self.transformer_action(
+            action_embedding, anchor_embedding
+        )
+        transformer_anchor_outputs = self.transformer_anchor(
+            anchor_embedding, action_embedding
+        )
+        action_embedding_tf = transformer_action_outputs["src_embedding"]
+        action_attn = transformer_action_outputs["src_attn"]
+        anchor_embedding_tf = transformer_anchor_outputs["src_embedding"]
+        anchor_attn = transformer_anchor_outputs["src_attn"]
+
+        if not self.return_attn:
             action_attn = None
             anchor_attn = None
 
@@ -539,69 +536,40 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         if action_attn is not None:
             action_attn = action_attn.mean(dim=1)
 
-        if self.return_flow_component:
-            flow_output_action = self.head_action(
-                action_embedding_tf,
-                anchor_embedding_tf,
-                action_points,
-                anchor_points,
-                scores=action_attn,
-                return_flow_component=self.return_flow_component,
-            )
-            flow_action = flow_output_action["full_flow"].permute(0, 2, 1)
-            residual_flow_action = flow_output_action["residual_flow"].permute(0, 2, 1)
-            corr_flow_action = flow_output_action["corr_flow"].permute(0, 2, 1)
-        else:
-            flow_action = self.head_action(
-                action_embedding_tf,
-                anchor_embedding_tf,
-                action_points,
-                anchor_points,
-                scores=action_attn,
-                return_flow_component=self.return_flow_component,
-            ).permute(0, 2, 1)
+        head_action_output = self.head_action(
+            action_embedding_tf,
+            anchor_embedding_tf,
+            action_points,
+            anchor_points,
+            scores=action_attn,
+        )
+        flow_action = head_action_output["full_flow"].permute(0, 2, 1)
+        residual_flow_action = head_action_output["residual_flow"].permute(0, 2, 1)
+        corr_flow_action = head_action_output["corr_flow"].permute(0, 2, 1)
+
+        outputs = {
+            "flow_action": flow_action,
+            "residual_flow_action": residual_flow_action,
+            "corr_flow_action": corr_flow_action,
+        }
 
         if self.cycle:
             anchor_attn = anchor_attn.mean(dim=1)
-            if self.return_flow_component:
-                flow_output_anchor = self.head_anchor(
-                    anchor_embedding_tf,
-                    action_embedding_tf,
-                    anchor_points,
-                    action_points,
-                    scores=anchor_attn,
-                    return_flow_component=self.return_flow_component,
-                )
-                flow_anchor = flow_output_anchor["full_flow"].permute(0, 2, 1)
-                residual_flow_anchor = flow_output_anchor["residual_flow"].permute(
-                    0, 2, 1
-                )
-                corr_flow_anchor = flow_output_anchor["corr_flow"].permute(0, 2, 1)
-            else:
-                flow_anchor = self.head_anchor(
-                    anchor_embedding_tf,
-                    action_embedding_tf,
-                    anchor_points,
-                    action_points,
-                    scores=anchor_attn,
-                    return_flow_component=self.return_flow_component,
-                ).permute(0, 2, 1)
-            if self.return_flow_component:
-                return {
-                    "flow_action": flow_action,
-                    "flow_anchor": flow_anchor,
-                    "residual_flow_action": residual_flow_action,
-                    "residual_flow_anchor": residual_flow_anchor,
-                    "corr_flow_action": corr_flow_action,
-                    "corr_flow_anchor": corr_flow_anchor,
-                }
-            else:
-                return flow_action, flow_anchor
-        if self.return_flow_component:
-            return {
-                "flow_action": flow_action,
-                "residual_flow_action": residual_flow_action,
-                "corr_flow_action": corr_flow_action,
+            head_anchor_output = self.head_anchor(
+                anchor_embedding_tf,
+                action_embedding_tf,
+                anchor_points,
+                action_points,
+                scores=anchor_attn,
+            )
+            flow_anchor = head_anchor_output["full_flow"].permute(0, 2, 1)
+            residual_flow_anchor = head_anchor_output["residual_flow"].permute(0, 2, 1)
+            corr_flow_anchor = head_anchor_output["corr_flow"].permute(0, 2, 1)
+
+            outputs = {
+                **outputs,
+                "flow_anchor": flow_anchor,
+                "residual_flow_anchor": residual_flow_anchor,
+                "corr_flow_anchor": corr_flow_anchor,
             }
-        else:
-            return flow_action
+        return outputs

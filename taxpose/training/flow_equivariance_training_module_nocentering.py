@@ -345,16 +345,14 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
 
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
-        if self.return_flow_component:
-            model_output = self.model(points_trans_action, points_trans_anchor)
-            x_action = model_output["flow_action"]
-            x_anchor = model_output["flow_anchor"]
-            residual_flow_action = model_output["residual_flow_action"]
-            residual_flow_anchor = model_output["residual_flow_anchor"]
-            corr_flow_action = model_output["corr_flow_action"]
-            corr_flow_anchor = model_output["corr_flow_anchor"]
-        else:
-            x_action, x_anchor = self.model(points_trans_action, points_trans_anchor)
+
+        model_output = self.model(points_trans_action, points_trans_anchor)
+        x_action = model_output["flow_action"]
+        x_anchor = model_output["flow_anchor"]
+        residual_flow_action = model_output["residual_flow_action"]
+        residual_flow_anchor = model_output["residual_flow_anchor"]
+        corr_flow_action = model_output["corr_flow_action"]
+        corr_flow_anchor = model_output["corr_flow_anchor"]
 
         log_values = {}
         loss, log_values = self.compute_loss(
@@ -374,16 +372,13 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
 
-        if self.return_flow_component:
-            model_output = self.model(points_trans_action, points_trans_anchor)
-            x_action = model_output["flow_action"]
-            x_anchor = model_output["flow_anchor"]
-            residual_flow_action = model_output["residual_flow_action"]
-            residual_flow_anchor = model_output["residual_flow_anchor"]
-            corr_flow_action = model_output["corr_flow_action"]
-            corr_flow_anchor = model_output["corr_flow_anchor"]
-        else:
-            x_action, x_anchor = self.model(points_trans_action, points_trans_anchor)
+        model_output = self.model(points_trans_action, points_trans_anchor)
+        x_action = model_output["flow_action"]
+        x_anchor = model_output["flow_anchor"]
+        residual_flow_action = model_output["residual_flow_action"]
+        residual_flow_anchor = model_output["residual_flow_anchor"]
+        corr_flow_action = model_output["corr_flow_action"]
+        corr_flow_anchor = model_output["corr_flow_anchor"]
 
         points_action = points_action[:, :, :3]
         points_anchor = points_anchor[:, :, :3]
