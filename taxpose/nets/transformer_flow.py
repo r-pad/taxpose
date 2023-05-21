@@ -316,7 +316,14 @@ class DotProductKernel(nn.Module):
 
 
 class MultilaterationHead(nn.Module):
-    def __init__(self, emb_dims=512, n_kps=100, pred_weight=True, last_attn=False):
+    def __init__(
+        self,
+        emb_dims=512,
+        n_kps=100,
+        pred_weight=True,
+        last_attn=False,
+        sample: bool = False,
+    ):
         super().__init__()
 
         self.emb_dims = emb_dims
@@ -325,6 +332,7 @@ class MultilaterationHead(nn.Module):
 
         self.kernel = MLPKernel(self.emb_dims - int(last_attn))
         # self.kernel = NormKernel(self.emb_dims)
+        self.sample = sample
 
         self.pred_weight = pred_weight
         if self.pred_weight:
@@ -352,16 +360,7 @@ class MultilaterationHead(nn.Module):
         action_points = input[2]
         anchor_points = input[3]
 
-        # Compute the radius matrix.
-        choice_v = functorch.vmap(
-            lambda x, n: torch.randperm(x.shape[-1])[:n],
-            in_dims=(0, None),
-            randomness="different",
-        )
-        # TODO: decide if we need to deal with weighting here? Could sample...
-        A_ixs = choice_v(action_points, self.n_kps).to(action_points.device)
-        B_ixs = choice_v(anchor_points, self.n_kps).to(anchor_points.device)
-        P_A = anchor_points.permute(0, 2, 1)
+        P_A = action_points.permute(0, 2, 1)
         P_B = anchor_points.permute(0, 2, 1)
 
         Phi_A = action_embedding.permute(0, 2, 1)
@@ -381,10 +380,26 @@ class MultilaterationHead(nn.Module):
             A_weights = torch.ones(Phi_A.shape[:2], device=Phi_A.device)
             B_weights = torch.ones(Phi_B.shape[:2], device=Phi_B.device)
 
-        # P_A = torch.take_along_dim(P_A, A_ixs.unsqueeze(-1), dim=1)
-        # Phi_A = torch.take_along_dim(Phi_A, A_ixs.unsqueeze(-1), dim=1)
-        # P_B = torch.take_along_dim(P_B, B_ixs.unsqueeze(-1), dim=1)
-        # Phi_B = torch.take_along_dim(Phi_B, B_ixs.unsqueeze(-1), dim=1)
+        # We probably want to sample
+        if self.sample:
+            # This function samples without replacement, in a batch.
+            choice_v = functorch.vmap(
+                lambda x, n: torch.randperm(x.shape[-1])[:n],
+                in_dims=(0, None),
+                randomness="different",
+            )
+            A_ixs = choice_v(action_points, self.n_kps).to(action_points.device)
+            B_ixs = choice_v(anchor_points, self.n_kps).to(anchor_points.device)
+            P_A = torch.take_along_dim(P_A, A_ixs.unsqueeze(-1), dim=1)
+            Phi_A = torch.take_along_dim(Phi_A, A_ixs.unsqueeze(-1), dim=1)
+            P_B = torch.take_along_dim(P_B, B_ixs.unsqueeze(-1), dim=1)
+            Phi_B = torch.take_along_dim(Phi_B, B_ixs.unsqueeze(-1), dim=1)
+            A_weights = torch.take_along_dim(A_weights, A_ixs, dim=1)
+            B_weights = torch.take_along_dim(B_weights, B_ixs, dim=1)
+        else:
+            bs = P_A.shape[0]
+            A_ixs = torch.arange(P_A.shape[1], device=P_A.device).repeat(bs, 1)
+            B_ixs = torch.arange(P_B.shape[1], device=P_B.device).repeat(bs, 1)
 
         # compute_R = functorch.vmap(
         #     functorch.vmap(
@@ -416,18 +431,19 @@ class MultilaterationHead(nn.Module):
         # mlat_weights = torch.ones_like(scores, device=scores.device)
         v_est_p = functorch.vmap(functorch.vmap(estimate_p, in_dims=(None, 0, None)))
         P_A_B_pred = v_est_p(P_B[..., None], R_est, B_weights)[..., 0]
-        # breakpoint()
 
-        # Use multilateration to compute the position of each point in the action.
         corr_points = P_A_B_pred.permute(0, 2, 1)
+        flow = (P_A_B_pred - P_A).permute(0, 2, 1)
 
         # TODO: figure out how to downsample the points, and pass it all back up the stack.
 
         # \tilde{y}_i = sum_{j}{w_ij,y_j}, - x_i  # B, 3, N
-        flow = corr_points - action_points
+        # flow = corr_points - action_points
 
         if self.pred_weight:
             weight = self.proj_flow_weight(action_embedding)
+            if self.sample:
+                weight = torch.take_along_dim(weight, A_ixs.unsqueeze(1), dim=2)
             corr_flow_weight = torch.concat([flow, weight], dim=1)
         else:
             corr_flow_weight = flow
@@ -438,6 +454,8 @@ class MultilaterationHead(nn.Module):
             "corr_flow": flow,
             "corr_points": corr_points,
             "scores": scores,
+            "P_A": P_A.permute(0, 2, 1),
+            "A_ixs": A_ixs,
         }
 
 
@@ -454,6 +472,8 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         freeze_embnn=False,
         return_attn=True,
         multilaterate=False,
+        sample: bool = False,
+        mlat_nkps: int = 100,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.emb_dims = emb_dims
@@ -477,10 +497,16 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         )
         if multilaterate:
             self.head_action = MultilaterationHead(
-                emb_dims=emb_dims, pred_weight=self.pred_weight
+                emb_dims=emb_dims,
+                pred_weight=self.pred_weight,
+                sample=sample,
+                n_kps=mlat_nkps,
             )
             self.head_anchor = MultilaterationHead(
-                emb_dims=emb_dims, pred_weight=self.pred_weight
+                emb_dims=emb_dims,
+                pred_weight=self.pred_weight,
+                sample=sample,
+                n_kps=mlat_nkps,
             )
         else:
             self.head_action = ResidualMLPHead(
@@ -546,12 +572,19 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         flow_action = head_action_output["full_flow"].permute(0, 2, 1)
         residual_flow_action = head_action_output["residual_flow"].permute(0, 2, 1)
         corr_flow_action = head_action_output["corr_flow"].permute(0, 2, 1)
+        corr_points_action = head_action_output["corr_points"].permute(0, 2, 1)
 
         outputs = {
             "flow_action": flow_action,
             "residual_flow_action": residual_flow_action,
             "corr_flow_action": corr_flow_action,
+            "corr_points_action": corr_points_action,
         }
+
+        if "P_A" in head_action_output:
+            original_points_action = head_action_output["P_A"].permute(0, 2, 1)
+            outputs["original_points_action"] = original_points_action
+            outputs["sampled_ixs_action"] = head_action_output["A_ixs"]
 
         if self.cycle:
             anchor_attn = anchor_attn.mean(dim=1)
@@ -565,11 +598,19 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             flow_anchor = head_anchor_output["full_flow"].permute(0, 2, 1)
             residual_flow_anchor = head_anchor_output["residual_flow"].permute(0, 2, 1)
             corr_flow_anchor = head_anchor_output["corr_flow"].permute(0, 2, 1)
+            corr_points_anchor = head_anchor_output["corr_points"].permute(0, 2, 1)
 
             outputs = {
                 **outputs,
                 "flow_anchor": flow_anchor,
                 "residual_flow_anchor": residual_flow_anchor,
                 "corr_flow_anchor": corr_flow_anchor,
+                "corr_points_anchor": corr_points_anchor,
             }
+
+            if "P_A" in head_anchor_output:
+                original_points_anchor = head_anchor_output["P_A"].permute(0, 2, 1)
+                outputs["original_points_anchor"] = original_points_anchor
+                outputs["sampled_ixs_anchor"] = head_anchor_output["A_ixs"]
+
         return outputs

@@ -63,6 +63,8 @@ sigmoid_on: True
 return_flow_component: False
 mlp: False
 multilaterate: False
+mlat_sample: True
+mlat_nkps: 100
 
 # Loss Settings
 flow_supervision: both

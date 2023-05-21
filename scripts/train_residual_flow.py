@@ -74,6 +74,8 @@ def main(cfg):
         center_feature=cfg.center_feature,
         pred_weight=cfg.pred_weight,
         multilaterate=cfg.multilaterate,
+        sample=cfg.mlat_sample,
+        mlat_nkps=cfg.mlat_nkps,
     )
 
     model = EquivarianceTrainingModule(
