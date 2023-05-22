@@ -3,11 +3,19 @@
 # - Change the paths to relative imports.
 # - Make the label optional (i.e. goal-conditioned).
 # - Add this comment.
+from dataclasses import dataclass
+
 import torch.nn as nn
 import torch.utils.data
 
 from third_party.vnn.utils.vn_dgcnn_util import get_graph_feature
 from third_party.vnn.vn_layers import *
+
+
+@dataclass
+class VNArgs:
+    n_knn: int
+    pooling: str
 
 
 class VN_DGCNN(nn.Module):

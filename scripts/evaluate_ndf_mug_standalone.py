@@ -736,6 +736,8 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         return_attn=True,
         input_dims=3,
         multilaterate=False,
+        sample: bool = False,
+        mlat_nkps: int = 100,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.emb_dims = emb_dims
@@ -766,7 +768,6 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             self.emb_nn_anchor = VN_PointNet()
         else:
             raise Exception("Not implemented")
-        self.return_flow_component = return_flow_component
         self.center_feature = center_feature
         self.pred_weight = pred_weight
         self.residual_on = residual_on
@@ -781,10 +782,16 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         )
         if multilaterate:
             self.head_action = MultilaterationHead(
-                emb_dims=emb_dims, pred_weight=self.pred_weight
+                emb_dims=emb_dims,
+                pred_weight=self.pred_weight,
+                sample=sample,
+                n_kps=mlat_nkps,
             )
             self.head_anchor = MultilaterationHead(
-                emb_dims=emb_dims, pred_weight=self.pred_weight
+                emb_dims=emb_dims,
+                pred_weight=self.pred_weight,
+                sample=sample,
+                n_kps=mlat_nkps,
             )
         else:
             self.head_action = ResidualMLPHead(
@@ -799,134 +806,120 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             )
 
     def forward(self, *input):
-        action_points_input = input[0].permute(0, 2, 1)  # B,3,num_points
-        anchor_points_input = input[1].permute(0, 2, 1)
-        assert action_points_input.shape[1] in [
+        assert input[0].shape[2] in [
             3,
             4,
-        ], "action_points should be of shape (Batch, {3,4}. num_points), but got {}".format(
-            action_points.shape
-        )
-        # compute action_dmean
-        if action_points_input.shape[1] == 4:
-            action_xyz = action_points_input[:, :3]
-            anchor_xyz = anchor_points_input[:, :3]
-            action_sym_cls = action_points_input[:, 3:]
-            anchor_sym_cls = anchor_points_input[:, 3:]
-            action_xyz_dmean = action_xyz - action_xyz.mean(dim=2, keepdim=True)
-            anchor_xyz_dmean = anchor_xyz - anchor_xyz.mean(dim=2, keepdim=True)
-            action_points_dmean = torch.cat([action_xyz_dmean, action_sym_cls], axis=1)
-            anchor_points_dmean = torch.cat([anchor_xyz_dmean, anchor_sym_cls], axis=1)
+        ], f"action_points should be of shape (Batch, {3,4}. num_points), but got {input[0].shape}"
 
-        elif action_points_input.shape[1] == 3:
-            action_points_dmean = action_points_input - action_points_input.mean(
-                dim=2, keepdim=True
-            )
-            anchor_points_dmean = anchor_points_input - anchor_points_input.mean(
-                dim=2, keepdim=True
-            )
+        # compute action_dmean
+        if input[0].shape[2] == 4:
+            raise ValueError("this is not expected...")
+            # action_xyz = action_points_input[:, :3]
+            # anchor_xyz = anchor_points_input[:, :3]
+            # action_sym_cls = action_points_input[:, 3:]
+            # anchor_sym_cls = anchor_points_input[:, 3:]
+            # action_xyz_dmean = action_xyz - action_xyz.mean(dim=2, keepdim=True)
+            # anchor_xyz_dmean = anchor_xyz - anchor_xyz.mean(dim=2, keepdim=True)
+            # action_points_dmean = torch.cat([action_xyz_dmean, action_sym_cls], axis=1)
+            # anchor_points_dmean = torch.cat([anchor_xyz_dmean, anchor_sym_cls], axis=1)
+
+        # elif action_points.shape[1] == 3:
+
+        action_points = input[0].permute(0, 2, 1)[:, :3]  # B,3,num_points
+        anchor_points = input[1].permute(0, 2, 1)[:, :3]
+
+        action_points_dmean = action_points - action_points.mean(dim=2, keepdim=True)
+        anchor_points_dmean = anchor_points - anchor_points.mean(dim=2, keepdim=True)
+
         # mean center point cloud before DGCNN
         if not self.center_feature:
-            action_points_dmean = action_points_input
-            anchor_points_dmean = anchor_points_input
-        action_points = action_points_input[:, :3]
-        anchor_points = anchor_points_input[:, :3]
+            action_points_dmean = action_points
+            anchor_points_dmean = anchor_points
+
+        action_embedding = self.emb_nn_action(action_points_dmean)
+        anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
+
         if self.freeze_embnn:
-            action_embedding = self.emb_nn_action(action_points_dmean).detach()
-            anchor_embedding = self.emb_nn_anchor(anchor_points_dmean).detach()
-        else:
-            action_embedding = self.emb_nn_action(action_points_dmean)
-            anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
+            action_embedding = action_embedding.detach()
+            anchor_embedding = anchor_embedding.detach()
 
         # tilde_phi, phi are both B,512,N
-        if self.return_attn:
-            action_embedding_tf, action_attn = self.transformer_action(
-                action_embedding, anchor_embedding
-            )
-            anchor_embedding_tf, anchor_attn = self.transformer_anchor(
-                anchor_embedding, action_embedding
-            )
-        else:
-            action_embedding_tf = self.transformer_action(
-                action_embedding, anchor_embedding
-            )
-            anchor_embedding_tf = self.transformer_anchor(
-                anchor_embedding, action_embedding
-            )
+        # Get the new cross-attention embeddings.
+        transformer_action_outputs = self.transformer_action(
+            action_embedding, anchor_embedding
+        )
+        transformer_anchor_outputs = self.transformer_anchor(
+            anchor_embedding, action_embedding
+        )
+        action_embedding_tf = transformer_action_outputs["src_embedding"]
+        action_attn = transformer_action_outputs["src_attn"]
+        anchor_embedding_tf = transformer_anchor_outputs["src_embedding"]
+        anchor_attn = transformer_anchor_outputs["src_attn"]
+
+        if not self.return_attn:
             action_attn = None
             anchor_attn = None
 
         action_embedding_tf = action_embedding + action_embedding_tf
         anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
+
         if action_attn is not None:
             action_attn = action_attn.mean(dim=1)
-        if self.return_flow_component:
-            flow_output_action = self.head_action(
-                action_embedding_tf,
-                anchor_embedding_tf,
-                action_points,
-                anchor_points,
-                scores=action_attn,
-                return_flow_component=self.return_flow_component,
-            )
-            flow_action = flow_output_action["full_flow"].permute(0, 2, 1)
-            residual_flow_action = flow_output_action["residual_flow"].permute(0, 2, 1)
-            corr_flow_action = flow_output_action["corr_flow"].permute(0, 2, 1)
-        else:
-            flow_action = self.head_action(
-                action_embedding_tf,
-                anchor_embedding_tf,
-                action_points,
-                anchor_points,
-                scores=action_attn,
-                return_flow_component=self.return_flow_component,
-            ).permute(0, 2, 1)
+
+        head_action_output = self.head_action(
+            action_embedding_tf,
+            anchor_embedding_tf,
+            action_points,
+            anchor_points,
+            scores=action_attn,
+        )
+        flow_action = head_action_output["full_flow"].permute(0, 2, 1)
+        residual_flow_action = head_action_output["residual_flow"].permute(0, 2, 1)
+        corr_flow_action = head_action_output["corr_flow"].permute(0, 2, 1)
+        corr_points_action = head_action_output["corr_points"].permute(0, 2, 1)
+
+        outputs = {
+            "flow_action": flow_action,
+            "residual_flow_action": residual_flow_action,
+            "corr_flow_action": corr_flow_action,
+            "corr_points_action": corr_points_action,
+        }
+
+        if "P_A" in head_action_output:
+            original_points_action = head_action_output["P_A"].permute(0, 2, 1)
+            outputs["original_points_action"] = original_points_action
+            outputs["sampled_ixs_action"] = head_action_output["A_ixs"]
 
         if self.cycle:
             if anchor_attn is not None:
                 anchor_attn = anchor_attn.mean(dim=1)
-            if self.return_flow_component:
-                flow_output_anchor = self.head_anchor(
-                    anchor_embedding_tf,
-                    action_embedding_tf,
-                    anchor_points,
-                    action_points,
-                    scores=anchor_attn,
-                    return_flow_component=self.return_flow_component,
-                )
-                flow_anchor = flow_output_anchor["full_flow"].permute(0, 2, 1)
-                residual_flow_anchor = flow_output_anchor["residual_flow"].permute(
-                    0, 2, 1
-                )
-                corr_flow_anchor = flow_output_anchor["corr_flow"].permute(0, 2, 1)
-            else:
-                flow_anchor = self.head_anchor(
-                    anchor_embedding_tf,
-                    action_embedding_tf,
-                    anchor_points,
-                    action_points,
-                    scores=anchor_attn,
-                    return_flow_component=self.return_flow_component,
-                ).permute(0, 2, 1)
-            if self.return_flow_component:
-                return {
-                    "flow_action": flow_action,
-                    "flow_anchor": flow_anchor,
-                    "residual_flow_action": residual_flow_action,
-                    "residual_flow_anchor": residual_flow_anchor,
-                    "corr_flow_action": corr_flow_action,
-                    "corr_flow_anchor": corr_flow_anchor,
-                }
-            else:
-                return flow_action, flow_anchor
-        if self.return_flow_component:
-            return {
-                "flow_action": flow_action,
-                "residual_flow_action": residual_flow_action,
-                "corr_flow_action": corr_flow_action,
+
+            head_anchor_output = self.head_anchor(
+                anchor_embedding_tf,
+                action_embedding_tf,
+                anchor_points,
+                action_points,
+                scores=anchor_attn,
+            )
+            flow_anchor = head_anchor_output["full_flow"].permute(0, 2, 1)
+            residual_flow_anchor = head_anchor_output["residual_flow"].permute(0, 2, 1)
+            corr_flow_anchor = head_anchor_output["corr_flow"].permute(0, 2, 1)
+            corr_points_anchor = head_anchor_output["corr_points"].permute(0, 2, 1)
+
+            outputs = {
+                **outputs,
+                "flow_anchor": flow_anchor,
+                "residual_flow_anchor": residual_flow_anchor,
+                "corr_flow_anchor": corr_flow_anchor,
+                "corr_points_anchor": corr_points_anchor,
             }
-        else:
-            return flow_action
+
+            if "P_A" in head_anchor_output:
+                original_points_anchor = head_anchor_output["P_A"].permute(0, 2, 1)
+                outputs["original_points_anchor"] = original_points_anchor
+                outputs["sampled_ixs_anchor"] = head_anchor_output["A_ixs"]
+
+        return outputs
 
 
 class ResidualFlow(nn.Module):
@@ -1641,9 +1634,28 @@ class EquivarianceTestingModule(PointCloudTrainingModule):
 
     def get_transform(self, points_trans_action, points_trans_anchor):
         for i in range(self.loop):
-            x_action, x_anchor = self.model(points_trans_action, points_trans_anchor)
+            model_output = self.model(points_trans_action, points_trans_anchor)
+            x_action = model_output["flow_action"]
+            x_anchor = model_output["flow_anchor"]
+
             points_trans_action = points_trans_action[:, :, :3]
             points_trans_anchor = points_trans_anchor[:, :, :3]
+
+            # If we've applied some sampling, we need to extract the predictions too...
+            if "sampled_ixs_action" in model_output:
+                ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+                # points_action = torch.take_along_dim(points_action, ixs_action, dim=1)
+                points_trans_action = torch.take_along_dim(
+                    points_trans_action, ixs_action, dim=1
+                )
+
+            if "sampled_ixs_anchor" in model_output:
+                ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+                # points_anchor = torch.take_along_dim(points_anchor, ixs_anchor, dim=1)
+                points_trans_anchor = torch.take_along_dim(
+                    points_trans_anchor, ixs_anchor, dim=1
+                )
+
             ans_dict = self.predict(
                 x_action=x_action,
                 x_anchor=x_anchor,
@@ -1652,6 +1664,9 @@ class EquivarianceTestingModule(PointCloudTrainingModule):
             )
             if i == 0:
                 pred_T_action = ans_dict["pred_T_action"]
+
+                if self.loop == 1:
+                    return ans_dict
             else:
                 pred_T_action = pred_T_action.compose(
                     T_trans.inverse()
@@ -1976,6 +1991,7 @@ MAX_TIME = 5.0
     config_path="../configs/",
     config_name="eval_full_mug_standalone",
 )
+@torch.no_grad()
 def main(hydra_cfg):
     txt_file_name = "{}.txt".format(hydra_cfg.eval_data_dir)
     data_dir = hydra_cfg.data_dir
@@ -2103,7 +2119,7 @@ def main(hydra_cfg):
 
     if not hydra_cfg.random:
         checkpoint_path = global_dict["vnn_checkpoint_path"]
-        model.load_state_dict(torch.load(checkpoint_path))
+        # model.load_state_dict(torch.load(checkpoint_path))
     else:
         pass
 
@@ -2334,6 +2350,8 @@ def main(hydra_cfg):
                         inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
                         residual_on=hydra_cfg.residual_on,
                         multilaterate=hydra_cfg.multilaterate,
+                        sample=hydra_cfg.mlat_sample,
+                        mlat_nkps=hydra_cfg.mlat_nkps,
                     )
             else:
                 network = ResidualFlow_DiffEmb(
@@ -2383,6 +2401,7 @@ def main(hydra_cfg):
     )
 
     place_model.cuda()
+    # place_model.eval()
 
     if hydra_cfg.checkpoint_file_place is not None:
         place_model.load_state_dict(
@@ -2409,6 +2428,8 @@ def main(hydra_cfg):
                             inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
                             residual_on=hydra_cfg.residual_on,
                             multilaterate=hydra_cfg.multilaterate,
+                            sample=hydra_cfg.mlat_sample,
+                            mlat_nkps=hydra_cfg.mlat_nkps,
                         )
                 else:
                     network = ResidualFlow_DiffEmb(
@@ -2486,6 +2507,8 @@ def main(hydra_cfg):
                         inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
                         residual_on=hydra_cfg.residual_on,
                         multilaterate=hydra_cfg.multilaterate,
+                        sample=hydra_cfg.mlat_sample,
+                        mlat_nkps=hydra_cfg.mlat_nkps,
                     )
             else:
                 network = ResidualFlow_DiffEmb(
@@ -2536,6 +2559,7 @@ def main(hydra_cfg):
     )
 
     grasp_model.cuda()
+    # grasp_model.eval()
 
     if hydra_cfg.checkpoint_file_grasp is not None:
         grasp_model.load_state_dict(
@@ -2562,6 +2586,8 @@ def main(hydra_cfg):
                             inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
                             residual_on=hydra_cfg.residual_on,
                             multilaterate=hydra_cfg.multilaterate,
+                            sample=hydra_cfg.mlat_sample,
+                            mlat_nkps=hydra_cfg.mlat_nkps,
                         )
                 else:
                     network = ResidualFlow_DiffEmb(
@@ -2822,6 +2848,7 @@ def main(hydra_cfg):
         ans = place_model.get_transform(points_mug, points_rack)  # 1, 4, 4
 
         if hydra_cfg.checkpoint_file_place_refinement is not None:
+            assert False
             pred_points_action = ans["pred_points_action"]
             pred_T_action = ans["pred_T_action"]
             (
