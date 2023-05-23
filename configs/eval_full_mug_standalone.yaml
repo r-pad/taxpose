@@ -93,8 +93,12 @@ checkpoint_file_grasp_refinement: Null
 # checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-21_125009/residual_flow_occlusion/k4rb3cqw/checkpoints/epoch_471_global_step_59000.ckpt
 
 # 256 sample
-checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-21_214041/residual_flow_occlusion/4jvjcn9s/checkpoints/epoch_183_global_step_46000.ckpt
-checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-21_212506/residual_flow_occlusion/xmb355au/checkpoints/epoch_199_global_step_50000.ckpt
+# checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-21_214041/residual_flow_occlusion/4jvjcn9s/checkpoints/epoch_631_global_step_158000.ckpt
+# checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-21_212506/residual_flow_occlusion/xmb355au/checkpoints/epoch_663_global_step_166000.ckpt
+
+# Note: the placement one was trained with multiple restarts...
+checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-22_211745/residual_flow_occlusion/yaenf8vx/checkpoints/epoch_335_global_step_168000.ckpt
+checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-23_025041/residual_flow_occlusion/or87bvdc/checkpoints/epoch_59_global_step_30000.ckpt
 
 #TOBECANGED#
 

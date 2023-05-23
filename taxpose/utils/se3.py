@@ -199,6 +199,9 @@ def dualflow2pose(
     if weights_tgt is None:
         weights_tgt = torch.ones(xyz_tgt.shape[:-1], device=xyz_tgt.device)
 
+    assert not torch.isinf(weights_src).any() and not torch.isinf(weights_tgt).any()
+    assert not torch.isnan(weights_src).any() and not torch.isnan(weights_tgt).any()
+
     if normalization_scehme == "l1":
         w_src = F.normalize(weights_src, p=1.0, dim=-1).unsqueeze(-1)
         w_tgt = F.normalize(weights_tgt, p=1.0, dim=-1).unsqueeze(-1)

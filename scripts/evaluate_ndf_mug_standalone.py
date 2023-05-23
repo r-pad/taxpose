@@ -53,6 +53,7 @@ from taxpose.nets.pointnet import PointNet
 from taxpose.nets.transformer_flow import MLP, CorrespondenceMLPHead
 from taxpose.nets.transformer_flow import CustomTransformer as Transformer
 from taxpose.nets.transformer_flow import MultilaterationHead, ResidualMLPHead
+from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
 from taxpose.training.point_cloud_training_module import PointCloudTrainingModule
 from taxpose.utils.color_utils import get_color
 from taxpose.utils.ndf_sim_utils import get_clouds, get_object_clouds
@@ -766,6 +767,10 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         elif emb_nn == "vn":
             self.emb_nn_action = VN_PointNet()
             self.emb_nn_anchor = VN_PointNet()
+        elif emb_nn == "vn_dgcnn":
+            args = VNArgs()
+            self.emb_nn_action = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
+            self.emb_nn_anchor = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
         else:
             raise Exception("Not implemented")
         self.center_feature = center_feature
@@ -2401,7 +2406,7 @@ def main(hydra_cfg):
     )
 
     place_model.cuda()
-    # place_model.eval()
+    place_model.eval()
 
     if hydra_cfg.checkpoint_file_place is not None:
         place_model.load_state_dict(
@@ -2559,7 +2564,7 @@ def main(hydra_cfg):
     )
 
     grasp_model.cuda()
-    # grasp_model.eval()
+    grasp_model.eval()
 
     if hydra_cfg.checkpoint_file_grasp is not None:
         grasp_model.load_state_dict(

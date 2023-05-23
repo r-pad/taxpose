@@ -154,7 +154,7 @@ def main(cfg):
 
 
 if __name__ == "__main__":
-    torch.set_float32_matmul_precision("medium")
+    torch.set_float32_matmul_precision("high")
     torch.autograd.set_detect_anomaly(True)
     torch.cuda.empty_cache()
     torch.multiprocessing.set_sharing_strategy("file_system")

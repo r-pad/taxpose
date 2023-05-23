@@ -14,8 +14,8 @@ from third_party.vnn.vn_layers import *
 
 @dataclass
 class VNArgs:
-    n_knn: int
-    pooling: str
+    n_knn: int = 40
+    pooling: str = "mean"
 
 
 class VN_DGCNN(nn.Module):
@@ -77,7 +77,7 @@ class VN_DGCNN(nn.Module):
             self.bn10,
             nn.LeakyReLU(negative_slope=0.2),
         )
-        self.conv11 = nn.Conv1d(128, num_part, kernel_size=1, bias=False)
+        self.conv11 = nn.Conv1d(128, num_part, kernel_size=1, bias=True)
 
     def forward(self, x, l=None):
         batch_size = x.size(0)
@@ -129,5 +129,4 @@ class VN_DGCNN(nn.Module):
         x = self.conv10(x)
         x = self.conv11(x)
 
-        trans_feat = None
-        return x.transpose(1, 2), trans_feat
+        return x

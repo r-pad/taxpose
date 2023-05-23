@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from taxpose.nets.pointnet import PointNet
 from taxpose.nets.transformer_flow_pm import CustomTransformer
 from taxpose.nets.tv_mlp import MLP as TVMLP
+from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
 from taxpose.utils.multilateration import estimate_p
 from third_party.dcp.model import DGCNN
 
@@ -23,6 +24,8 @@ class EquivariantFeatureEmbeddingNetwork(nn.Module):
         self.emb_nn_name = emb_nn
         if emb_nn == "dgcnn":
             self.emb_nn = DGCNN(emb_dims=self.emb_dims)
+        elif emb_nn == "vn_dgcnn":
+            self.emb_nn = VN_DGCNN(VNArgs(), num_part=self.emb_dims, gc=False)
         else:
             raise Exception("Not implemented")
 
@@ -481,6 +484,10 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         if emb_nn == "dgcnn":
             self.emb_nn_action = DGCNN(emb_dims=self.emb_dims)
             self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims)
+        elif emb_nn == "vn_dgcnn":
+            args = VNArgs()
+            self.emb_nn_action = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
+            self.emb_nn_anchor = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
         else:
             raise Exception("Not implemented")
         self.center_feature = center_feature
