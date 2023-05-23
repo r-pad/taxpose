@@ -27,7 +27,9 @@ def main(cfg):
         logger=logger,
         gpus=1,
         reload_dataloaders_every_n_epochs=1,
-        val_check_interval=0.2,
+        # val_check_interval=0.2,
+        # val_check_interval=10,
+        check_val_every_n_epoch=10,
         callbacks=[SaverCallbackEmbnn()],
     )
     dm = PretrainingMultiviewDataModule(
