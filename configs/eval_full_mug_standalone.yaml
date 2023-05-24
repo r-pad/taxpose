@@ -171,8 +171,8 @@ dgcnn: False
 random: False
 early_weight: False
 late_weight: False
-rand_mesh_scale: False
-only_test_ids: False
+rand_mesh_scale: True
+only_test_ids: True
 all_cat_model: False
 n_demos: 0
 acts: all
