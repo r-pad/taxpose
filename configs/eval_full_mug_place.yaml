@@ -32,7 +32,7 @@ log_every_trial: False # True - log success rate at every trial; False - log onl
 #### TO BE CHANGED ####
 
 # Model Settings
-flow_compute_type: 0
+# flow_compute_type: 0
 emb_nn: dgcnn
 num_points: 1024
 emb_dims: 512

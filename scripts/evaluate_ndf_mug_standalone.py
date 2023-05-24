@@ -1,12 +1,13 @@
-import math
 import os
 import os.path as osp
 import random
 import signal
 
 import hydra
+import matplotlib.pyplot as plt
 import ndf_robot.model.vnn_occupancy_net_pointnet_dgcnn as vnn_occupancy_network
 import numpy as np
+import PIL
 import pybullet as p
 import pytorch_lightning as pl
 import torch
@@ -17,6 +18,7 @@ from airobot import Robot, log_info, log_warn, set_log_level
 from airobot.utils import common
 from airobot.utils.arm_util import reach_jnt_goal
 from airobot.utils.common import euler2quat
+from mpl_toolkits.axes_grid1 import ImageGrid
 from ndf_robot.config.default_eval_cfg import get_eval_cfg_defaults
 from ndf_robot.config.default_obj_cfg import get_obj_cfg_defaults
 from ndf_robot.opt.optimizer import OccNetOptimizer
@@ -43,15 +45,13 @@ from ndf_robot.utils.eval_gen_utils import (
 )
 from ndf_robot.utils.franka_ik import FrankaIK
 from ndf_robot.utils.util import np2img
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import OmegaConf
 from pytorch3d.ops import sample_farthest_points
 from pytorch3d.transforms import Rotate, Transform3d
 from torch import nn
 from torch.nn import functional as F
 from torchvision.transforms import ToTensor
 
-from taxpose.nets.pointnet import PointNet
-from taxpose.nets.transformer_flow import MLP, CorrespondenceMLPHead
 from taxpose.nets.transformer_flow import CustomTransformer as Transformer
 from taxpose.nets.transformer_flow import MultilaterationHead, ResidualMLPHead
 from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
@@ -79,30 +79,6 @@ from third_party.dcp.model import get_graph_feature
 # Pulled from DCP
 
 # Part of the code is referred from: http://nlp.seas.harvard.edu/2018/04/03/attention.html#positional-encoding
-
-
-class VN_PointNet(nn.Module):
-    def __init__(self, layer_dims=[3, 64, 64, 64, 128, 512]):
-        super(VN_PointNet, self).__init__()
-
-        convs = []
-        for j in range(len(layer_dims) - 1):
-            convs.append(
-                VNLinearLeakyReLU(
-                    layer_dims[j],
-                    layer_dims[j + 1],
-                    dim=4,
-                    negative_slope=0.0,
-                )
-            )
-        self.convs = nn.ModuleList(convs)
-
-    def forward(self, x):
-        if x.ndim == 3:
-            x = x.unsqueeze(1)
-        for conv in self.convs:
-            x = conv(x)
-        return x
 
 
 class DGCNN(nn.Module):
@@ -142,587 +118,6 @@ class DGCNN(nn.Module):
         return x
 
 
-class ResidualMLPHeadRefinement(nn.Module):
-    """
-    Base ResidualMLPHead with flow calculated as
-    v_i = f(\phi_i) + \tilde{y}_i - x_i
-    """
-
-    def __init__(self, emb_dims=512, pred_weight=True):
-        super(ResidualMLPHeadRefinement, self).__init__()
-
-        self.emb_dims = emb_dims
-        self.pred_weight = pred_weight
-        self.proj_flow = nn.Sequential(
-            PointNet([emb_dims, 64, 64, 64, 128, 512]),
-            nn.Conv1d(512, 3, kernel_size=1, bias=False),
-        )
-        if self.pred_weight:
-            self.proj_flow_weight = nn.Sequential(
-                PointNet([emb_dims, 64, 64, 64, 128, 512]),
-                # PointNet([emb_dims, emb_dims//2, emb_dims//4, emb_dims//8]),
-                nn.Conv1d(512, 1, kernel_size=1, bias=False),
-            )
-
-    def forward(self, *input, scores=None, return_flow_component=False):
-        action_embedding = input[0]
-        anchor_embedding = input[1]
-        action_points = input[2]
-        anchor_points = input[3]
-
-        if scores is None:
-            if len(input) <= 4:
-                action_query = action_embedding
-                anchor_key = anchor_embedding
-            else:
-                action_query = input[4]
-                anchor_key = input[5]
-
-            d_k = action_query.size(1)
-            scores = torch.matmul(
-                action_query.transpose(2, 1).contiguous(), anchor_key
-            ) / math.sqrt(d_k)
-            # W_i # B, N, N (N=number of points, 1024 cur)
-            scores = torch.softmax(scores, dim=2)
-
-        corr_points = torch.matmul(anchor_points, scores.transpose(2, 1).contiguous())
-        # \tilde{y}_i = sum_{j}{w_ij,y_j}, - x_i  # B, 3, N
-        corr_flow = corr_points - action_points
-
-        embedding = action_embedding  # B,512,N
-        residual_flow = self.proj_flow(embedding)  # B,3,N
-
-        flow = residual_flow + corr_flow
-        if self.pred_weight:
-            weight = self.proj_flow_weight(action_embedding)
-            corr_flow_weight = torch.concat([flow, weight], dim=1)
-        else:
-            corr_flow_weight = flow
-        return corr_flow_weight
-
-
-class ResidualMLPHead_Identity(nn.Module):
-    """
-    Base ResidualMLPHead with flow calculated as
-    v_i = f(\phi_i) + \tilde{y}_i - x_i
-    """
-
-    def __init__(self, emb_dims=512):
-        super(ResidualMLPHead_Identity, self).__init__()
-
-        self.emb_dims = emb_dims + 3
-        self.proj_flow = nn.Sequential(
-            PointNet(
-                [
-                    self.emb_dims,
-                    self.emb_dims // 2,
-                    self.emb_dims // 4,
-                    self.emb_dims // 8,
-                ]
-            ),
-            nn.Conv1d(self.emb_dims // 8, 3, kernel_size=1, bias=False),
-        )
-        self.residualhead = ResidualMLPHead(emb_dims=emb_dims)
-
-    def forward(self, *input):
-        action_embedding_tf = input[0]
-        corr_flow = self.residualhead(*input)  # B,3,N
-        embedding = torch.concat(
-            [action_embedding_tf, corr_flow], dim=1
-        )  # B,emb_dis*2,N
-        residual_flow = self.proj_flow(embedding)  # B,3,N
-
-        return residual_flow + corr_flow
-
-
-class ResidualMLPHead_V1(nn.Module):
-    """
-    ResidualMLP Head Variant 1 with flow calcuated as:
-    v_i = f(\phi_i,\tilde{\phi}_i) + \tilde{y}_i - x_i
-    """
-
-    def __init__(self, emb_dims=512):
-        super(ResidualMLPHead_V1, self).__init__()
-
-        self.emb_dims = emb_dims * 2
-        self.proj_flow = nn.Sequential(
-            PointNet(
-                [
-                    self.emb_dims,
-                    self.emb_dims // 2,
-                    self.emb_dims // 4,
-                    self.emb_dims // 8,
-                    self.emb_dims // 16,
-                ]
-            ),
-            nn.Conv1d(self.emb_dims // 16, 3, kernel_size=1, bias=False),
-        )
-
-    def forward(self, *input, scores=None):
-        action_embedding_tf = input[0]
-        anchor_embedding_tf = input[1]
-        action_points = input[2]
-        anchor_points = input[3]
-        action_embedding = input[4]
-        anchor_embedding = input[5]
-        if scores is None:
-            action_embedding = input[4]
-            anchor_embedding = input[5]
-
-            action_query = input[4]
-            anchor_key = input[5]
-
-            d_k = action_query.size(1)
-            scores = torch.matmul(
-                action_query.transpose(2, 1).contiguous(), anchor_key
-            ) / math.sqrt(
-                d_k
-            )  # B, N, N (N=number of points, 1024 cur)
-            # W_i # B, N, N (N=number of points, 1024 cur)
-            scores = torch.softmax(scores, dim=2)
-
-        corr_points = torch.matmul(anchor_points, scores.transpose(2, 1).contiguous())
-        # \tilde{y}_i = sum_{j}{w_ij,y_j}, - x_i  # B, 3, N
-        corr_flow = corr_points - action_points
-
-        embedding = torch.concat(
-            [action_embedding, action_embedding_tf], dim=1
-        )  # B,emb_dis*2,N
-        residual_flow = self.proj_flow(embedding)  # B,3,N
-        return residual_flow + corr_flow
-
-
-class ResidualMLPHead_V2(nn.Module):
-    """
-    ResidualMLP Head Variant 1 with flow calcuated as:
-    v_i = f(\phi_i,\tilde{y}_i) + \tilde{y}_i -x_i
-    \tilde_phi_i -> action_embedding
-    \phi_i -> action_embedding_tf
-
-    """
-
-    def __init__(self, emb_dims=512):
-        super(ResidualMLPHead_V2, self).__init__()
-
-        self.emb_dims = emb_dims + 3
-        self.proj_flow = nn.Sequential(
-            PointNet(
-                [
-                    self.emb_dims,
-                    self.emb_dims // 2,
-                    self.emb_dims // 4,
-                    self.emb_dims // 8,
-                ]
-            ),
-            nn.Conv1d(self.emb_dims // 8, 3, kernel_size=1, bias=False),
-        )
-
-    def forward(self, *input, scores=None):
-        action_embedding_tf = input[0]
-        anchor_embedding_tf = input[1]
-        action_points = input[2]
-        anchor_points = input[3]
-        if scores is None:
-            action_embedding = input[4]
-            anchor_embedding = input[5]
-            action_query = input[4]
-            anchor_key = input[5]
-
-            d_k = action_query.size(1)
-            scores = torch.matmul(
-                action_query.transpose(2, 1).contiguous(), anchor_key
-            ) / math.sqrt(
-                d_k
-            )  # B, N, N (N=number of points, 1024 cur)
-            # W_i # B, N, N (N=number of points, 1024 cur)
-            scores = torch.softmax(scores, dim=2)
-
-        tilde_y = torch.matmul(anchor_points, scores.transpose(2, 1).contiguous())
-        # \tilde{y}_i = sum_{j}{w_ij,y_j}, - x_i  # B, 3, N
-        corr_flow = tilde_y - action_points
-
-        embedding = torch.concat([action_embedding_tf, tilde_y], dim=1)  # B,emb_dis*2,N
-        residual_flow = self.proj_flow(embedding)  # B,3,N
-
-        return residual_flow + corr_flow
-
-
-class ResidualMLPHead_V3(nn.Module):
-    """
-    ResidualMLP Head Variant 1 with flow calcuated as:
-    v_i = f(\phi_i,\tilde{y}_i) + \tilde{y}_i -x_i
-    \tilde_phi_i -> action_embedding
-    \phi_i -> action_embedding_tf
-
-    """
-
-    def __init__(self, emb_dims=512):
-        super(ResidualMLPHead_V3, self).__init__()
-        self.emb_dims = emb_dims + 3
-        self.proj_flow = nn.Sequential(
-            PointNet(
-                [
-                    self.emb_dims,
-                    self.emb_dims // 2,
-                    self.emb_dims // 4,
-                    self.emb_dims // 8,
-                ]
-            ),
-            nn.Conv1d(self.emb_dims // 8, 3, kernel_size=1, bias=False),
-        )
-
-    def forward(self, *input, scores=None):
-        action_embedding_tf = input[0]
-        anchor_embedding_tf = input[1]
-        action_points = input[2]
-        anchor_points = input[3]
-        if scores is None:
-            action_embedding = input[4]
-            anchor_embedding = input[5]
-            action_query = input[4]
-            anchor_key = input[5]
-
-            d_k = action_query.size(1)
-            scores = torch.matmul(
-                action_query.transpose(2, 1).contiguous(), anchor_key
-            ) / math.sqrt(
-                d_k
-            )  # B, N, N (N=number of points, 1024 cur)
-            # W_i # B, N, N (N=number of points, 1024 cur)
-            scores = torch.softmax(scores, dim=2)
-
-        corr_points = torch.matmul(anchor_points, scores.transpose(2, 1).contiguous())
-        # \tilde{y}_i = sum_{j}{w_ij,y_j}, - x_i  # B, 3, N
-        corr_flow = corr_points - action_points
-
-        embedding = torch.concat(
-            [action_embedding_tf, corr_flow], dim=1
-        )  # B,emb_dis*2,N
-        residual_flow = self.proj_flow(embedding)  # B,3,N
-
-        return residual_flow
-
-
-class ResidualMLPHead_V4(nn.Module):
-    """
-    ResidualMLP Head Variant 1 with flow calcuated as:
-    v_i = f(\phi_i,\tilde{y}_i) + \tilde{y}_i -x_i
-    \tilde_phi_i -> action_embedding
-    \phi_i -> action_embedding_tf
-
-    """
-
-    def __init__(self, emb_dims=512):
-        super(ResidualMLPHead_V4, self).__init__()
-        self.emb_dims = emb_dims + 3
-        self.proj_flow = nn.Sequential(
-            PointNet(
-                [
-                    self.emb_dims,
-                    self.emb_dims // 2,
-                    self.emb_dims // 4,
-                    self.emb_dims // 8,
-                ]
-            ),
-            nn.Conv1d(self.emb_dims // 8, 3, kernel_size=1, bias=False),
-        )
-
-    def forward(self, *input, scores=None):
-        action_embedding_tf = input[0]
-        anchor_embedding_tf = input[1]
-        action_points = input[2]
-        anchor_points = input[3]
-        if scores is None:
-            action_embedding = input[4]
-            anchor_embedding = input[5]
-            action_query = input[4]
-            anchor_key = input[5]
-
-            d_k = action_query.size(1)
-            scores = torch.matmul(
-                action_query.transpose(2, 1).contiguous(), anchor_key
-            ) / math.sqrt(
-                d_k
-            )  # B, N, N (N=number of points, 1024 cur)
-            # W_i # B, N, N (N=number of points, 1024 cur)
-            scores = torch.softmax(scores, dim=2)
-
-        corr_points = torch.matmul(anchor_points, scores.transpose(2, 1).contiguous())
-
-        embedding = torch.concat(
-            [action_embedding_tf, corr_points], dim=1
-        )  # B,emb_dis*2,N
-        residual_flow = self.proj_flow(embedding)  # B,3,N
-
-        return residual_flow
-
-
-class ResidualMLPHead_Correspondence(nn.Module):
-    """
-    ResidualMLP Head Variant 1 with flow calcuated as:
-    v_i = f(\phi_i,\tilde{y}_i) + \tilde{y}_i -x_i
-    \tilde_phi_i -> action_embedding
-    \phi_i -> action_embedding_tf
-
-    """
-
-    def __init__(self, emb_dims=512):
-        super(ResidualMLPHead_Correspondence, self).__init__()
-
-        self.emb_dims = emb_dims + 3
-        self.proj_flow = nn.Sequential(
-            PointNet(
-                [
-                    self.emb_dims,
-                    self.emb_dims // 2,
-                    self.emb_dims // 4,
-                    self.emb_dims // 8,
-                ]
-            ),
-            nn.Conv1d(self.emb_dims // 8, 3, kernel_size=1, bias=False),
-        )
-
-    def forward(self, *input, scores=None):
-        action_embedding_tf = input[0]
-        anchor_embedding_tf = input[1]
-        action_points = input[2]
-        anchor_points = input[3]
-        if scores is None:
-            action_embedding = input[4]
-            anchor_embedding = input[5]
-            action_query = input[4]
-            anchor_key = input[5]
-
-            d_k = action_query.size(1)
-            scores = torch.matmul(
-                action_query.transpose(2, 1).contiguous(), anchor_key
-            ) / math.sqrt(
-                d_k
-            )  # B, N, N (N=number of points, 1024 cur)
-            # W_i # B, N, N (N=number of points, 1024 cur)
-            scores = torch.softmax(scores, dim=2)
-        corr_points = torch.matmul(anchor_points, scores.transpose(2, 1).contiguous())
-        # \tilde{y}_i = sum_{j}{w_ij,y_j}, - x_i  # B, 3, N
-        corr_flow = corr_points - action_points
-
-        return corr_flow
-
-
-class CorrespondenceFlow_DiffEmbMLP(nn.Module):
-    def __init__(
-        self,
-        emb_dims=512,
-        cycle=True,
-        emb_nn="dgcnn",
-        inital_sampling_ratio=0.2,
-        center_feature=True,
-    ):
-        super(CorrespondenceFlow_DiffEmbMLP, self).__init__()
-        self.emb_dims = emb_dims
-        self.cycle = cycle
-
-        if emb_nn == "pointnet":
-            self.emb_nn_action = PointNet()
-            self.emb_nn_anchor = PointNet()
-        elif emb_nn == "pointnet2ben":
-            params_action = PN2DenseParams()
-            params_action.sa1.ratio = inital_sampling_ratio
-            self.emb_nn_action = Pointnet2Dense(emb_dims, params=params_action)
-            params_anchor = PN2DenseParams()
-            params_anchor.sa1.ratio = inital_sampling_ratio
-            self.emb_nn_anchor = Pointnet2Dense(emb_dims, params=params_anchor)
-        elif emb_nn == "pointnet2ori":
-            self.emb_nn_action = pointnet2(emb_dims)
-            self.emb_nn_anchor = pointnet2(emb_dims)
-        elif emb_nn == "dgcnn":
-            self.emb_nn_action = DGCNN(emb_dims=self.emb_dims)
-            self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims)
-        elif emb_nn == "vn":
-            self.emb_nn_action = VN_PointNet()
-            self.emb_nn_anchor = VN_PointNet()
-        else:
-            raise Exception("Not implemented")
-
-        self.center_feature = center_feature
-
-        self.transformer_action = MLP(emb_dims=emb_dims)
-        self.transformer_anchor = MLP(emb_dims=emb_dims)
-        self.head_action = CorrespondenceMLPHead(emb_dims=emb_dims)
-        self.head_anchor = CorrespondenceMLPHead(emb_dims=emb_dims)
-
-    def forward(self, *input):
-        action_points = input[0].permute(0, 2, 1)  # B,3,num_points
-        anchor_points = input[1].permute(0, 2, 1)
-        action_points_dmean = action_points - action_points.mean(dim=2, keepdim=True)
-        anchor_points_dmean = anchor_points - anchor_points.mean(dim=2, keepdim=True)
-        # mean center point cloud before DGCNN
-        if not self.center_feature:
-            action_points_dmean = action_points
-            anchor_points_dmean = anchor_points
-        action_embedding = self.emb_nn_action(action_points_dmean)
-        anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
-
-        # tilde_phi, phi are both B,512,N
-        action_embedding_tf = self.transformer_action(action_embedding)
-        # action_embedding_tf: Batch, emb_dim, num_points
-        # action_attn: Batch, 4, num_points, num_points
-        anchor_embedding_tf = self.transformer_anchor(anchor_embedding)
-        action_embedding_tf = action_embedding + action_embedding_tf
-        anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
-
-        flow_action = self.head_action(
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_points,
-            anchor_points,
-            scores=None,
-        ).permute(0, 2, 1)
-
-        if self.cycle:
-            flow_anchor = self.head_anchor(
-                anchor_embedding_tf,
-                action_embedding_tf,
-                anchor_points,
-                action_points,
-                scores=None,
-            ).permute(0, 2, 1)
-            return flow_action, flow_anchor
-        return flow_action
-
-
-class ResidualFlow_DiffEmb(nn.Module):
-    def __init__(
-        self,
-        emb_dims=512,
-        cycle=True,
-        emb_nn="dgcnn",
-        return_flow_component=False,
-        center_feature=False,
-        inital_sampling_ratio=0.2,
-    ):
-        super(ResidualFlow_DiffEmb, self).__init__()
-        self.emb_dims = emb_dims
-        self.cycle = cycle
-        if emb_nn == "pointnet":
-            self.emb_nn_action = PointNet()
-            self.emb_nn_anchor = PointNet()
-        elif emb_nn == "pointnet2ben":
-            params_action = PN2DenseParams()
-            params_action.sa1.ratio = inital_sampling_ratio
-            self.emb_nn_action = Pointnet2Dense(emb_dims, params=params_action)
-            params_anchor = PN2DenseParams()
-            params_anchor.sa1.ratio = inital_sampling_ratio
-            self.emb_nn_anchor = Pointnet2Dense(emb_dims, params=params_anchor)
-        elif emb_nn == "pointnet2ori":
-            self.emb_nn_action = pointnet2(emb_dims)
-            self.emb_nn_anchor = pointnet2(emb_dims)
-        elif emb_nn == "dgcnn":
-            self.emb_nn_action = DGCNN(emb_dims=self.emb_dims)
-            self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims)
-        elif emb_nn == "vn":
-            self.emb_nn_action = VN_PointNet()
-            self.emb_nn_anchor = VN_PointNet()
-        else:
-            raise Exception("Not implemented")
-        self.return_flow_component = return_flow_component
-        self.center_feature = center_feature
-
-        self.transformer = Transformer(emb_dims=emb_dims, return_attn=True)
-        self.head_action = ResidualMLPHead(emb_dims=emb_dims)
-        self.head_anchor = ResidualMLPHead(emb_dims=emb_dims)
-
-    def forward(self, *input):
-        action_points = input[0].permute(0, 2, 1)  # B,3,num_points
-        anchor_points = input[1].permute(0, 2, 1)
-        action_points_dmean = action_points - action_points.mean(dim=2, keepdim=True)
-        anchor_points_dmean = anchor_points - anchor_points.mean(dim=2, keepdim=True)
-        # mean center point cloud before DGCNN
-        if not self.center_feature:
-            action_points_dmean = action_points
-            anchor_points_dmean = anchor_points
-        action_embedding = self.emb_nn_action(action_points_dmean)
-        anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
-
-        # tilde_phi, phi are both B,512,N
-        (
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_attn,
-            anchor_attn,
-        ) = self.transformer(action_embedding, anchor_embedding)
-
-        action_embedding_tf = action_embedding + action_embedding_tf
-        anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
-
-        action_attn = action_attn.mean(dim=1)
-        if self.return_flow_component:
-            flow_output_action = self.head_action(
-                action_embedding_tf,
-                anchor_embedding_tf,
-                action_points,
-                anchor_points,
-                scores=action_attn,
-                return_flow_component=self.return_flow_component,
-            )
-            flow_action = flow_output_action["full_flow"].permute(0, 2, 1)
-            residual_flow_action = flow_output_action["residual_flow"].permute(0, 2, 1)
-            corr_flow_action = flow_output_action["corr_flow"].permute(0, 2, 1)
-        else:
-            flow_action = self.head_action(
-                action_embedding_tf,
-                anchor_embedding_tf,
-                action_points,
-                anchor_points,
-                scores=action_attn,
-                return_flow_component=self.return_flow_component,
-            ).permute(0, 2, 1)
-
-        if self.cycle:
-            anchor_attn = anchor_attn.mean(dim=1)
-            if self.return_flow_component:
-                flow_output_anchor = self.head_anchor(
-                    anchor_embedding_tf,
-                    action_embedding_tf,
-                    anchor_points,
-                    action_points,
-                    scores=anchor_attn,
-                    return_flow_component=self.return_flow_component,
-                )
-                flow_anchor = flow_output_anchor["full_flow"].permute(0, 2, 1)
-                residual_flow_anchor = flow_output_anchor["residual_flow"].permute(
-                    0, 2, 1
-                )
-                corr_flow_anchor = flow_output_anchor["corr_flow"].permute(0, 2, 1)
-            else:
-                flow_anchor = self.head_anchor(
-                    anchor_embedding_tf,
-                    action_embedding_tf,
-                    anchor_points,
-                    action_points,
-                    scores=anchor_attn,
-                    return_flow_component=self.return_flow_component,
-                ).permute(0, 2, 1)
-            if self.return_flow_component:
-                return {
-                    "flow_action": flow_action,
-                    "flow_anchor": flow_anchor,
-                    "residual_flow_action": residual_flow_action,
-                    "residual_flow_anchor": residual_flow_anchor,
-                    "corr_flow_action": corr_flow_action,
-                    "corr_flow_anchor": corr_flow_anchor,
-                }
-            else:
-                return flow_action, flow_anchor
-        if self.return_flow_component:
-            return {
-                "flow_action": flow_action,
-                "residual_flow_action": residual_flow_action,
-                "corr_flow_action": corr_flow_action,
-            }
-        else:
-            return flow_action
-
-
 class ResidualFlow_DiffEmbTransformer(nn.Module):
     def __init__(
         self,
@@ -745,29 +140,14 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.emb_dims = emb_dims
         self.cycle = cycle
         self.input_dims = input_dims
-        if emb_nn == "pointnet":
-            self.emb_nn_action = PointNet()
-            self.emb_nn_anchor = PointNet()
-        elif emb_nn == "pointnet2ben":
-            params_action = PN2DenseParams()
-            params_action.sa1.ratio = inital_sampling_ratio
-            self.emb_nn_action = Pointnet2Dense(emb_dims, params=params_action)
-            params_anchor = PN2DenseParams()
-            params_anchor.sa1.ratio = inital_sampling_ratio
-            self.emb_nn_anchor = Pointnet2Dense(emb_dims, params=params_anchor)
-        elif emb_nn == "pointnet2ori":
-            self.emb_nn_action = pointnet2(emb_dims)
-            self.emb_nn_anchor = pointnet2(emb_dims)
-        elif emb_nn == "dgcnn":
+
+        if emb_nn == "dgcnn":
             self.emb_nn_action = DGCNN(
                 emb_dims=self.emb_dims, input_dims=self.input_dims
             )
             self.emb_nn_anchor = DGCNN(
                 emb_dims=self.emb_dims, input_dims=self.input_dims
             )
-        elif emb_nn == "vn":
-            self.emb_nn_action = VN_PointNet()
-            self.emb_nn_anchor = VN_PointNet()
         elif emb_nn == "vn_dgcnn":
             args = VNArgs()
             self.emb_nn_action = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
@@ -928,132 +308,6 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         return outputs
 
 
-class ResidualFlow(nn.Module):
-    def __init__(
-        self,
-        emb_dims=512,
-        cycle=True,
-        emb_nn="dgcnn",
-        return_flow_component=False,
-        center_feature=False,
-        inital_sampling_ratio=0.2,
-    ):
-        super(ResidualFlow, self).__init__()
-        self.emb_dims = emb_dims
-        self.cycle = cycle
-        if emb_nn == "pointnet":
-            self.emb_nn = PointNet()
-        elif emb_nn == "pointnet2ben":
-            params_action = PN2DenseParams()
-            params_action.sa1.ratio = inital_sampling_ratio
-            self.emb_nn = Pointnet2Dense(emb_dims, params=params_action)
-        elif emb_nn == "pointnet2ori":
-            self.emb_nn = pointnet2(emb_dims)
-        elif emb_nn == "dgcnn":
-            self.emb_nn = DGCNN(emb_dims=self.emb_dims)
-        elif emb_nn == "vn":
-            self.emb_nn = VN_PointNet()
-        else:
-            raise Exception("Not implemented")
-        self.return_flow_component = return_flow_component
-        self.center_feature = center_feature
-
-        self.transformer = Transformer(emb_dims=emb_dims, return_attn=True)
-        self.head_action = ResidualMLPHead(emb_dims=emb_dims)
-        self.head_anchor = ResidualMLPHead(emb_dims=emb_dims)
-
-    def forward(self, *input):
-        action_points = input[0].permute(0, 2, 1)  # B,3,num_points
-        anchor_points = input[1].permute(0, 2, 1)
-        action_points_dmean = action_points - action_points.mean(dim=2, keepdim=True)
-        anchor_points_dmean = anchor_points - anchor_points.mean(dim=2, keepdim=True)
-        # mean center point cloud before DGCNN
-        if not self.center_feature:
-            action_points_dmean = action_points
-            anchor_points_dmean = anchor_points
-        action_embedding = self.emb_nn(action_points_dmean)
-        anchor_embedding = self.emb_nn(anchor_points_dmean)
-
-        # tilde_phi, phi are both B,512,N
-        (
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_attn,
-            anchor_attn,
-        ) = self.transformer(action_embedding, anchor_embedding)
-
-        action_embedding_tf = action_embedding + action_embedding_tf
-        anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
-
-        action_attn = action_attn.mean(dim=1)
-        if self.return_flow_component:
-            flow_output_action = self.head_action(
-                action_embedding_tf,
-                anchor_embedding_tf,
-                action_points,
-                anchor_points,
-                scores=action_attn,
-                return_flow_component=self.return_flow_component,
-            )
-            flow_action = flow_output_action["full_flow"].permute(0, 2, 1)
-            residual_flow_action = flow_output_action["residual_flow"].permute(0, 2, 1)
-            corr_flow_action = flow_output_action["corr_flow"].permute(0, 2, 1)
-        else:
-            flow_action = self.head_action(
-                action_embedding_tf,
-                anchor_embedding_tf,
-                action_points,
-                anchor_points,
-                scores=action_attn,
-                return_flow_component=self.return_flow_component,
-            ).permute(0, 2, 1)
-
-        if self.cycle:
-            anchor_attn = anchor_attn.mean(dim=1)
-            if self.return_flow_component:
-                flow_output_anchor = self.head_anchor(
-                    anchor_embedding_tf,
-                    action_embedding_tf,
-                    anchor_points,
-                    action_points,
-                    scores=anchor_attn,
-                    return_flow_component=self.return_flow_component,
-                )
-                flow_anchor = flow_output_anchor["full_flow"].permute(0, 2, 1)
-                residual_flow_anchor = flow_output_anchor["residual_flow"].permute(
-                    0, 2, 1
-                )
-                corr_flow_anchor = flow_output_anchor["corr_flow"].permute(0, 2, 1)
-            else:
-                flow_anchor = self.head_anchor(
-                    anchor_embedding_tf,
-                    action_embedding_tf,
-                    anchor_points,
-                    action_points,
-                    scores=anchor_attn,
-                    return_flow_component=self.return_flow_component,
-                ).permute(0, 2, 1)
-            if self.return_flow_component:
-                return {
-                    "flow_action": flow_action,
-                    "flow_anchor": flow_anchor,
-                    "residual_flow_action": residual_flow_action,
-                    "residual_flow_anchor": residual_flow_anchor,
-                    "corr_flow_action": corr_flow_action,
-                    "corr_flow_anchor": corr_flow_anchor,
-                }
-            else:
-                return flow_action, flow_anchor
-        if self.return_flow_component:
-            return {
-                "flow_action": flow_action,
-                "residual_flow_action": residual_flow_action,
-                "corr_flow_action": corr_flow_action,
-            }
-        else:
-            return flow_action
-
-
 def scale_coords(src, scale_len):
     """
     src of shape: B,3,N
@@ -1062,439 +316,6 @@ def scale_coords(src, scale_len):
     src_normalized = src_zeromined / src_zeromined.max()
     src_scaled = (src_normalized * scale_len).int()
     return src_scaled
-
-
-class ResidualFlow_PE(nn.Module):
-    def __init__(self, emb_dims=512, cycle=True, emb_nn="dgcnn", scale_len=50):
-        super(ResidualFlow_PE, self).__init__()
-        self.emb_dims = emb_dims
-        self.cycle = cycle
-        if emb_nn == "pointnet":
-            self.emb_nn = PointNet()
-        elif emb_nn == "dgcnn":
-            self.emb_nn = DGCNN(emb_dims=self.emb_dims)
-        else:
-            raise Exception("Not implemented")
-        self.scale_len = scale_len
-        self.positional_encoding = PositionalEncoding3D(channels=self.emb_dims)
-        self.transformer = Transformer(emb_dims=emb_dims, return_attn=True)
-        self.head_action = ResidualMLPHead(emb_dims=emb_dims)
-        self.head_anchor = ResidualMLPHead(emb_dims=emb_dims)
-
-    def forward(self, *input):
-        action_points = input[0].permute(0, 2, 1)
-        anchor_points = input[1].permute(0, 2, 1)
-        # TODO:
-        # Use coordinaters of each point to get positional_endocings and add to action_embedding/anchor_embedding
-        action_embedding = self.emb_nn(action_points)  # B,512,N
-        anchor_embedding = self.emb_nn(anchor_points)
-
-        src_embedding_tf, tgt_embedding_tf, action_attn, anchor_attn = self.transformer(
-            action_embedding, anchor_embedding
-        )  # tilde_phi, phi are both B,512,N
-        shape_tensor = torch.zeros(
-            action_points.shape[0],
-            self.scale_len,
-            self.scale_len,
-            self.scale_len,
-            self.emb_dims,
-        )
-
-        pe = self.positional_encoding(shape_tensor)  # B,100,100,100,512
-        src_scaled = scale_coords(action_points, self.scale_len)  # B,3,N
-        tgt_scaled = scale_coords(anchor_points, self.scale_len)  # B,3,N
-
-        src_index = torch.transpose(src_scaled, 1, 2)  # B,N,3
-        tgt_index = torch.transpose(tgt_scaled, 1, 2)  # B,N,3
-
-        # for i in range(src_index.shape[1]):
-        l = []
-        for i in range(action_embedding.shape[-1]):
-            perpt_idx = src_index[:, i].long()  # B,1,3
-
-            emb = pe[
-                torch.arange(src_index.shape[0]),
-                perpt_idx[:, 0],
-                perpt_idx[:, 1],
-                perpt_idx[:, 2],
-                :,
-            ].unsqueeze(
-                1
-            )  # B,512
-            l.append(emb)
-
-        src_pe = torch.cat(l, 1)
-
-        src_embedding_tf = action_embedding + src_embedding_tf
-        tgt_embedding_tf = anchor_embedding + tgt_embedding_tf
-        action_attn = action_attn.mean(dim=1)
-        flow_ab = self.head_src(
-            src_embedding_tf,
-            tgt_embedding_tf,
-            action_points,
-            anchor_points,
-            scores=action_attn,
-        ).permute(0, 2, 1)
-
-        if self.cycle:
-            anchor_attn = anchor_attn.mean(dim=1)
-            flow_ba = self.head_tgt(
-                tgt_embedding_tf,
-                src_embedding_tf,
-                anchor_points,
-                action_points,
-                scores=anchor_attn,
-            ).permute(0, 2, 1)
-            return flow_ab, flow_ba
-
-        return flow_ab
-
-
-class ResidualFlow_V1(nn.Module):
-    def __init__(self, emb_dims=512, cycle=True, emb_nn="dgcnn"):
-        super(ResidualFlow_V1, self).__init__()
-        self.emb_dims = emb_dims
-        self.cycle = cycle
-        if emb_nn == "pointnet":
-            self.emb_nn = PointNet()
-        elif emb_nn == "dgcnn":
-            self.emb_nn = DGCNN(emb_dims=self.emb_dims)
-        else:
-            raise Exception("Not implemented")
-
-        self.transformer = Transformer(emb_dims=emb_dims, return_attn=True)
-        self.head_action = ResidualMLPHead_V1(emb_dims=emb_dims)
-        self.head_anchor = ResidualMLPHead_V1(emb_dims=emb_dims)
-
-    def forward(self, *input):
-        action_points = input[0].permute(0, 2, 1)
-        anchor_points = input[1].permute(0, 2, 1)
-        action_embedding = self.emb_nn(action_points)
-        anchor_embedding = self.emb_nn(anchor_points)
-
-        (
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_attn,
-            anchor_attn,
-        ) = self.transformer(
-            action_embedding, anchor_embedding
-        )  # tilde_phi, phi are both B,512,N
-
-        action_embedding_tf = action_embedding + action_embedding_tf
-        anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
-
-        action_attn = action_attn.mean(dim=1)
-        flow_action = self.head_action(
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_points,
-            anchor_points,
-            action_embedding,
-            anchor_embedding,
-            scores=action_attn,
-        ).permute(0, 2, 1)
-
-        if self.cycle:
-            anchor_attn = anchor_attn.mean(dim=1)
-            flow_anchor = self.head_anchor(
-                anchor_embedding_tf,
-                action_embedding_tf,
-                anchor_points,
-                action_points,
-                anchor_embedding,
-                action_embedding,
-                scores=anchor_attn,
-            ).permute(0, 2, 1)
-            return flow_action, flow_anchor
-
-        return flow_action
-
-
-class ResidualFlow_V2(nn.Module):
-    def __init__(self, emb_dims=512, cycle=True, emb_nn="dgcnn"):
-        super(ResidualFlow_V2, self).__init__()
-        self.emb_dims = emb_dims
-        self.cycle = cycle
-        if emb_nn == "pointnet":
-            self.emb_nn = PointNet()
-        elif emb_nn == "dgcnn":
-            self.emb_nn = DGCNN(emb_dims=self.emb_dims)
-        else:
-            raise Exception("Not implemented")
-
-        self.transformer = Transformer(emb_dims=emb_dims, return_attn=True)
-        self.head_action = ResidualMLPHead_V2(emb_dims=emb_dims)
-        self.head_anchor = ResidualMLPHead_V2(emb_dims=emb_dims)
-
-    def forward(self, *input):
-        action_points = input[0].permute(0, 2, 1)
-        anchor_points = input[1].permute(0, 2, 1)
-        action_embedding = self.emb_nn(action_points)
-        anchor_embedding = self.emb_nn(anchor_points)
-
-        (
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_attn,
-            anchor_attn,
-        ) = self.transformer(
-            action_embedding, anchor_embedding
-        )  # tilde_phi, phi are both B,512,N
-
-        action_embedding_tf = action_embedding + action_embedding_tf
-        anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
-
-        action_attn = action_attn.mean(dim=1)
-        flow_action = self.head_action(
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_points,
-            anchor_points,
-            scores=action_attn,
-        ).permute(0, 2, 1)
-
-        if self.cycle:
-            anchor_attn = anchor_attn.mean(dim=1)
-            flow_anchor = self.head_anchor(
-                anchor_embedding_tf,
-                action_embedding_tf,
-                anchor_points,
-                action_points,
-                scores=anchor_attn,
-            ).permute(0, 2, 1)
-            return flow_action, flow_anchor
-
-        return flow_action
-
-
-class ResidualFlow_V3(nn.Module):
-    def __init__(self, emb_dims=512, cycle=True, emb_nn="dgcnn"):
-        super(ResidualFlow_V3, self).__init__()
-        self.emb_dims = emb_dims
-        self.cycle = cycle
-        if emb_nn == "pointnet":
-            self.emb_nn = PointNet()
-        elif emb_nn == "dgcnn":
-            self.emb_nn = DGCNN(emb_dims=self.emb_dims)
-        else:
-            raise Exception("Not implemented")
-
-        self.transformer = Transformer(emb_dims=emb_dims, return_attn=True)
-        self.head_action = ResidualMLPHead_V3(emb_dims=emb_dims)
-        self.head_anchor = ResidualMLPHead_V3(emb_dims=emb_dims)
-
-    def forward(self, *input):
-        action_points = input[0].permute(0, 2, 1)
-        anchor_points = input[1].permute(0, 2, 1)
-        action_embedding = self.emb_nn(action_points)
-        anchor_embedding = self.emb_nn(anchor_points)
-
-        (
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_attn,
-            anchor_attn,
-        ) = self.transformer(
-            action_embedding, anchor_embedding
-        )  # tilde_phi, phi are both B,512,N
-
-        action_embedding_tf = action_embedding + action_embedding_tf
-        anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
-
-        action_attn = action_attn.mean(dim=1)
-        flow_action = self.head_action(
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_points,
-            anchor_points,
-            scores=action_attn,
-        ).permute(0, 2, 1)
-
-        if self.cycle:
-            anchor_attn = anchor_attn.mean(dim=1)
-            flow_anchor = self.head_anchor(
-                anchor_embedding_tf,
-                action_embedding_tf,
-                anchor_points,
-                action_points,
-                scores=anchor_attn,
-            ).permute(0, 2, 1)
-            return flow_action, flow_anchor
-
-        return flow_action
-
-
-class ResidualFlow_V4(nn.Module):
-    def __init__(self, emb_dims=512, cycle=True, emb_nn="dgcnn"):
-        super(ResidualFlow_V4, self).__init__()
-        self.emb_dims = emb_dims
-        self.cycle = cycle
-        if emb_nn == "pointnet":
-            self.emb_nn = PointNet()
-        elif emb_nn == "dgcnn":
-            self.emb_nn = DGCNN(emb_dims=self.emb_dims)
-        else:
-            raise Exception("Not implemented")
-
-        self.transformer = Transformer(emb_dims=emb_dims, return_attn=True)
-        self.head_action = ResidualMLPHead_V4(emb_dims=emb_dims)
-        self.head_anchor = ResidualMLPHead_V4(emb_dims=emb_dims)
-
-    def forward(self, *input):
-        action_points = input[0].permute(0, 2, 1)
-        anchor_points = input[1].permute(0, 2, 1)
-        action_embedding = self.emb_nn(action_points)
-        anchor_embedding = self.emb_nn(anchor_points)
-
-        (
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_attn,
-            anchor_attn,
-        ) = self.transformer(
-            action_embedding, anchor_embedding
-        )  # tilde_phi, phi are both B,512,N
-
-        action_embedding_tf = action_embedding + action_embedding_tf
-        anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
-
-        action_attn = action_attn.mean(dim=1)
-        flow_action = self.head_action(
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_points,
-            anchor_points,
-            scores=action_attn,
-        ).permute(0, 2, 1)
-
-        if self.cycle:
-            anchor_attn = anchor_attn.mean(dim=1)
-            flow_anchor = self.head_anchor(
-                anchor_embedding_tf,
-                action_embedding_tf,
-                anchor_points,
-                action_points,
-                scores=anchor_attn,
-            ).permute(0, 2, 1)
-            return flow_action, flow_anchor
-
-        return flow_action
-
-
-class ResidualFlow_Correspondence(nn.Module):
-    def __init__(self, emb_dims=512, cycle=True, emb_nn="dgcnn"):
-        super(ResidualFlow_Correspondence, self).__init__()
-        self.emb_dims = emb_dims
-        self.cycle = cycle
-        if emb_nn == "pointnet":
-            self.emb_nn = PointNet()
-        elif emb_nn == "dgcnn":
-            self.emb_nn = DGCNN(emb_dims=self.emb_dims)
-        else:
-            raise Exception("Not implemented")
-
-        self.transformer = Transformer(emb_dims=emb_dims, return_attn=True)
-        self.head_action = ResidualMLPHead_Correspondence(emb_dims=emb_dims)
-        self.head_anchor = ResidualMLPHead_Correspondence(emb_dims=emb_dims)
-
-    def forward(self, *input):
-        action_points = input[0].permute(0, 2, 1)
-        anchor_points = input[1].permute(0, 2, 1)
-        action_embedding = self.emb_nn(action_points)
-        anchor_embedding = self.emb_nn(anchor_points)
-
-        (
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_attn,
-            anchor_attn,
-        ) = self.transformer(
-            action_embedding, anchor_embedding
-        )  # tilde_phi, phi are both B,512,N
-
-        action_embedding_tf = action_embedding + action_embedding_tf
-        anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
-
-        action_attn = action_attn.mean(dim=1)
-        flow_action = self.head_action(
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_points,
-            anchor_points,
-            scores=action_attn,
-        ).permute(0, 2, 1)
-
-        if self.cycle:
-            anchor_attn = anchor_attn.mean(dim=1)
-            flow_anchor = self.head_anchor(
-                anchor_embedding_tf,
-                action_embedding_tf,
-                anchor_points,
-                action_points,
-                scores=anchor_attn,
-            ).permute(0, 2, 1)
-            return flow_action, flow_anchor
-
-        return flow_action
-
-
-class ResidualFlow_Identity(nn.Module):
-    def __init__(self, emb_dims=512, cycle=True, emb_nn="dgcnn"):
-        super(ResidualFlow_Identity, self).__init__()
-        self.emb_dims = emb_dims
-        self.cycle = cycle
-        if emb_nn == "pointnet":
-            self.emb_nn = PointNet()
-        elif emb_nn == "dgcnn":
-            self.emb_nn = DGCNN(emb_dims=self.emb_dims)
-        else:
-            raise Exception("Not implemented")
-
-        self.transformer = Transformer(emb_dims=emb_dims, return_attn=True)
-        self.head_action = ResidualMLPHead_Identity(emb_dims=emb_dims)
-        self.head_anchor = ResidualMLPHead_Identity(emb_dims=emb_dims)
-
-    def forward(self, *input):
-        action_points = input[0].permute(0, 2, 1)
-        anchor_points = input[1].permute(0, 2, 1)
-        action_embedding = self.emb_nn(action_points)
-        anchor_embedding = self.emb_nn(anchor_points)
-
-        (
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_attn,
-            anchor_attn,
-        ) = self.transformer(
-            action_embedding, anchor_embedding
-        )  # tilde_phi, phi are both B,512,N
-
-        action_embedding_tf = action_embedding + action_embedding_tf
-        anchor_embedding_tf = anchor_embedding + anchor_embedding_tf
-
-        action_attn = action_attn.mean(dim=1)
-        flow_action = self.head_action(
-            action_embedding_tf,
-            anchor_embedding_tf,
-            action_points,
-            anchor_points,
-            action_embedding,
-            anchor_embedding,
-        ).permute(0, 2, 1)
-
-        if self.cycle:
-            anchor_attn = anchor_attn.mean(dim=1)
-            flow_anchor = self.head_anchor(
-                anchor_embedding_tf,
-                action_embedding_tf,
-                anchor_points,
-                action_points,
-                scores=anchor_attn,
-            ).permute(0, 2, 1)
-            return flow_action, flow_anchor
-
-        return flow_action
 
 
 mse_criterion = nn.MSELoss(reduction="sum")
@@ -1993,6 +814,83 @@ def step_till_goal(robot, goal, max_duration=2.0):
 MAX_TIME = 5.0
 
 
+def create_network(model_cfg):
+    network = ResidualFlow_DiffEmbTransformer(
+        pred_weight=model_cfg.pred_weight,
+        emb_nn=model_cfg.emb_nn,
+        emb_dims=model_cfg.emb_dims,
+        return_flow_component=model_cfg.return_flow_component,
+        center_feature=model_cfg.center_feature,
+        inital_sampling_ratio=model_cfg.inital_sampling_ratio,
+        residual_on=model_cfg.residual_on,
+        multilaterate=model_cfg.multilaterate,
+        sample=model_cfg.mlat_sample,
+        mlat_nkps=model_cfg.mlat_nkps,
+    )
+    return network
+
+
+def create_ndf_networks(hydra_cfg):
+    vnn_model_path = osp.join(
+        path_util.get_ndf_model_weights(), hydra_cfg.model_path + ".pth"
+    )
+    if hydra_cfg.dgcnn:
+        model = vnn_occupancy_network.VNNOccNet(
+            latent_dim=256,
+            model_type="dgcnn",
+            return_features=True,
+            sigmoid=True,
+            acts=hydra_cfg.acts,
+        ).cuda()
+    else:
+        model = vnn_occupancy_network.VNNOccNet(
+            latent_dim=256, model_type="pointnet", return_features=True, sigmoid=True
+        ).cuda()
+
+    if not hydra_cfg.random:
+        checkpoint_path = global_dict["vnn_checkpoint_path"]
+        model.load_state_dict(torch.load(checkpoint_path))
+    else:
+        pass
+
+    place_optimizer = OccNetOptimizer(
+        model,
+        query_pts=place_optimizer_pts,
+        query_pts_real_shape=place_optimizer_pts_rs,
+        opt_iterations=hydra_cfg.opt_iterations,
+    )
+
+    grasp_optimizer = OccNetOptimizer(
+        model,
+        query_pts=optimizer_gripper_pts,
+        query_pts_real_shape=optimizer_gripper_pts_rs,
+        opt_iterations=hydra_cfg.opt_iterations,
+    )
+    grasp_optimizer.set_demo_info(demo_target_info_list)
+    place_optimizer.set_demo_info(demo_rack_target_info_list)
+
+
+def make_grid_fig(eval_dir, grid_img_fn):
+    img_dir = os.path.join(eval_dir, "teleport_imgs")
+    res_file = os.path.join(eval_dir, "trial_99/success_rate_eval_implicit.npz")
+    results_dict = np.load(res_file)
+    fig = plt.figure(figsize=(16.0, 16.0))
+
+    grid = ImageGrid(fig, 111, nrows_ncols=(10, 10), share_all=True, axes_pad=0.3)
+    grid[0].get_yaxis().set_ticks([])
+    grid[0].get_xaxis().set_ticks([])
+
+    for i, ax in enumerate(grid):
+        ax.imshow(PIL.Image.open(os.path.join(img_dir, f"teleport_{i}.png")))
+        ax.set_xlim(350, 550)
+        ax.set_ylim(350, 150)
+
+        succ = results_dict["place_success_teleport_list"][i]
+        ax.set_title("success" if succ else "fail", color="blue" if succ else "red")
+
+    plt.savefig(grid_img_fn)
+
+
 @hydra.main(
     config_path="../configs/",
     config_name="eval_full_mug_standalone",
@@ -2000,34 +898,29 @@ MAX_TIME = 5.0
 @torch.no_grad()
 def main(hydra_cfg):
     print(OmegaConf.to_yaml(hydra_cfg, resolve=True))
-    txt_file_name = "{}.txt".format(hydra_cfg.eval_data_dir)
-    data_dir = hydra_cfg.data_dir
-    save_dir = os.path.join("./ben_trying_things", data_dir)
-    if not os.path.isdir(save_dir):
-        os.makedirs(save_dir)
+    set_log_level("debug" if hydra_cfg.debug else "info")
 
-    hydra_cfg.eval_data_dir = hydra_cfg.data_dir
+    # Configure the output directories.
+    eval_save_dir = hydra_cfg.eval_save_dir
+    eval_pointclouds_dir = osp.join(eval_save_dir, "pointclouds")
+    eval_grasp_imgs_dir = osp.join(eval_save_dir, "grasp_imgs")
+    eval_teleport_imgs_dir = osp.join(eval_save_dir, "teleport_imgs")
+    util.safe_makedirs(eval_save_dir)
+    util.safe_makedirs(eval_pointclouds_dir)
+    util.safe_makedirs(eval_grasp_imgs_dir)
+    util.safe_makedirs(eval_teleport_imgs_dir)
+
+    results_file_name = hydra_cfg.results_file_name
+    results_path = osp.join(eval_save_dir, results_file_name)
+
     obj_class = hydra_cfg.object_class.name
+
     shapenet_obj_dir = osp.join(
         path_util.get_ndf_obj_descriptions(), obj_class + "_centered_obj_normalized"
     )
 
     demo_load_dir = osp.join(
-        path_util.get_ndf_data(), "demos", obj_class, hydra_cfg.demo_exp
-    )
-
-    expstr = "exp--" + str(hydra_cfg.exp)
-    modelstr = "model--" + str(hydra_cfg.model_path)
-    seedstr = "seed--" + str(hydra_cfg.seed)
-    full_experiment_name = "_".join([expstr, modelstr, seedstr])
-
-    eval_save_dir = osp.join(
-        path_util.get_ndf_eval_data(), hydra_cfg.eval_data_dir, full_experiment_name
-    )
-    util.safe_makedirs(eval_save_dir)
-
-    vnn_model_path = osp.join(
-        path_util.get_ndf_model_weights(), hydra_cfg.model_path + ".pth"
+        path_util.get_ndf_data(), "demos", obj_class, hydra_cfg.object_class.demo_exp
     )
 
     global_dict = dict(
@@ -2035,13 +928,8 @@ def main(hydra_cfg):
         demo_load_dir=demo_load_dir,
         eval_save_dir=eval_save_dir,
         object_class=obj_class,
-        vnn_checkpoint_path=vnn_model_path,
+        # vnn_checkpoint_path=vnn_model_path,
     )
-
-    if hydra_cfg.debug:
-        set_log_level("debug")
-    else:
-        set_log_level("info")
 
     robot = Robot(
         "franka",
@@ -2074,11 +962,6 @@ def main(hydra_cfg):
     obj_class = global_dict["object_class"]
     eval_save_dir = global_dict["eval_save_dir"]
 
-    eval_grasp_imgs_dir = osp.join(eval_save_dir, "grasp_imgs")
-    eval_teleport_imgs_dir = osp.join(eval_save_dir, "teleport_imgs")
-    util.safe_makedirs(eval_grasp_imgs_dir)
-    util.safe_makedirs(eval_teleport_imgs_dir)
-
     test_shapenet_ids = np.loadtxt(
         osp.join(path_util.get_ndf_share(), "%s_test_object_split.txt" % obj_class),
         dtype=str,
@@ -2108,25 +991,6 @@ def main(hydra_cfg):
     preplace_horizontal_tf_list = cfg.PREPLACE_HORIZONTAL_OFFSET_TF
     preplace_horizontal_tf = util.list2pose_stamped(cfg.PREPLACE_HORIZONTAL_OFFSET_TF)
     preplace_offset_tf = util.list2pose_stamped(cfg.PREPLACE_OFFSET_TF)
-
-    if hydra_cfg.dgcnn:
-        model = vnn_occupancy_network.VNNOccNet(
-            latent_dim=256,
-            model_type="dgcnn",
-            return_features=True,
-            sigmoid=True,
-            acts=hydra_cfg.acts,
-        ).cuda()
-    else:
-        model = vnn_occupancy_network.VNNOccNet(
-            latent_dim=256, model_type="pointnet", return_features=True, sigmoid=True
-        ).cuda()
-
-    if not hydra_cfg.random:
-        checkpoint_path = global_dict["vnn_checkpoint_path"]
-        # model.load_state_dict(torch.load(checkpoint_path))
-    else:
-        pass
 
     if cfg.DEMOS.PLACEMENT_SURFACE == "shelf":
         load_shelf = True
@@ -2254,22 +1118,6 @@ def main(hydra_cfg):
         demo_rack_target_info_list.append(rack_target_info)
         demo_shapenet_ids.append(shapenet_id)
 
-    place_optimizer = OccNetOptimizer(
-        model,
-        query_pts=place_optimizer_pts,
-        query_pts_real_shape=place_optimizer_pts_rs,
-        opt_iterations=hydra_cfg.opt_iterations,
-    )
-
-    grasp_optimizer = OccNetOptimizer(
-        model,
-        query_pts=optimizer_gripper_pts,
-        query_pts_real_shape=optimizer_gripper_pts_rs,
-        opt_iterations=hydra_cfg.opt_iterations,
-    )
-    grasp_optimizer.set_demo_info(demo_target_info_list)
-    place_optimizer.set_demo_info(demo_rack_target_info_list)
-
     # get objects that we can use for testing
     test_object_ids = []
     shapenet_id_list = (
@@ -2336,150 +1184,37 @@ def main(hydra_cfg):
 
     pl.seed_everything(hydra_cfg.seed)
 
-    if hydra_cfg.flow_compute_type == 0:
-        if hydra_cfg.diff_emb:
-            if hydra_cfg.diff_transformer:
-                if hydra_cfg.mlp:
-                    network = CorrespondenceFlow_DiffEmbMLP(
-                        emb_dims=hydra_cfg.emb_dims,
-                        emb_nn=hydra_cfg.emb_nn,
-                        center_feature=hydra_cfg.center_feature,
-                        inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                    )
-                else:
-                    network = ResidualFlow_DiffEmbTransformer(
-                        pred_weight=hydra_cfg.pred_weight,
-                        emb_nn=hydra_cfg.emb_nn,
-                        return_flow_component=hydra_cfg.return_flow_component,
-                        center_feature=hydra_cfg.center_feature,
-                        inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                        residual_on=hydra_cfg.residual_on,
-                        multilaterate=hydra_cfg.multilaterate,
-                        sample=hydra_cfg.mlat_sample,
-                        mlat_nkps=hydra_cfg.mlat_nkps,
-                    )
-            else:
-                network = ResidualFlow_DiffEmb(
-                    emb_nn=hydra_cfg.emb_nn,
-                    return_flow_component=hydra_cfg.return_flow_component,
-                    center_feature=hydra_cfg.center_feature,
-                    inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                )
-        else:
-            network = ResidualFlow(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-                center_feature=hydra_cfg.center_feature,
-            )
-    elif hydra_cfg.flow_compute_type == 1:
-        network = ResidualFlow_V1(
-            emb_nn=hydra_cfg.emb_nn,
-            return_flow_component=hydra_cfg.return_flow_component,
-        )
-    elif hydra_cfg.flow_compute_type == 2:
-        network = ResidualFlow_V2(
-            emb_nn=hydra_cfg.emb_nn,
-            return_flow_component=hydra_cfg.return_flow_component,
-        )
-    elif hydra_cfg.flow_compute_type == 3:
-        network = ResidualFlow_V3(
-            emb_nn=hydra_cfg.emb_nn,
-            return_flow_component=hydra_cfg.return_flow_component,
-        )
-    elif hydra_cfg.flow_compute_type == 4:
-        network = ResidualFlow_V4(
-            emb_nn=hydra_cfg.emb_nn,
-            return_flow_component=hydra_cfg.return_flow_component,
-        )
-    elif hydra_cfg.flow_compute_type == 5:
-        network = ResidualFlow_Correspondence(emb_nn=hydra_cfg.emb_nn)
-    elif hydra_cfg.flow_compute_type == 6:
-        network = ResidualFlow_Identity(emb_nn=hydra_cfg.emb_nn)
-    elif hydra_cfg.flow_compute_type == "pe":
-        network = ResidualFlow_PE(emb_nn=hydra_cfg.emb_nn)
+    network = create_network(hydra_cfg.model)
+
     place_model = EquivarianceTestingModule(
         network,
         lr=hydra_cfg.lr,
         image_log_period=hydra_cfg.image_logging_period,
-        weight_normalize=hydra_cfg.weight_normalize_place,
+        weight_normalize=hydra_cfg.place_task.weight_normalize,
+        softmax_temperature=hydra_cfg.place_task.softmax_temperature,
         loop=hydra_cfg.loop,
     )
 
     place_model.cuda()
-    place_model.eval()
+
+    if hydra_cfg.model_eval_on:
+        place_model.eval()
 
     if hydra_cfg.checkpoint_file_place is not None:
         place_model.load_state_dict(
             torch.load(hydra_cfg.checkpoint_file_place)["state_dict"]
         )
         log_info("Model Loaded from " + str(hydra_cfg.checkpoint_file_place))
+
     if hydra_cfg.checkpoint_file_place_refinement is not None:
-        if hydra_cfg.flow_compute_type == 0:
-            if hydra_cfg.diff_emb:
-                if hydra_cfg.diff_transformer:
-                    if hydra_cfg.mlp:
-                        network = CorrespondenceFlow_DiffEmbMLP(
-                            emb_dims=hydra_cfg.emb_dims,
-                            emb_nn=hydra_cfg.emb_nn,
-                            center_feature=hydra_cfg.center_feature,
-                            inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                        )
-                    else:
-                        network = ResidualFlow_DiffEmbTransformer(
-                            pred_weight=hydra_cfg.pred_weight,
-                            emb_nn=hydra_cfg.emb_nn,
-                            return_flow_component=hydra_cfg.return_flow_component,
-                            center_feature=hydra_cfg.center_feature,
-                            inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                            residual_on=hydra_cfg.residual_on,
-                            multilaterate=hydra_cfg.multilaterate,
-                            sample=hydra_cfg.mlat_sample,
-                            mlat_nkps=hydra_cfg.mlat_nkps,
-                        )
-                else:
-                    network = ResidualFlow_DiffEmb(
-                        emb_nn=hydra_cfg.emb_nn,
-                        return_flow_component=hydra_cfg.return_flow_component,
-                        center_feature=hydra_cfg.center_feature,
-                        inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                    )
-            else:
-                network = ResidualFlow(
-                    emb_nn=hydra_cfg.emb_nn,
-                    return_flow_component=hydra_cfg.return_flow_component,
-                    center_feature=hydra_cfg.center_feature,
-                )
-        elif hydra_cfg.flow_compute_type == 1:
-            network = ResidualFlow_V1(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 2:
-            network = ResidualFlow_V2(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 3:
-            network = ResidualFlow_V3(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 4:
-            network = ResidualFlow_V4(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 5:
-            network = ResidualFlow_Correspondence(emb_nn=hydra_cfg.emb_nn)
-        elif hydra_cfg.flow_compute_type == 6:
-            network = ResidualFlow_Identity(emb_nn=hydra_cfg.emb_nn)
-        elif hydra_cfg.flow_compute_type == "pe":
-            network = ResidualFlow_PE(emb_nn=hydra_cfg.emb_nn)
+        network = create_network(hydra_cfg.model)
+
         place_model_refinement = EquivarianceTestingModule(
             network,
             lr=hydra_cfg.lr,
             image_log_period=hydra_cfg.image_logging_period,
-            weight_normalize=hydra_cfg.weight_normalize_place,
+            weight_normalize=hydra_cfg.place_task.weight_normalize,
+            softmax_temperature=hydra_cfg.place_task.softmax_temperature,
             loop=hydra_cfg.loop,
         )
 
@@ -2493,78 +1228,19 @@ def main(hydra_cfg):
             + str(hydra_cfg.checkpoint_file_place_refinement)
         )
 
-    if hydra_cfg.flow_compute_type == 0:
-        if hydra_cfg.diff_emb:
-            if hydra_cfg.diff_transformer:
-                if hydra_cfg.mlp:
-                    network = CorrespondenceFlow_DiffEmbMLP(
-                        emb_dims=hydra_cfg.emb_dims,
-                        emb_nn=hydra_cfg.emb_nn,
-                        center_feature=hydra_cfg.center_feature,
-                        inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                    )
-                else:
-                    network = ResidualFlow_DiffEmbTransformer(
-                        pred_weight=hydra_cfg.pred_weight,
-                        emb_nn=hydra_cfg.emb_nn,
-                        return_flow_component=hydra_cfg.return_flow_component,
-                        center_feature=hydra_cfg.center_feature,
-                        inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                        residual_on=hydra_cfg.residual_on,
-                        multilaterate=hydra_cfg.multilaterate,
-                        sample=hydra_cfg.mlat_sample,
-                        mlat_nkps=hydra_cfg.mlat_nkps,
-                    )
-            else:
-                network = ResidualFlow_DiffEmb(
-                    emb_nn=hydra_cfg.emb_nn,
-                    return_flow_component=hydra_cfg.return_flow_component,
-                    center_feature=hydra_cfg.center_feature,
-                    inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                )
-        else:
-            network = ResidualFlow(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-                center_feature=hydra_cfg.center_feature,
-            )
-    elif hydra_cfg.flow_compute_type == 1:
-        network = ResidualFlow_V1(
-            emb_nn=hydra_cfg.emb_nn,
-            return_flow_component=hydra_cfg.return_flow_component,
-        )
-    elif hydra_cfg.flow_compute_type == 2:
-        network = ResidualFlow_V2(
-            emb_nn=hydra_cfg.emb_nn,
-            return_flow_component=hydra_cfg.return_flow_component,
-        )
-    elif hydra_cfg.flow_compute_type == 3:
-        network = ResidualFlow_V3(
-            emb_nn=hydra_cfg.emb_nn,
-            return_flow_component=hydra_cfg.return_flow_component,
-        )
-    elif hydra_cfg.flow_compute_type == 4:
-        network = ResidualFlow_V4(
-            emb_nn=hydra_cfg.emb_nn,
-            return_flow_component=hydra_cfg.return_flow_component,
-        )
-    elif hydra_cfg.flow_compute_type == 5:
-        network = ResidualFlow_Correspondence(emb_nn=hydra_cfg.emb_nn)
-    elif hydra_cfg.flow_compute_type == 6:
-        network = ResidualFlow_Identity(emb_nn=hydra_cfg.emb_nn)
-    elif hydra_cfg.flow_compute_type == "pe":
-        network = ResidualFlow_PE(emb_nn=hydra_cfg.emb_nn)
+    network = create_network(hydra_cfg.model)
     grasp_model = EquivarianceTestingModule(
         network,
         lr=hydra_cfg.lr,
         image_log_period=hydra_cfg.image_logging_period,
-        weight_normalize=hydra_cfg.weight_normalize_grasp,
-        softmax_temperature=hydra_cfg.softmax_temperature_grasp,
+        weight_normalize=hydra_cfg.grasp_task.weight_normalize,
+        softmax_temperature=hydra_cfg.grasp_task.softmax_temperature,
         loop=hydra_cfg.loop,
     )
 
     grasp_model.cuda()
-    grasp_model.eval()
+    if hydra_cfg.model_eval_on:
+        grasp_model.eval()
 
     if hydra_cfg.checkpoint_file_grasp is not None:
         grasp_model.load_state_dict(
@@ -2572,73 +1248,14 @@ def main(hydra_cfg):
         )
         log_info("Model Loaded from " + str(hydra_cfg.checkpoint_file_grasp))
     if hydra_cfg.checkpoint_file_grasp_refinement is not None:
-        if hydra_cfg.flow_compute_type == 0:
-            if hydra_cfg.diff_emb:
-                if hydra_cfg.diff_transformer:
-                    if hydra_cfg.mlp:
-                        network = CorrespondenceFlow_DiffEmbMLP(
-                            emb_dims=hydra_cfg.emb_dims,
-                            emb_nn=hydra_cfg.emb_nn,
-                            center_feature=hydra_cfg.center_feature,
-                            inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                        )
-                    else:
-                        network = ResidualFlow_DiffEmbTransformer(
-                            pred_weight=hydra_cfg.pred_weight,
-                            emb_nn=hydra_cfg.emb_nn,
-                            return_flow_component=hydra_cfg.return_flow_component,
-                            center_feature=hydra_cfg.center_feature,
-                            inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                            residual_on=hydra_cfg.residual_on,
-                            multilaterate=hydra_cfg.multilaterate,
-                            sample=hydra_cfg.mlat_sample,
-                            mlat_nkps=hydra_cfg.mlat_nkps,
-                        )
-                else:
-                    network = ResidualFlow_DiffEmb(
-                        emb_nn=hydra_cfg.emb_nn,
-                        return_flow_component=hydra_cfg.return_flow_component,
-                        center_feature=hydra_cfg.center_feature,
-                        inital_sampling_ratio=hydra_cfg.inital_sampling_ratio,
-                    )
-            else:
-                network = ResidualFlow(
-                    emb_nn=hydra_cfg.emb_nn,
-                    return_flow_component=hydra_cfg.return_flow_component,
-                    center_feature=hydra_cfg.center_feature,
-                )
-        elif hydra_cfg.flow_compute_type == 1:
-            network = ResidualFlow_V1(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 2:
-            network = ResidualFlow_V2(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 3:
-            network = ResidualFlow_V3(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 4:
-            network = ResidualFlow_V4(
-                emb_nn=hydra_cfg.emb_nn,
-                return_flow_component=hydra_cfg.return_flow_component,
-            )
-        elif hydra_cfg.flow_compute_type == 5:
-            network = ResidualFlow_Correspondence(emb_nn=hydra_cfg.emb_nn)
-        elif hydra_cfg.flow_compute_type == 6:
-            network = ResidualFlow_Identity(emb_nn=hydra_cfg.emb_nn)
-        elif hydra_cfg.flow_compute_type == "pe":
-            network = ResidualFlow_PE(emb_nn=hydra_cfg.emb_nn)
+        network = create_network(hydra_cfg.model)
+
         grasp_model_refinement = EquivarianceTestingModule(
             network,
             lr=hydra_cfg.lr,
             image_log_period=hydra_cfg.image_logging_period,
-            weight_normalize=hydra_cfg.weight_normalize_grasp,
-            softmax_temperature=hydra_cfg.softmax_temperature_grasp,
+            weight_normalize=hydra_cfg.grasp_task.weight_normalize,
+            softmax_temperature=hydra_cfg.grasp_task.softmax_temperature,
             loop=hydra_cfg.loop,
         )
 
@@ -2685,7 +1302,7 @@ def main(hydra_cfg):
         else:
             mesh_scale = [scale_default] * 3
 
-        if hydra_cfg.any_pose:
+        if hydra_cfg.pose_dist.any_pose:
             if obj_class in ["bowl", "bottle"]:
                 rp = np.random.rand(2) * (2 * np.pi / 3) - (np.pi / 3)
                 ori = common.euler2quat([rp[0], rp[1], 0]).tolist()
@@ -2777,7 +1394,7 @@ def main(hydra_cfg):
             base_ori=ori,
         )
         p.changeDynamics(obj_id, -1, lateralFriction=0.5)
-        log_info("any_pose:{}".format(hydra_cfg.any_pose))
+        log_info("any_pose:{}".format(hydra_cfg.pose_dist.any_pose))
         if obj_class == "bowl":
             safeCollisionFilterPair(
                 bodyUniqueIdA=obj_id,
@@ -2796,7 +1413,7 @@ def main(hydra_cfg):
             # robot.pb_client.set_step_sim(False)
 
         o_cid = None
-        if hydra_cfg.any_pose:
+        if hydra_cfg.pose_dist.any_pose:
             o_cid = constraint_obj_world(obj_id, pos, ori)
             # robot.pb_client.set_step_sim(False)
         safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
@@ -2913,16 +1530,16 @@ def main(hydra_cfg):
         )  # transform from gripper to mug in world frame
         pre_grasp_ee_pose = util.pose_stamped2list(gripper_relative_pose)
 
-        np.savez(
-            f"{save_dir}/{iteration}_init_all_points.npz",
-            clouds=cloud_points,
-            colors=cloud_colors,
-            classes=cloud_classes,
-            shapenet_id=obj_shapenet_id,
-        )
+        # np.savez(
+        #     f"{eval_pointclouds_dir}/{iteration}_init_all_points.npz",
+        #     clouds=cloud_points,
+        #     colors=cloud_colors,
+        #     classes=cloud_classes,
+        #     shapenet_id=obj_shapenet_id,
+        # )
 
         np.savez(
-            f"{save_dir}/{iteration}_init_obj_points.npz",
+            f"{eval_pointclouds_dir}/{iteration}_init_obj_points.npz",
             clouds=obj_points,
             colors=obj_colors,
             classes=obj_classes,
@@ -2934,7 +1551,7 @@ def main(hydra_cfg):
             pred_T_action_mat_gripper2mug=pred_T_action_mat_gripper2mug,
         )
         log_info("Saved point cloud data to:")
-        log_info(f"{save_dir}/{iteration}_init_obj_points.npz")
+        log_info(f"{eval_pointclouds_dir}/{iteration}_init_obj_points.npz")
 
         # optimize grasp pose
         viz_dict["start_ee_pose"] = pre_grasp_ee_pose
@@ -2962,16 +1579,16 @@ def main(hydra_cfg):
         cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
         obj_points, obj_colors, obj_classes = get_object_clouds(cams)
 
-        np.savez(
-            f"{save_dir}/{iteration}_teleport_all_points.npz",
-            clouds=cloud_points,
-            colors=cloud_colors,
-            classes=cloud_classes,
-            shapenet_id=obj_shapenet_id,
-        )
+        # np.savez(
+        #     f"{eval_pointclouds_dir}/{iteration}_teleport_all_points.npz",
+        #     clouds=cloud_points,
+        #     colors=cloud_colors,
+        #     classes=cloud_classes,
+        #     shapenet_id=obj_shapenet_id,
+        # )
 
         np.savez(
-            f"{save_dir}/{iteration}_teleport_obj_points.npz",
+            f"{eval_pointclouds_dir}/{iteration}_teleport_obj_points.npz",
             clouds=obj_points,
             colors=obj_colors,
             classes=obj_classes,
@@ -3003,16 +1620,16 @@ def main(hydra_cfg):
         cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
         obj_points, obj_colors, obj_classes = get_object_clouds(cams)
 
-        np.savez(
-            f"{save_dir}/{iteration}_post_teleport_all_points.npz",
-            clouds=cloud_points,
-            colors=cloud_colors,
-            classes=cloud_classes,
-            shapenet_id=obj_shapenet_id,
-        )
+        # np.savez(
+        #     f"{eval_pointclouds_dir}/{iteration}_post_teleport_all_points.npz",
+        #     clouds=cloud_points,
+        #     colors=cloud_colors,
+        #     classes=cloud_classes,
+        #     shapenet_id=obj_shapenet_id,
+        # )
 
         np.savez(
-            f"{save_dir}/{iteration}_post_teleport_obj_points.npz",
+            f"{eval_pointclouds_dir}/{iteration}_post_teleport_obj_points.npz",
             clouds=obj_points,
             colors=obj_colors,
             classes=obj_classes,
@@ -3055,7 +1672,7 @@ def main(hydra_cfg):
             # reset everything
             # robot.pb_client.set_step_sim(False)
             safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
-            # if hydra_cfg.any_pose:
+            # if hydra_cfg.pose_dist.any_pose:
             #   robot.pb_client.set_step_sim(True)
             safeRemoveConstraint(o_cid)
             p.resetBasePositionAndOrientation(obj_id, pos, ori)
@@ -3063,7 +1680,7 @@ def main(hydra_cfg):
             # time.sleep(0.5)
             step_for_time(robot, 0.5)
 
-            if hydra_cfg.any_pose:
+            if hydra_cfg.pose_dist.any_pose:
                 o_cid = constraint_obj_world(obj_id, pos, ori)
                 # robot.pb_client.set_step_sim(False)
 
@@ -3128,16 +1745,16 @@ def main(hydra_cfg):
                     cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
                     obj_points, obj_colors, obj_classes = get_object_clouds(cams)
 
-                    np.savez(
-                        f"{save_dir}/{iteration}_pre_grasp_all_points.npz",
-                        clouds=cloud_points,
-                        colors=cloud_colors,
-                        classes=cloud_classes,
-                        shapenet_id=obj_shapenet_id,
-                    )
+                    # np.savez(
+                    #     f"{eval_pointclouds_dir}/{iteration}_pre_grasp_all_points.npz",
+                    #     clouds=cloud_points,
+                    #     colors=cloud_colors,
+                    #     classes=cloud_classes,
+                    #     shapenet_id=obj_shapenet_id,
+                    # )
 
                     np.savez(
-                        f"{save_dir}/{iteration}_pre_grasp_obj_points.npz",
+                        f"{eval_pointclouds_dir}/{iteration}_pre_grasp_obj_points.npz",
                         clouds=obj_points,
                         colors=obj_colors,
                         classes=obj_classes,
@@ -3235,16 +1852,16 @@ def main(hydra_cfg):
                         cloud_points, cloud_colors, cloud_classes = get_clouds(cams)
                         obj_points, obj_colors, obj_classes = get_object_clouds(cams)
 
-                        np.savez(
-                            f"{save_dir}/{iteration}_post_grasp_all_points.npz",
-                            clouds=cloud_points,
-                            colors=cloud_colors,
-                            classes=cloud_classes,
-                            shapenet_id=obj_shapenet_id,
-                        )
+                        # np.savez(
+                        #     f"{eval_pointclouds_dir}/{iteration}_post_grasp_all_points.npz",
+                        #     clouds=cloud_points,
+                        #     colors=cloud_colors,
+                        #     classes=cloud_classes,
+                        #     shapenet_id=obj_shapenet_id,
+                        # )
 
                         np.savez(
-                            f"{save_dir}/{iteration}_post_grasp_obj_points.npz",
+                            f"{eval_pointclouds_dir}/{iteration}_post_grasp_obj_points.npz",
                             clouds=obj_points,
                             colors=obj_colors,
                             classes=obj_classes,
@@ -3452,7 +2069,7 @@ def main(hydra_cfg):
             log_str += "%s: %.3f, " % (k, v)
         id_str = ", shapenet_id: %s" % obj_shapenet_id
         log_info(log_str + id_str)
-        f = open(txt_file_name, "a")
+        f = open(results_path, "a")
         f.write("{} \n".format("place success"))
         f.write(str(bool(place_success_list[-1])))
         f.write("\n")
@@ -3489,6 +2106,8 @@ def main(hydra_cfg):
         )
 
         robot.pb_client.remove_body(obj_id)
+
+    make_grid_fig(eval_save_dir, "place_results_fig.png")
 
 
 if __name__ == "__main__":

@@ -1,2 +1,8 @@
 defaults:
   - _mlat
+
+name: mlat_s100
+
+multilaterate: True
+mlat_sample: True
+mlat_nkps: 100
