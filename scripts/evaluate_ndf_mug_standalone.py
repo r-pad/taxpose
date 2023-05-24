@@ -43,6 +43,7 @@ from ndf_robot.utils.eval_gen_utils import (
 )
 from ndf_robot.utils.franka_ik import FrankaIK
 from ndf_robot.utils.util import np2img
+from omegaconf import DictConfig, OmegaConf
 from pytorch3d.ops import sample_farthest_points
 from pytorch3d.transforms import Rotate, Transform3d
 from torch import nn
@@ -1998,6 +1999,7 @@ MAX_TIME = 5.0
 )
 @torch.no_grad()
 def main(hydra_cfg):
+    print(OmegaConf.to_yaml(hydra_cfg, resolve=True))
     txt_file_name = "{}.txt".format(hydra_cfg.eval_data_dir)
     data_dir = hydra_cfg.data_dir
     save_dir = os.path.join("./ben_trying_things", data_dir)
@@ -2005,7 +2007,7 @@ def main(hydra_cfg):
         os.makedirs(save_dir)
 
     hydra_cfg.eval_data_dir = hydra_cfg.data_dir
-    obj_class = hydra_cfg.object_class
+    obj_class = hydra_cfg.object_class.name
     shapenet_obj_dir = osp.join(
         path_util.get_ndf_obj_descriptions(), obj_class + "_centered_obj_normalized"
     )
@@ -2064,9 +2066,7 @@ def main(hydra_cfg):
 
     # object specific configs
     obj_cfg = get_obj_cfg_defaults()
-    obj_config_name = osp.join(
-        path_util.get_ndf_config(), hydra_cfg.object_class + "_obj_cfg.yaml"
-    )
+    obj_config_name = osp.join(path_util.get_ndf_config(), obj_class + "_obj_cfg.yaml")
     obj_cfg.merge_from_file(obj_config_name)
     obj_cfg.freeze()
 

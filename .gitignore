@@ -381,4 +381,4 @@ recent_training_paths.txt
 
 # Ignore all checkpoint configs except for release files.
 configs/checkpoints/**/*.yaml
-!configs/checkpoints/**/release/*.yaml
+!configs/checkpoints/**/release.yaml

@@ -6,9 +6,22 @@ hydra:
     subdir: ${hydra.job.num}
 
 experiment: residual_flow_test_partial_cloud_initpose
-# seed: 0
 
+defaults:
+  - _self_
+  - object_class: mug #{mug, bottle, bowl}
+  - pose_dist: upright # {upright, arbitrary}
 
+  # Machinery to load the correct model architecture.
+  - model: ???
+
+  # Load the checkpoints appropriately.
+  - checkpoints/ndf@checkpoints: ${object_class}/${model}
+
+checkpoint_file_grasp: ${checkpoints.${pose_dist.name}.grasp}
+checkpoint_file_place: ${checkpoints.${pose_dist.name}.place}
+checkpoint_file_place_refinement: ${checkpoints.${pose_dist.name}.place_refinement}
+checkpoint_file_grasp_refinement: ${checkpoints.${pose_dist.name}.grasp_refinement}
 
 #TOBECANGED#
 # 10 demo, mlp
@@ -29,8 +42,7 @@ experiment: residual_flow_test_partial_cloud_initpose
 # not trained on any pose
 # checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm/2022-06-11_182921/residual_flow_occlusion_gm/2rt6k4ra/checkpoints/epoch=168-step=21125.ckpt
 # 10 demo trained on any pose new
-checkpoint_file_place_refinement: Null
-checkpoint_file_grasp_refinement: Null
+
 # checkpoint_file_grasp: /media/exx/data/media/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm_anypose/2022-06-13_045254/residual_flow_occlusion_gm_anypose/26ll28l4/checkpoints/epoch_535_global_step_67000.ckpt
 
 # checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-11_170536/residual_flow_occlusion_mr/1e3tubl4/checkpoints/epoch=120-step=15125.ckpt
@@ -71,36 +83,6 @@ checkpoint_file_grasp_refinement: Null
 # checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow_no_pretraining/residual_flow_occlusion_gm/2022-08-25_032410/residual_flow_occlusion_gm/1asrqblu/checkpoints/epoch=140-step=17625.ckpt
 # checkpoint_file_place: /data/media/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-21_020904/residual_flow_occlusion_mr/1akx8ihc/checkpoints/epoch_95_global_step_12000.ckpt
 
-
-# Release models.
-# checkpoint_file_grasp: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/upright/grasp.ckpt
-# checkpoint_file_place: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/upright/place.ckpt
-# checkpoint_file_grasp: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/arbitrary/grasp.ckpt
-# checkpoint_file_place: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/arbitrary/place.ckpt
-
-# Re-trained models.
-# checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_171304/residual_flow_occlusion/3050urah/checkpoints/epoch_359_global_step_45000.ckpt
-# checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_171338/residual_flow_occlusion/ual5s3fl/checkpoints/epoch_359_global_step_45000.ckpt
-
-
-# Multilateration models.
-# 256, no sample
-# checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_225115/residual_flow_occlusion/b20foq5r/checkpoints/epoch_999_global_step_250000.ckpt
-# checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_225041/residual_flow_occlusion/c3gtthpp/checkpoints/epoch_999_global_step_250000.ckpt
-
-# 100 sample
-# checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-21_124513/residual_flow_occlusion/ul3e91gc/checkpoints/epoch_463_global_step_58000.ckpt
-# checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-21_125009/residual_flow_occlusion/k4rb3cqw/checkpoints/epoch_471_global_step_59000.ckpt
-
-# 256 sample
-# checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-21_214041/residual_flow_occlusion/4jvjcn9s/checkpoints/epoch_631_global_step_158000.ckpt
-# checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-21_212506/residual_flow_occlusion/xmb355au/checkpoints/epoch_663_global_step_166000.ckpt
-
-# Note: the placement one was trained with multiple restarts...
-checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-22_211745/residual_flow_occlusion/yaenf8vx/checkpoints/epoch_335_global_step_168000.ckpt
-checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-05-23_025041/residual_flow_occlusion/or87bvdc/checkpoints/epoch_59_global_step_30000.ckpt
-
-#TOBECANGED#
 
 # Model Settings
 flow_compute_type: 0
@@ -173,7 +155,7 @@ obj_shapenet_id: b46e89995f4f9cc5161e440f04bd2a2
 #TOBECANGED#
 demo_exp: grasp_rim_hang_handle_gaussian_precise_w_shelf
 exp: debug_eval
-object_class: mug
+# object_class: mug
 opt_iterations: 250
 num_demo: 12
 any_pose: True

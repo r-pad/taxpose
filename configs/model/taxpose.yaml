@@ -1,1 +1,2 @@
-name: taxpose
+defaults:
+  - _taxpose
