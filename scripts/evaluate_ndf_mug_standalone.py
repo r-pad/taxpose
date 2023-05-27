@@ -870,23 +870,32 @@ def create_ndf_networks(hydra_cfg):
     place_optimizer.set_demo_info(demo_rack_target_info_list)
 
 
-def make_grid_fig(eval_dir, grid_img_fn):
+def make_grid_fig(eval_dir, grid_img_fn, num_iterations=100):
     img_dir = os.path.join(eval_dir, "teleport_imgs")
-    res_file = os.path.join(eval_dir, "trial_99/success_rate_eval_implicit.npz")
+    res_file = os.path.join(
+        eval_dir, f"trial_{num_iterations-1}/success_rate_eval_implicit.npz"
+    )
     results_dict = np.load(res_file)
-    fig = plt.figure(figsize=(16.0, 16.0))
+    fig = plt.figure(figsize=(32.0, 16.0))
 
-    grid = ImageGrid(fig, 111, nrows_ncols=(10, 10), share_all=True, axes_pad=0.3)
+    grid = ImageGrid(fig, 111, nrows_ncols=(5, 20), share_all=True, axes_pad=0.3)
     grid[0].get_yaxis().set_ticks([])
     grid[0].get_xaxis().set_ticks([])
 
-    for i, ax in enumerate(grid):
+    for i, ax in enumerate(range(num_iterations)):
+        ax = grid[i]
         ax.imshow(PIL.Image.open(os.path.join(img_dir, f"teleport_{i}.png")))
         ax.set_xlim(350, 550)
         ax.set_ylim(350, 150)
 
         succ = results_dict["place_success_teleport_list"][i]
-        ax.set_title("success" if succ else "fail", color="blue" if succ else "red")
+        cond = "success" if succ else "fail"
+        if "penetration_list" in results_dict:
+            max_pen = results_dict["penetration_list"][i]
+            title = f"{cond}: {max_pen:0.3f}"
+        else:
+            title = f"{cond}"
+        ax.set_title(title, color="blue" if succ else "red")
 
     plt.savefig(grid_img_fn)
 
@@ -1034,6 +1043,8 @@ def main(hydra_cfg):
     place_fail_list = []
     place_fail_teleport_list = []
     grasp_fail_list = []
+
+    penetration_list = []
 
     demo_shapenet_ids = []
 
@@ -1605,13 +1616,15 @@ def main(hydra_cfg):
         )
 
         # Detect penetration.
-        def detect_penetration():
+        def detect_penetration(thresh=0.001):
             p.performCollisionDetection()
             contacts = p.getContactPoints(obj_id, table_id)
-            has_penetration = any([c[8] < -0.001 for c in contacts])
-            return has_penetration
+            # breakpoint()
+            has_penetration = any([c[8] < -thresh for c in contacts])
+            max_penetration = max([-c[8] for c in contacts], default=0.0)
+            return has_penetration, max_penetration
 
-        goal_has_penetration = detect_penetration()
+        goal_has_penetration, max_penetration = detect_penetration()
 
         # robot.pb_client.set_step_sim(False)
         # time.sleep(1.0)
@@ -1730,6 +1743,8 @@ def main(hydra_cfg):
                     # robot.pb_client.set_step_sim(True)
                     robot.arm.set_jpos(grasp_jnt_pos, ignore_physics=True)
                     step_till_goal(robot, grasp_jnt_pos, 2.0)
+
+                    # TODO(Ben): Check that the gripper is not in collision...
 
                     robot.arm.eetool.close(ignore_physics=True)
                     step_for_time(robot, 2.0)
@@ -2042,6 +2057,7 @@ def main(hydra_cfg):
             place_fail_list.append(iteration)
         if not grasp_success:
             grasp_fail_list.append(iteration)
+        penetration_list.append(max_penetration)
         log_str = "Iteration: %d, " % iteration
         kvs = {}
         kvs["Place Success Rate"] = sum(place_success_list) / float(
@@ -2089,6 +2105,7 @@ def main(hydra_cfg):
             sample_fname,
             obj_shapenet_id=obj_shapenet_id,
             success=success_list,
+            penetration_list=penetration_list,
             grasp_success=grasp_success,
             place_success=place_success,
             place_success_teleport=place_success_teleport,
@@ -2107,7 +2124,7 @@ def main(hydra_cfg):
 
         robot.pb_client.remove_body(obj_id)
 
-    make_grid_fig(eval_save_dir, "place_results_fig.png")
+    make_grid_fig(eval_save_dir, "place_results_fig.png", hydra_cfg.num_iterations)
 
 
 if __name__ == "__main__":
