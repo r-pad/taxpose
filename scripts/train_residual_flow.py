@@ -4,6 +4,7 @@ import hydra
 import numpy as np
 import pytorch_lightning as pl
 import torch
+from omegaconf import OmegaConf
 from pytorch_lightning.loggers import WandbLogger
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
@@ -23,6 +24,9 @@ def write_to_file(file_name, string):
 
 @hydra.main(config_path="../configs", config_name="train_mug_residual")
 def main(cfg):
+    print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    # breakpoint()
     # torch.set_float32_matmul_precision("medium")
     pl.seed_everything(cfg.seed)
     logger = WandbLogger(project=cfg.experiment)
@@ -101,7 +105,7 @@ def main(cfg):
         )
 
     else:
-        if cfg.task.checkpoint_file_action is not None:
+        if cfg.pretraining.checkpoint_file_action is not None:
             model.model.emb_nn_action.load_state_dict(
                 torch.load(
                     hydra.utils.to_absolute_path(cfg.task.checkpoint_file_action)
@@ -115,7 +119,7 @@ def main(cfg):
                     cfg.task.checkpoint_file_action
                 )
             )
-        if cfg.task.checkpoint_file_anchor is not None:
+        if cfg.pretraining.checkpoint_file_anchor is not None:
             model.model.emb_nn_anchor.load_state_dict(
                 torch.load(
                     hydra.utils.to_absolute_path(cfg.task.checkpoint_file_anchor)
