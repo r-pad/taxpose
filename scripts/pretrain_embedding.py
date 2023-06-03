@@ -17,10 +17,10 @@ from taxpose.utils.callbacks import SaverCallbackEmbnn
 # chuerp conda env: pytorch3d_38
 
 
-@hydra.main(config_path="../configs", config_name="pretraining_mug_dgcnn")
+@hydra.main(config_path="../configs", config_name="pretraining")
 def main(cfg):
     pl.seed_everything(cfg.seed)
-    logger = WandbLogger(project=cfg.experiment)
+    logger = WandbLogger(project=cfg.job_name)
     logger.log_hyperparams(cfg)
     logger.log_hyperparams({"working_dir": os.getcwd()})
     trainer = pl.Trainer(

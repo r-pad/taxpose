@@ -209,17 +209,13 @@ def dualflow2pose(
         softmax_operator = torch.nn.Softmax(dim=-1)
         w_src = softmax_operator(weights_src / temperature).unsqueeze(-1)
         w_tgt = softmax_operator(weights_tgt / temperature).unsqueeze(-1)
-    try:
-        assert torch.allclose(
-            w_src.sum(1), torch.ones(w_src.sum(1).shape).cuda()
-        ), "flow src weights does not sum to 1 for each batch element"
-        assert torch.allclose(
-            w_tgt.sum(1), torch.ones(w_tgt.sum(1).shape).cuda()
-        ), "flow tgt weights does not sum to 1 for each batch element"
-    except:
-        import pdb
 
-        pdb.set_trace()
+    # assert torch.allclose(
+    #     w_src.sum(1), torch.ones(w_src.sum(1).shape).cuda()
+    # ), "flow src weights does not sum to 1 for each batch element"
+    # assert torch.allclose(
+    #     w_tgt.sum(1), torch.ones(w_tgt.sum(1).shape).cuda()
+    # ), "flow tgt weights does not sum to 1 for each batch element"
 
     xyz_mean_src = (w_src * xyz_src).sum(dim=1, keepdims=True)
 

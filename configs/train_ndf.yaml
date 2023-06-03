@@ -1,21 +1,12 @@
-# Logging Settings
-hydra:
-  run:
-    dir: ${log_dir}/${experiment}/${now:%Y-%m-%d_%H%M%S}
-  sweep:
-    dir: ${log_dir}/${experiment}/sweep/${now:%Y-%m-%d_%H%M%S}
-    subdir: ${hydra.job.num}
-  job:
-    chdir: True
 
-log_dir: logs
-experiment: residual_flow_occlusion
+
+job_name: residual_flow_occlusion
 image_logging_period: 100
 
-### TO BE CHANGED ###
 log_txt_file:  ${hydra:runtime.cwd}/recent_training_paths.txt # absolute path for text file for logging
 defaults:
   - _self_
+  - hydra_logging
   - object_class: mug # {mug, bottle, bowl}
   - pose_dist: upright # {upright, arbitrary}
   - relationship: place # {place, grasp}
@@ -63,9 +54,6 @@ pred_weight: ${model.pred_weight}
 sigmoid_on: True
 return_flow_component: ${model.return_flow_component}
 mlp: False
-# multilaterate: False
-# mlat_sample: True
-# mlat_nkps: 100
 multilaterate: ${model.multilaterate}
 mlat_sample: ${model.mlat_sample}
 mlat_nkps: ${model.mlat_nkps}

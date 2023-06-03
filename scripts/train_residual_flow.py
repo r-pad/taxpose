@@ -22,14 +22,14 @@ def write_to_file(file_name, string):
     f.close()
 
 
-@hydra.main(config_path="../configs", config_name="train_mug_residual")
+@hydra.main(config_path="../configs", config_name="train_ndf")
 def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
 
     # breakpoint()
     # torch.set_float32_matmul_precision("medium")
     pl.seed_everything(cfg.seed)
-    logger = WandbLogger(project=cfg.experiment)
+    logger = WandbLogger(project=cfg.job_name)
     logger.log_hyperparams(cfg)
     logger.log_hyperparams({"working_dir": os.getcwd()})
     trainer = pl.Trainer(
@@ -108,7 +108,7 @@ def main(cfg):
         if cfg.pretraining.checkpoint_file_action is not None:
             model.model.emb_nn_action.load_state_dict(
                 torch.load(
-                    hydra.utils.to_absolute_path(cfg.task.checkpoint_file_action)
+                    hydra.utils.to_absolute_path(cfg.pretraining.checkpoint_file_action)
                 )["embnn_state_dict"]
             )
             print(
@@ -116,13 +116,13 @@ def main(cfg):
             )
             print(
                 "Loaded Pretrained EmbNN Action: {}".format(
-                    cfg.task.checkpoint_file_action
+                    cfg.pretraining.checkpoint_file_action
                 )
             )
         if cfg.pretraining.checkpoint_file_anchor is not None:
             model.model.emb_nn_anchor.load_state_dict(
                 torch.load(
-                    hydra.utils.to_absolute_path(cfg.task.checkpoint_file_anchor)
+                    hydra.utils.to_absolute_path(cfg.pretraining.checkpoint_file_anchor)
                 )["embnn_state_dict"]
             )
             print(
@@ -130,7 +130,7 @@ def main(cfg):
             )
             print(
                 "Loaded Pretrained EmbNN Anchor: {}".format(
-                    cfg.task.checkpoint_file_anchor
+                    cfg.pretraining.checkpoint_file_anchor
                 )
             )
     if cfg.mode == "train":
