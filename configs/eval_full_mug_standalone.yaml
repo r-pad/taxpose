@@ -1,181 +1,68 @@
-hydra:
-  run:
-    dir: ${log_dir}/${experiment}/${now:%Y-%m-%d_%H%M%S}
-  sweep:
-    dir: ${log_dir}/${experiment}/sweep/${now:%Y-%m-%d_%H%M%S}
-    subdir: ${hydra.job.num}
-
-experiment: residual_flow_test_partial_cloud_initpose
-# seed: 0
 
 
+defaults:
+  - _self_
 
-#TOBECANGED#
-# 10 demo, mlp
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm_mlp/2022-06-13_221309/residual_flow_occlusion_gm_mlp/3nnuim8s/checkpoints/epoch_55_global_step_7000.ckpt
-# checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr_mlp/2022-06-13_222820/residual_flow_occlusion_mr_mlp/3d38c6wx/checkpoints/epoch_55_global_step_7000.ckpt
-# 10 demo no weight + correspondence only
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm_anypose/2022-06-13_194326/residual_flow_occlusion_gm_anypose/1c92s05s/checkpoints/epoch_31_global_step_4000.ckpt
-# checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-13_184741/residual_flow_occlusion_mr/3smlxqfz/checkpoints/epoch_31_global_step_4000.ckpt
-# # 10 demo no weight + residual
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm_anypose/2022-06-13_182339/residual_flow_occlusion_gm_anypose/3ghyaypc/checkpoints/epoch_31_global_step_4000.ckpt
-# checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-13_181613/residual_flow_occlusion_mr/5j6fdbkb/checkpoints/epoch_31_global_step_4000.ckpt
-# 10 demo no residual
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm_anypose/2022-06-13_165856/residual_flow_occlusion_gm_anypose/1lm8ebm5/checkpoints/epoch=36-step=4625.ckpt
-# checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-13_173038/residual_flow_occlusion_mr/kjtdwc9p/checkpoints/epoch_15_global_step_2000.ckpt
-# any pose 10 demo
-# upright, occulsion on gripper
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm_anypose/2022-06-13_135420/residual_flow_occlusion_gm_anypose/3en3fbxe/checkpoints/epoch=58-step=7375.ckpt
-# not trained on any pose
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm/2022-06-11_182921/residual_flow_occlusion_gm/2rt6k4ra/checkpoints/epoch=168-step=21125.ckpt
-# 10 demo trained on any pose new
-checkpoint_file_place_refinement: Null
-checkpoint_file_grasp_refinement: Null
-# checkpoint_file_grasp: /media/exx/data/media/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm_anypose/2022-06-13_045254/residual_flow_occlusion_gm_anypose/26ll28l4/checkpoints/epoch_535_global_step_67000.ckpt
+  - object_class: mug #{mug, bottle, bowl}
+  - pose_dist: upright # {upright, arbitrary}
 
-# checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-11_170536/residual_flow_occlusion_mr/1e3tubl4/checkpoints/epoch=120-step=15125.ckpt
+  # Machinery to load the correct model architecture.
+  # The model config can be found in configs/model.
+  - model: ???
+
+  # Task-specific settings.
+  - task@grasp_task: ${object_class}_grasp
+  - task@place_task: ${object_class}_place
+
+  # Load the checkpoints appropriately.
+  - checkpoints/ndf@checkpoints: ${object_class}/${model}
 
 
-# checkpoint_file_place: /media/exx/data/media/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-11_170536/residual_flow_occlusion_mr/1e3tubl4/checkpoints/epoch=120-step=15125.ckpt
-# checkpoint_file_place: /home/exx/good_mug_models/rm/epoch=120-step=15125.ckpt
-# old
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm_anypose/2022-06-13_034606/residual_flow_occlusion_gm_anypose/21wtib15/checkpoints/epoch=73-step=9250.ckpt
-# checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-11_170536/residual_flow_occlusion_mr/1e3tubl4/checkpoints/epoch=120-step=15125.ckpt
-# 1 demo
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm/2022-06-12_000130/residual_flow_occlusion_gm/sifzg6gj/checkpoints/epoch=141-step=17750.ckpt
-# checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-11_223857/residual_flow_occlusion_mr/3n7i7wfp/checkpoints/epoch_151_global_step_19000.ckpt
-# # 12 demo
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm/2022-06-12_015823/residual_flow_occlusion_gm/2edtw8op/checkpoints/epoch=106-step=13375.ckpt
-# checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-12_024313/residual_flow_occlusion_mr/27xpsv9f/checkpoints/epoch=39-step=5000.ckpt
-# 10 demo
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm/2022-06-11_182921/residual_flow_occlusion_gm/2rt6k4ra/checkpoints/epoch=168-step=21125.ckpt
-# checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-11_170536/residual_flow_occlusion_mr/1e3tubl4/checkpoints/epoch=120-step=15125.ckpt
+checkpoint_file_grasp: ${checkpoints.${pose_dist.name}.grasp}
+checkpoint_file_place: ${checkpoints.${pose_dist.name}.place}
+checkpoint_file_place_refinement: ${checkpoints.${pose_dist.name}.place_refinement}
+checkpoint_file_grasp_refinement: ${checkpoints.${pose_dist.name}.grasp_refinement}
 
-# checkpoint_file_grasp: /home/exx/vis_models/all/gm/28lirakn/epoch=191-step=24000.ckpt
-# checkpoint_file_place: /home/exx/vis_models/all/230cc55h/epoch=186-step=23375.ckpt
-
-# checkpoint_file_place_refinement: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr_refinement/2022-06-14_064909/residual_flow_occlusion_mr_refinement/1rq6aepc/checkpoints/epoch=18-step=2375.ckpt
-# checkpoint_file_grasp_refinement: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm_refinement/2022-06-14_064353/residual_flow_occlusion_gm_refinement/3uy00x45/checkpoints/epoch=26-step=3375.ckpt
-# 5 demo
-# checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-11_200937/residual_flow_occlusion_mr/1rd91xj9/checkpoints/epoch=104-step=13125.ckpt
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm/2022-06-11_211750/residual_flow_occlusion_gm/3dkxq5v6/checkpoints/epoch=43-step=5500.ckpt
-# 12 demo
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm/2022-06-11_133230/residual_flow_occlusion_gm/1hm7hy56/checkpoints/epoch=120-step=15125.ckpt
-# checkpoint_file_place: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion/2022-06-09_144139/residual_flow_occlusion/dnw6p7r9/checkpoints/epoch=213-step=26750.ckpt
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_gm/2022-06-11_154554/residual_flow_occlusion_gm/1mreschv/checkpoints/my.ckpt
-# action: mug, anchor: gripper
-
-# # No Pre Training
-# checkpoint_file_place_refinement: Null
-# checkpoint_file_grasp_refinement: Null
-# checkpoint_file_grasp: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow_no_pretraining/residual_flow_occlusion_gm/2022-08-25_032410/residual_flow_occlusion_gm/1asrqblu/checkpoints/epoch=140-step=17625.ckpt
-# checkpoint_file_place: /data/media/singularity_chuerp/epg_results/residual_flow/residual_flow_occlusion_mr/2022-06-21_020904/residual_flow_occlusion_mr/1akx8ihc/checkpoints/epoch_95_global_step_12000.ckpt
-
-
-# Release models.
-# checkpoint_file_grasp: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/upright/grasp.ckpt
-# checkpoint_file_place: /home/beisner/code/rpad/taxpose/trained_models/ndf/mug/upright/place.ckpt
-
-# Re-trained models.
-checkpoint_file_grasp: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_171304/residual_flow_occlusion/3050urah/checkpoints/epoch_359_global_step_45000.ckpt
-checkpoint_file_place: /home/beisner/code/multi_project/taxpose/logs/residual_flow_occlusion/2023-04-27_171338/residual_flow_occlusion/ual5s3fl/checkpoints/epoch_359_global_step_45000.ckpt
-
-
-#TOBECANGED#
-
-# Model Settings
-flow_compute_type: 0
-emb_nn: dgcnn
-num_points: 1024
-inital_sampling_ratio: 1
-emb_dims: 512
-
-# Dataset Settings
-# dataset_root: /home/exx/Documents/ndf_robot/train_data_ndf_mug_place_0/renders
-# # test_dataset_root: /home/exx/Documents/ndf_robot/test_data_ndf_mug_place_0/renders
-# test_dataset_root: /home/exx/Documents/ndf_robot/b46e89995f4f9cc5161e440f04bd2a2_7/renders
-dataset_index: None
-action_class: 0
-anchor_class: 1
-dataset_size: 300
-rotation_variance: 180
-translation_variance: 0.5
-batch_size: 1
-num_workers: 4
-cloud_type: init
-no_transform_applied: True
-point_loss_type: 0
-gripper_lr_label: False
-return_flow_component: False
-center_feature: True
-overfit: False
-diff_emb: True
-diff_transformer: True
-weight_normalize_place: l1
-sigmoid_on: True
-rotation_weight: 0
-consistency_weight: 1
-smoothness_weight: 0.1
-synthetic_occlusion: False
-ball_radius: 0.1
-plane_standoff: 0.01
-plane_occlusion: True
-ball_occlusion: True
-pred_weight: True
-softmax_temperature: 1
-weight_normalize_grasp: softmax
-softmax_temperature_grasp: 0.1
-residual_on: True
-mlp: False
-include_penetration: False
-
+# Extra random irrelevant model settings, legacy.
 loop: 1
-init_distribution_tranform_file: Null
-# init_distribution_tranform_file: /home/exx/Documents/ndf_robot/tmp/rack_relative_pose_stacked.npz
-# Loss Settings
 lr: 1e-4
 
-# Logging Settings
-# log_dir: /home/exx/media/DataDrive/singularity_chuerp/epg_results/residual_flow_test
-log_dir: ./bensnewlogs
-image_logging_period: 100
-
-debug: False
-seed: 10
-num_samples: 100
-#TOBECANGED#
-data_dir: mug_upright
-eval_data_dir: mug_upright
-obj_shapenet_id: b46e89995f4f9cc5161e440f04bd2a2
-#TOBECANGED#
-demo_exp: grasp_rim_hang_handle_gaussian_precise_w_shelf
-exp: debug_eval
-object_class: mug
-opt_iterations: 250
-num_demo: 12
-any_pose: True
-num_iterations: 500
-resume_iter: 0
-config: base_cfg
-model_path: multi_category_weights
-save_vis_per_model: False
-noise_scale: 0.05
-noise_decay: 0.75
-pybullet_viz: True
+# Legacy NDF model settings.
 dgcnn: False
+opt_iterations: 250
 random: False
-early_weight: False
-late_weight: False
-rand_mesh_scale: False
-only_test_ids: False
-all_cat_model: False
-n_demos: 0
 acts: all
-old_model: False
-save_all_opt_results: False
-grasp_viz: False
+model_path: multi_category_weights
+
+
+# Eval Settings
+seed: ???  # Seeds we use: 10, 123456, 54321, 123152, 19501
+num_points: ${model.num_points}
+include_penetration: False
+num_samples: 100
+model_eval_on: False
+num_demo: 12
+num_iterations: 100
+config: base_cfg
+rand_mesh_scale: False
+only_test_ids: True
+n_demos: 0
 single_instance: False
-non_thin_feature: False
-grasp_dist_thresh: 0.0025
 start_iteration: 0
-test_or_train: train
+
+# Logging Settings
+log_dir: logs/ndf_evals
+eval_name: ${object_class.name}_${pose_dist.name}_${model.name}
+eval_save_dir: ./  # Dump directly inside the eval directory.
+results_file_name: results.txt
+
+pybullet_viz: True
+image_logging_period: 100
+debug: False
+
+hydra:
+  run:
+    dir: ${log_dir}/${eval_name}/${now:%Y-%m-%d_%H%M%S}/${seed}
+  sweep:
+    dir: ${log_dir}/${eval_name}/sweep/${now:%Y-%m-%d_%H%M%S}
+    subdir: ${hydra.job.num}

@@ -4,6 +4,7 @@ import hydra
 import numpy as np
 import pytorch_lightning as pl
 import torch
+from omegaconf import OmegaConf
 from pytorch_lightning.loggers import WandbLogger
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
@@ -21,10 +22,14 @@ def write_to_file(file_name, string):
     f.close()
 
 
-@hydra.main(config_path="../configs", config_name="train_mug_residual")
+@hydra.main(config_path="../configs", config_name="train_ndf")
 def main(cfg):
+    print(OmegaConf.to_yaml(cfg, resolve=True))
+
+    # breakpoint()
+    # torch.set_float32_matmul_precision("medium")
     pl.seed_everything(cfg.seed)
-    logger = WandbLogger(project=cfg.experiment)
+    logger = WandbLogger(project=cfg.job_name)
     logger.log_hyperparams(cfg)
     logger.log_hyperparams({"working_dir": os.getcwd()})
     trainer = pl.Trainer(
@@ -97,10 +102,10 @@ def main(cfg):
         )
 
     else:
-        if cfg.task.checkpoint_file_action is not None:
+        if cfg.pretraining.checkpoint_file_action is not None:
             model.model.emb_nn_action.load_state_dict(
                 torch.load(
-                    hydra.utils.to_absolute_path(cfg.task.checkpoint_file_action)
+                    hydra.utils.to_absolute_path(cfg.pretraining.checkpoint_file_action)
                 )["embnn_state_dict"]
             )
             print(
@@ -108,13 +113,13 @@ def main(cfg):
             )
             print(
                 "Loaded Pretrained EmbNN Action: {}".format(
-                    cfg.task.checkpoint_file_action
+                    cfg.pretraining.checkpoint_file_action
                 )
             )
-        if cfg.task.checkpoint_file_anchor is not None:
+        if cfg.pretraining.checkpoint_file_anchor is not None:
             model.model.emb_nn_anchor.load_state_dict(
                 torch.load(
-                    hydra.utils.to_absolute_path(cfg.task.checkpoint_file_anchor)
+                    hydra.utils.to_absolute_path(cfg.pretraining.checkpoint_file_anchor)
                 )["embnn_state_dict"]
             )
             print(
@@ -122,7 +127,7 @@ def main(cfg):
             )
             print(
                 "Loaded Pretrained EmbNN Anchor: {}".format(
-                    cfg.task.checkpoint_file_anchor
+                    cfg.pretraining.checkpoint_file_anchor
                 )
             )
     if cfg.mode == "train":
@@ -150,6 +155,7 @@ def main(cfg):
 
 
 if __name__ == "__main__":
+    torch.set_float32_matmul_precision("high")
     torch.autograd.set_detect_anomaly(True)
     torch.cuda.empty_cache()
     torch.multiprocessing.set_sharing_strategy("file_system")

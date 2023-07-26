@@ -1,0 +1,12 @@
+log_dir: logs
+job_name: ???
+
+# Logging Settings
+hydra:
+  run:
+    dir: ${log_dir}/${job_name}/${now:%Y-%m-%d_%H%M%S}
+  sweep:
+    dir: ${log_dir}/${job_name}/sweep/${now:%Y-%m-%d_%H%M%S}
+    subdir: ${hydra.job.num}
+  job:
+    chdir: True

@@ -4,11 +4,9 @@ This file uses OMPL to generate training data for goal-conditioned FF placement 
 
 import os
 import pickle
-import sys
 import time
 from itertools import product
 
-import imageio
 import numpy as np
 import pybullet as p
 from ompl import base as ob

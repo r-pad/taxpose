@@ -59,38 +59,34 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         if self.weight_normalize == "l1":
             assert self.sigmoid_on, "l1 weight normalization need sigmoid on"
 
-    def compute_loss(self, x_action, x_anchor, batch, log_values={}, loss_prefix=""):
-        points_action = batch["points_action"][:, :, :3]  # action point clouds
-        points_anchor = batch["points_anchor"][:, :, :3]  # anchor point clouds
-        # action point clouds transformed by T0
-        points_trans_action = batch["points_action_trans"][:, :, :3]
-        # anchor point clouds transformed by T1
-        points_trans_anchor = batch["points_anchor_trans"][:, :, :3]
+    def compute_loss(self, model_output, batch, log_values={}, loss_prefix=""):
+        x_action = model_output["flow_action"]
+        x_anchor = model_output["flow_anchor"]
 
-        # SE(3) transformation applied to points_action
+        # The original point clouds from the demonstration.
+        points_action = batch["points_action"]  # action point clouds
+        points_anchor = batch["points_anchor"]  # anchor point clouds
+
+        # The point clouds transformed by the ground truth transforms.
+        points_trans_action = batch["points_action_trans"]  # T0 -> action point clouds
+        points_trans_anchor = batch["points_anchor_trans"]  # T1 -> anchor point clouds
+
+        # Get the transforms.
         T0 = Transform3d(matrix=batch["T0"])
-        # SE(3) transformation applied to points_anchor
         T1 = Transform3d(matrix=batch["T1"])
 
-        R0_max, R0_min, R0_mean = get_degree_angle(
-            T0
-        )  # rotation component applied to points_action
-        R1_max, R1_min, R1_mean = get_degree_angle(
-            T1
-        )  # rotation component applied to points_anchor
-        t0_max, t0_min, t0_mean = get_translation(
-            T0
-        )  # translation component applied to points_action
-        t1_max, t1_min, t1_mean = get_translation(
-            T1
-        )  # translation component applied to points_anchor
+        # rotation component applied to points_action
+        R0_max, R0_min, R0_mean = get_degree_angle(T0)
+        # rotation component applied to points_anchor
+        R1_max, R1_min, R1_mean = get_degree_angle(T1)
+        # translation component applied to points_action
+        t0_max, t0_min, t0_mean = get_translation(T0)
+        # translation component applied to points_anchor
+        t1_max, t1_min, t1_mean = get_translation(T1)
 
-        pred_flow_action, pred_w_action = self.extract_flow_and_weight(
-            x_action
-        )  # flow predicted from action to anchor, per point importance weight for action points
-        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(
-            x_anchor
-        )  # flow predicted from anchor to action, per point importance weight for anchor points
+        # Extract predictred flow and weight
+        pred_flow_action, pred_w_action = self.extract_flow_and_weight(x_action)
+        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(x_anchor)
 
         if self.flow_supervision == "both":
             pred_T_action = dualflow2pose(
@@ -124,15 +120,11 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
             )
 
             # Loss associated with ground truth transform
-            point_loss_action = mse_criterion(
-                pred_points_action,
-                points_action_target,
-            )
+            point_loss_action = mse_criterion(pred_points_action, points_action_target)
 
             # Loss associated flow vectors matching a consistent rigid transform
             smoothness_loss_action = mse_criterion(
-                pred_flow_action,
-                induced_flow_action,
+                pred_flow_action, induced_flow_action
             )
             dense_loss_action = dense_flow_loss(
                 points=points_trans_action,
@@ -345,20 +337,12 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
 
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
-        if self.return_flow_component:
-            model_output = self.model(points_trans_action, points_trans_anchor)
-            x_action = model_output["flow_action"]
-            x_anchor = model_output["flow_anchor"]
-            residual_flow_action = model_output["residual_flow_action"]
-            residual_flow_anchor = model_output["residual_flow_anchor"]
-            corr_flow_action = model_output["corr_flow_action"]
-            corr_flow_anchor = model_output["corr_flow_anchor"]
-        else:
-            x_action, x_anchor = self.model(points_trans_action, points_trans_anchor)
+
+        model_output = self.model(points_trans_action, points_trans_anchor)
 
         log_values = {}
         loss, log_values = self.compute_loss(
-            x_action, x_anchor, batch, log_values=log_values, loss_prefix=""
+            model_output, batch, log_values=log_values, loss_prefix=""
         )
         return loss, log_values
 
@@ -374,21 +358,9 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
 
-        if self.return_flow_component:
-            model_output = self.model(points_trans_action, points_trans_anchor)
-            x_action = model_output["flow_action"]
-            x_anchor = model_output["flow_anchor"]
-            residual_flow_action = model_output["residual_flow_action"]
-            residual_flow_anchor = model_output["residual_flow_anchor"]
-            corr_flow_action = model_output["corr_flow_action"]
-            corr_flow_anchor = model_output["corr_flow_anchor"]
-        else:
-            x_action, x_anchor = self.model(points_trans_action, points_trans_anchor)
-
-        points_action = points_action[:, :, :3]
-        points_anchor = points_anchor[:, :, :3]
-        points_trans_action = points_trans_action[:, :, :3]
-        points_trans_anchor = points_trans_anchor[:, :, :3]
+        model_output = self.model(points_trans_action, points_trans_anchor)
+        x_action = model_output["flow_action"]
+        x_anchor = model_output["flow_anchor"]
 
         pred_flow_action = x_action[:, :, :3]
         if x_action.shape[2] > 3:

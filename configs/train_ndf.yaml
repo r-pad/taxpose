@@ -1,28 +1,20 @@
-# Logging Settings
-hydra:
-  run:
-    dir: ${log_dir}/${experiment}/${now:%Y-%m-%d_%H%M%S}
-  sweep:
-    dir: ${log_dir}/${experiment}/sweep/${now:%Y-%m-%d_%H%M%S}
-    subdir: ${hydra.job.num}
-  job:
-    chdir: True
 
-log_dir: logs
-experiment: residual_flow_occlusion
+
+job_name: residual_flow_occlusion
 image_logging_period: 100
 
-### TO BE CHANGED ###
 log_txt_file:  ${hydra:runtime.cwd}/recent_training_paths.txt # absolute path for text file for logging
 defaults:
   - _self_
+  - hydra_logging
   - object_class: mug # {mug, bottle, bowl}
   - pose_dist: upright # {upright, arbitrary}
   - relationship: place # {place, grasp}
   - model: release
   - task: ${object_class}_${relationship}
   - optional mode: train # $mode \in {train, train_val, validation}
-  - checkpoints: ndf/${object_class}/${pose_dist}/${model}/${relationship}
+  - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
+  - checkpoints/pretraining@checkpoints.pretraining
 
 ### TO BE CHANGED ###
 
@@ -32,7 +24,7 @@ train_data_dir: ${dataset_root}/${task.name}/train_data/renders
 test_data_dir: ${dataset_root}/${task.name}/test_data/renders
 num_workers: 52
 batch_size: 8
-num_points: 1024
+num_points: ${model.num_points}
 num_demo: 10
 dataset_index: None
 object_type: mug
@@ -50,19 +42,23 @@ overfit: False
 seed: 0
 
 # Network Settings
-center_feature: True
+center_feature: ${model.center_feature}
 diff_emb: True
 diff_transformer: True
-emb_nn: dgcnn
-emb_dims: 512
-inital_sampling_ratio: 1
+emb_nn: ${model.emb_nn}
+emb_dims: ${model.emb_dims}
+inital_sampling_ratio: ${model.inital_sampling_ratio}
 flow_compute_type: 0
-residual_on: True
-pred_weight: True
+residual_on: ${model.residual_on}
+pred_weight: ${model.pred_weight}
 sigmoid_on: True
-return_flow_component: False
+return_flow_component: ${model.return_flow_component}
 mlp: False
 
+pretraining:
+  mode: nce_loss
+  checkpoint_file_action: ${checkpoints.pretraining.${model.emb_nn}.${pretraining.mode}.${task.action_name}}
+  checkpoint_file_anchor: ${checkpoints.pretraining.${model.emb_nn}.${pretraining.mode}.${task.anchor_name}}
 # Loss Settings
 flow_supervision: both
 displace_loss_weight: 1
@@ -71,7 +67,8 @@ consistency_loss_weight: 0.1
 
 # Training Settings
 load_from_checkpoint: False
-checkpoint_file: ${checkpoints.ckpt_file}
+# checkpoint_file: ${checkpoints.ckpt_file}
+checkpoint_file: null
 freeze_embnn: False
 lr: 1e-4
 max_epochs: 1000

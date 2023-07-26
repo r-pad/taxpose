@@ -1,0 +1,9 @@
+name: ???
+pred_weight: True
+emb_nn: "dgcnn"
+emb_dims: 512
+return_flow_component: False
+center_feature: True
+inital_sampling_ratio: 1
+residual_on: True
+num_points: 1024

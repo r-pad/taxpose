@@ -65,19 +65,21 @@ class CustomTransformer(nn.Module):
         src_embedding = self.model(tgt, src, None, None).transpose(2, 1).contiguous()
         src_attn = self.model.decoder.layers[-1].src_attn.attn
 
+        outputs = {"src_embedding": src_embedding, "src_attn": src_attn}
+
         if self.bidirectional:
             tgt_embedding = (
                 self.model(src, tgt, None, None).transpose(2, 1).contiguous()
             )
             tgt_attn = self.model.decoder.layers[-1].src_attn.attn
 
-            if self.return_attn:
-                return src_embedding, tgt_embedding, src_attn, tgt_attn
-            return src_embedding, tgt_embedding
+            outputs = {
+                **outputs,
+                "tgt_embedding": tgt_embedding,
+                "tgt_attn": tgt_attn,
+            }
 
-        if self.return_attn:
-            return src_embedding, src_attn
-        return src_embedding
+        return outputs
 
 
 class ResidualMLPHead(nn.Module):

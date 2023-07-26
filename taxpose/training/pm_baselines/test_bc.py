@@ -16,6 +16,7 @@ from taxpose.datasets.pm_placement import (
     GOAL_INF_DSET_PATH,
     SEEN_CATS,
     SEM_CLASS_DSET_PATH,
+    UMPNET_SPLIT_FULL_FILE,
     UNSEEN_CATS,
     get_category,
     get_dataset_ids_all,
@@ -26,7 +27,6 @@ from taxpose.datasets.pm_placement import (
 from taxpose.training.pm_baselines.bc_dataset import articulate_specific_joints
 from taxpose.training.pm_baselines.bc_model import BCNet as DaggerNet
 from taxpose.training.pm_baselines.flow_model import FlowNet as TrajFlowNet
-from taxpose.datasets.pm_placement import UMPNET_SPLIT_FULL_FILE
 
 """
 This file loads a trained BC model and tests the rollout in simulation.
