@@ -71,6 +71,21 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         points_trans_action = batch["points_action_trans"]  # T0 -> action point clouds
         points_trans_anchor = batch["points_anchor_trans"]  # T1 -> anchor point clouds
 
+        # If we've applied some sampling, we need to extract the predictions too...
+        if "sampled_ixs_action" in model_output:
+            ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+            points_action = torch.take_along_dim(points_action, ixs_action, dim=1)
+            points_trans_action = torch.take_along_dim(
+                points_trans_action, ixs_action, dim=1
+            )
+
+        if "sampled_ixs_anchor" in model_output:
+            ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+            points_anchor = torch.take_along_dim(points_anchor, ixs_anchor, dim=1)
+            points_trans_anchor = torch.take_along_dim(
+                points_trans_anchor, ixs_anchor, dim=1
+            )
+
         # Get the transforms.
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
@@ -361,6 +376,21 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         model_output = self.model(points_trans_action, points_trans_anchor)
         x_action = model_output["flow_action"]
         x_anchor = model_output["flow_anchor"]
+
+        # If we've applied some sampling, we need to extract the predictions too...
+        if "sampled_ixs_action" in model_output:
+            ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+            points_action = torch.take_along_dim(points_action, ixs_action, dim=1)
+            points_trans_action = torch.take_along_dim(
+                points_trans_action, ixs_action, dim=1
+            )
+
+        if "sampled_ixs_anchor" in model_output:
+            ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+            points_anchor = torch.take_along_dim(points_anchor, ixs_anchor, dim=1)
+            points_trans_anchor = torch.take_along_dim(
+                points_trans_anchor, ixs_anchor, dim=1
+            )
 
         pred_flow_action = x_action[:, :, :3]
         if x_action.shape[2] > 3:

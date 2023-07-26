@@ -53,7 +53,7 @@ from torch.nn import functional as F
 from torchvision.transforms import ToTensor
 
 from taxpose.nets.transformer_flow import CustomTransformer as Transformer
-from taxpose.nets.transformer_flow import ResidualMLPHead
+from taxpose.nets.transformer_flow import MultilaterationHead, ResidualMLPHead
 from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
 from taxpose.training.point_cloud_training_module import PointCloudTrainingModule
 from taxpose.utils.color_utils import get_color
@@ -132,6 +132,9 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         freeze_embnn=False,
         return_attn=True,
         input_dims=3,
+        multilaterate=False,
+        sample: bool = False,
+        mlat_nkps: int = 100,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.emb_dims = emb_dims
@@ -163,17 +166,30 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.transformer_anchor = Transformer(
             emb_dims=emb_dims, return_attn=self.return_attn, bidirectional=False
         )
-
-        self.head_action = ResidualMLPHead(
-            emb_dims=emb_dims,
-            pred_weight=self.pred_weight,
-            residual_on=self.residual_on,
-        )
-        self.head_anchor = ResidualMLPHead(
-            emb_dims=emb_dims,
-            pred_weight=self.pred_weight,
-            residual_on=self.residual_on,
-        )
+        if multilaterate:
+            self.head_action = MultilaterationHead(
+                emb_dims=emb_dims,
+                pred_weight=self.pred_weight,
+                sample=sample,
+                n_kps=mlat_nkps,
+            )
+            self.head_anchor = MultilaterationHead(
+                emb_dims=emb_dims,
+                pred_weight=self.pred_weight,
+                sample=sample,
+                n_kps=mlat_nkps,
+            )
+        else:
+            self.head_action = ResidualMLPHead(
+                emb_dims=emb_dims,
+                pred_weight=self.pred_weight,
+                residual_on=self.residual_on,
+            )
+            self.head_anchor = ResidualMLPHead(
+                emb_dims=emb_dims,
+                pred_weight=self.pred_weight,
+                residual_on=self.residual_on,
+            )
 
     def forward(self, *input):
         assert input[0].shape[2] in [
@@ -255,6 +271,11 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             "corr_points_action": corr_points_action,
         }
 
+        if "P_A" in head_action_output:
+            original_points_action = head_action_output["P_A"].permute(0, 2, 1)
+            outputs["original_points_action"] = original_points_action
+            outputs["sampled_ixs_action"] = head_action_output["A_ixs"]
+
         if self.cycle:
             if anchor_attn is not None:
                 anchor_attn = anchor_attn.mean(dim=1)
@@ -278,6 +299,11 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 "corr_flow_anchor": corr_flow_anchor,
                 "corr_points_anchor": corr_points_anchor,
             }
+
+            if "P_A" in head_anchor_output:
+                original_points_anchor = head_anchor_output["P_A"].permute(0, 2, 1)
+                outputs["original_points_anchor"] = original_points_anchor
+                outputs["sampled_ixs_anchor"] = head_anchor_output["A_ixs"]
 
         return outputs
 
@@ -441,6 +467,22 @@ class EquivarianceTestingModule(PointCloudTrainingModule):
 
             points_trans_action = points_trans_action[:, :, :3]
             points_trans_anchor = points_trans_anchor[:, :, :3]
+
+            # If we've applied some sampling, we need to extract the predictions too...
+            if "sampled_ixs_action" in model_output:
+                ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+                # points_action = torch.take_along_dim(points_action, ixs_action, dim=1)
+                points_trans_action = torch.take_along_dim(
+                    points_trans_action, ixs_action, dim=1
+                )
+
+            if "sampled_ixs_anchor" in model_output:
+                ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+                # points_anchor = torch.take_along_dim(points_anchor, ixs_anchor, dim=1)
+                points_trans_anchor = torch.take_along_dim(
+                    points_trans_anchor, ixs_anchor, dim=1
+                )
+
             ans_dict = self.predict(
                 x_action=x_action,
                 x_anchor=x_anchor,

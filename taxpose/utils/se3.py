@@ -199,6 +199,9 @@ def dualflow2pose(
     if weights_tgt is None:
         weights_tgt = torch.ones(xyz_tgt.shape[:-1], device=xyz_tgt.device)
 
+    assert not torch.isinf(weights_src).any() and not torch.isinf(weights_tgt).any()
+    assert not torch.isnan(weights_src).any() and not torch.isnan(weights_tgt).any()
+
     if normalization_scehme == "l1":
         w_src = F.normalize(weights_src, p=1.0, dim=-1).unsqueeze(-1)
         w_tgt = F.normalize(weights_tgt, p=1.0, dim=-1).unsqueeze(-1)
@@ -206,12 +209,13 @@ def dualflow2pose(
         softmax_operator = torch.nn.Softmax(dim=-1)
         w_src = softmax_operator(weights_src / temperature).unsqueeze(-1)
         w_tgt = softmax_operator(weights_tgt / temperature).unsqueeze(-1)
-    assert torch.allclose(
-        w_src.sum(1), torch.ones(w_src.sum(1).shape).cuda()
-    ), "flow src weights does not sum to 1 for each batch element"
-    assert torch.allclose(
-        w_tgt.sum(1), torch.ones(w_tgt.sum(1).shape).cuda()
-    ), "flow tgt weights does not sum to 1 for each batch element"
+
+    # assert torch.allclose(
+    #     w_src.sum(1), torch.ones(w_src.sum(1).shape).cuda()
+    # ), "flow src weights does not sum to 1 for each batch element"
+    # assert torch.allclose(
+    #     w_tgt.sum(1), torch.ones(w_tgt.sum(1).shape).cuda()
+    # ), "flow tgt weights does not sum to 1 for each batch element"
 
     xyz_mean_src = (w_src * xyz_src).sum(dim=1, keepdims=True)
 

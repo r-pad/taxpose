@@ -54,6 +54,9 @@ pred_weight: ${model.pred_weight}
 sigmoid_on: True
 return_flow_component: ${model.return_flow_component}
 mlp: False
+multilaterate: ${model.multilaterate}
+mlat_sample: ${model.mlat_sample}
+mlat_nkps: ${model.mlat_nkps}
 
 pretraining:
   mode: nce_loss
