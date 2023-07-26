@@ -1,1 +1,4 @@
-name: release
+defaults:
+  - _taxpose
+
+name: taxpose_(release)
