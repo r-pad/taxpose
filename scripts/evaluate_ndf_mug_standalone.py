@@ -255,7 +255,6 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             "corr_points_action": corr_points_action,
         }
 
-
         if self.cycle:
             if anchor_attn is not None:
                 anchor_attn = anchor_attn.mean(dim=1)
@@ -279,7 +278,6 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 "corr_flow_anchor": corr_flow_anchor,
                 "corr_points_anchor": corr_points_anchor,
             }
-
 
         return outputs
 

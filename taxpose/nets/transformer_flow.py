@@ -4,14 +4,12 @@
 
 import math
 
-import functorch
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from taxpose.nets.pointnet import PointNet
 from taxpose.nets.transformer_flow_pm import CustomTransformer
-from taxpose.nets.tv_mlp import MLP as TVMLP
 from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
 from third_party.dcp.model import DGCNN
 
@@ -387,7 +385,6 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             "corr_flow_action": corr_flow_action,
             "corr_points_action": corr_points_action,
         }
-
 
         if self.cycle:
             anchor_attn = anchor_attn.mean(dim=1)

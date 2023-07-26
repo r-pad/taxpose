@@ -2,7 +2,6 @@ from typing import Dict
 
 import plotly.graph_objs as go
 import pytorch_lightning as pl
-import rpad.pyg.nets.pointnet2 as pnp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

@@ -362,8 +362,6 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         x_action = model_output["flow_action"]
         x_anchor = model_output["flow_anchor"]
 
-
-
         pred_flow_action = x_action[:, :, :3]
         if x_action.shape[2] > 3:
             if self.sigmoid_on:
