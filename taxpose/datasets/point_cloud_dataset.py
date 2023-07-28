@@ -1,13 +1,167 @@
+import fnmatch
+import functools
 import os
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, ClassVar, List, Optional, TypedDict
 
 import numpy as np
+import numpy.typing as npt
 import torch
 from pytorch3d.ops import sample_farthest_points
 from torch.utils.data import Dataset
 
 from taxpose.utils.occlusion_utils import ball_occlusion, plane_occlusion
 from taxpose.utils.se3 import random_se3
+
+
+class PlacementPointCloudData(TypedDict):
+    points_action: npt.NDArray[np.float32]  # (1, num_points, 3)
+    points_anchor: npt.NDArray[np.float32]  # (1, num_points, 3)
+    symmetric_cls: npt.NDArray[np.float32]  # Not really sure what this is...
+
+
+@dataclass
+class NDFPointCloudDatasetConfig:
+    dataset_type: ClassVar[str] = "ndf"
+    dataset_root: Path
+    dataset_indices: Optional[List[int]] = None
+    num_demo: int = 12
+    min_num_points: int = 1024
+
+    cloud_type: str = "final"
+    action_class: int = 0
+    anchor_class: int = 1
+    min_num_cameras: int = 4
+    max_num_cameras: int = 4
+
+
+class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
+    def __init__(self, cfg: NDFPointCloudDatasetConfig):
+        self.dataset_root = Path(cfg.dataset_root)
+        self.dataset_indices = cfg.dataset_indices
+        self.min_num_points = cfg.min_num_points
+        self.num_demo = cfg.num_demo
+        self.cloud_type = cfg.cloud_type
+        self.action_class = cfg.action_class
+        self.anchor_class = cfg.anchor_class
+        self.min_num_cameras = cfg.min_num_cameras
+        self.max_num_cameras = cfg.max_num_cameras
+
+        if self.dataset_indices is None or self.dataset_indices == "None":
+            dataset_indices = self.get_existing_data_indices()
+            self.dataset_indices = dataset_indices
+
+        self.bad_demo_id = self.go_through_list()
+
+        self.filenames = [
+            self.dataset_root / f"{idx}_{self.cloud_type}_obj_points.npz"
+            for idx in self.dataset_indices
+            if idx not in self.bad_demo_id
+        ]
+
+        if self.num_demo is not None:
+            self.filenames = self.filenames[: self.num_demo]
+
+    def get_existing_data_indices(self):
+        num_files = len(
+            fnmatch.filter(
+                os.listdir(self.dataset_root), f"**_{self.cloud_type}_obj_points.npz"
+            )
+        )
+        file_indices = [
+            int(fn.split("_")[0])
+            for fn in fnmatch.filter(
+                os.listdir(self.dataset_root), f"**_{self.cloud_type}_obj_points.npz"
+            )
+        ]
+        return file_indices
+
+    def go_through_list(self):
+        bad_demo_id = []
+        filenames = [
+            self.dataset_root / f"{idx}_{self.cloud_type}_obj_points.npz"
+            for idx in self.dataset_indices
+        ]
+        for i in range(len(filenames)):
+            filename = filenames[i]
+            if i == 0:
+                print(filename)
+            if not os.path.exists(filename):
+                bad_demo_id.append(i)
+                continue
+            points_action, points_anchor, _ = self.load_data(
+                filename,
+                action_class=self.action_class,
+                anchor_class=self.anchor_class,
+            )
+            if (points_action.shape[1] < self.min_num_points) or (
+                points_anchor.shape[1] < self.min_num_points
+            ):
+                bad_demo_id.append(i)
+
+        return bad_demo_id
+
+    @functools.cache
+    def load_data(self, filename, action_class, anchor_class):
+        point_data = np.load(filename, allow_pickle=True)
+        points_raw_np = point_data["clouds"]
+        classes_raw_np = point_data["classes"]
+        if self.min_num_cameras < 4:
+            camera_idxs = np.concatenate(
+                [[0], np.cumsum((np.diff(classes_raw_np) == -2))]
+            )
+            if not np.all(np.isin(np.arange(4), np.unique(camera_idxs))):
+                raise ValueError(
+                    "\033[93m"
+                    + f"{filename} did not contain all classes in all cameras"
+                    + "\033[0m"
+                )
+
+            num_cameras = np.random.randint(
+                low=self.min_num_cameras, high=self.max_num_cameras + 1
+            )
+            sampled_camera_idxs = np.random.choice(4, num_cameras, replace=False)
+            valid_idxs = np.isin(camera_idxs, sampled_camera_idxs)
+            points_raw_np = points_raw_np[valid_idxs]
+            classes_raw_np = classes_raw_np[valid_idxs]
+
+        points_action_np = points_raw_np[classes_raw_np == action_class].copy()
+        points_action_mean_np = points_action_np.mean(axis=0)
+        points_action_np = points_action_np - points_action_mean_np
+
+        points_anchor_np = points_raw_np[classes_raw_np == anchor_class].copy()
+        points_anchor_np = points_anchor_np - points_action_mean_np
+        points_anchor_mean_np = points_anchor_np.mean(axis=0)
+
+        points_action = points_action_np.astype(np.float32)[None, ...]
+        points_anchor = points_anchor_np.astype(np.float32)[None, ...]
+
+        # Not really sure what this is...
+        symmetric_cls = np.asarray([], dtype=np.float32)
+
+        return points_action, points_anchor, symmetric_cls
+
+    def __getitem__(self, index: int) -> PlacementPointCloudData:
+        filename = self.filenames[index]
+
+        points_action, points_anchor, symmetric_cls = self.load_data(
+            filename, action_class=self.action_class, anchor_class=self.anchor_class
+        )
+
+        return {
+            "points_action": points_action,
+            "points_anchor": points_anchor,
+            "symmetric_cls": symmetric_cls,
+        }
+
+    def __len__(self) -> int:
+        return len(self.filenames)
+
+
+@dataclass
+class PointClassDatasetConfig:
+    dset_config: Any
 
 
 class PointCloudDataset(Dataset):
@@ -37,19 +191,28 @@ class PointCloudDataset(Dataset):
         min_num_cameras=4,
         max_num_cameras=4,
     ):
+        dset_cfg = NDFPointCloudDatasetConfig(
+            dataset_root=dataset_root,
+            dataset_indices=dataset_indices,
+            cloud_type=cloud_type,
+            num_demo=num_demo,
+            min_num_points=num_points,
+            action_class=action_class,
+            anchor_class=anchor_class,
+            min_num_cameras=min_num_cameras,
+            max_num_cameras=max_num_cameras,
+        )
+        self.dataset = NDFPointCloudDataset(dset_cfg)
         self.dataset_size = dataset_size
         self.num_points = num_points
         # Path('/home/bokorn/src/ndf_robot/notebooks')
         self.dataset_root = Path(dataset_root)
-        self.cloud_type = cloud_type
         self.rot_var = rotation_variance
         self.trans_var = translation_variance
         self.action_class = action_class
         self.anchor_class = anchor_class
         self.symmetric_class = symmetric_class  # None if no symmetric class exists
         self.angle_degree = angle_degree
-        self.min_num_cameras = min_num_cameras
-        self.max_num_cameras = max_num_cameras
 
         self.overfit = overfit
         self.gripper_lr_label = gripper_lr_label
@@ -57,131 +220,37 @@ class PointCloudDataset(Dataset):
         self.num_overfit_transforms = num_overfit_transforms
         self.T0_list = []
         self.T1_list = []
-        if self.dataset_indices == "None":
-            dataset_indices = self.get_existing_data_indices()
-            self.dataset_indices = dataset_indices
-        self.bad_demo_id = self.go_through_list()
         self.synthetic_occlusion = synthetic_occlusion
         self.ball_radius = ball_radius
         self.plane_standoff = plane_standoff
         self.plane_occlusion = plane_occlusion
         self.ball_occlusion = ball_occlusion
         self.occlusion_class = occlusion_class
-        self.num_demo = num_demo
 
-        self.filenames = [
-            self.dataset_root / f"{idx}_{self.cloud_type}_obj_points.npz"
-            for idx in self.dataset_indices
-            if idx not in self.bad_demo_id
-        ]
-
-        if self.num_demo is not None:
-            self.filenames = self.filenames[: self.num_demo]
-
-    def get_fixed_transforms(self):
-        points_action, points_anchor, _ = self.load_data(
-            self.filenames[0],
-            action_class=self.action_class,
-            anchor_class=self.anchor_class,
-        )
-        if self.overfit:
-            # torch.random.manual_seed(0)
-            for i in range(self.num_overfit_transforms):
-                a = random_se3(
-                    1,
-                    rot_var=self.rot_var,
-                    trans_var=self.trans_var,
-                    device=points_action.device,
-                )
-                b = random_se3(
-                    1,
-                    rot_var=self.rot_var,
-                    trans_var=self.trans_var,
-                    device=points_anchor.device,
-                )
-                self.T0_list.append(a)
-                self.T1_list.append(b)
-        return
-
-    def get_existing_data_indices(self):
-        import fnmatch
-
-        num_files = len(
-            fnmatch.filter(
-                os.listdir(self.dataset_root), f"**_{self.cloud_type}_obj_points.npz"
-            )
-        )
-        file_indices = [
-            int(fn.split("_")[0])
-            for fn in fnmatch.filter(
-                os.listdir(self.dataset_root), f"**_{self.cloud_type}_obj_points.npz"
-            )
-        ]
-        return file_indices
-
-    def load_data(self, filename, action_class, anchor_class):
-        point_data = np.load(filename, allow_pickle=True)
-        points_raw_np = point_data["clouds"]
-        classes_raw_np = point_data["classes"]
-        if self.min_num_cameras < 4:
-            camera_idxs = np.concatenate(
-                [[0], np.cumsum((np.diff(classes_raw_np) == -2))]
-            )
-            if not np.all(np.isin(np.arange(4), np.unique(camera_idxs))):
-                print(
-                    "\033[93m"
-                    + f"{filename} did not contain all classes in all cameras"
-                    + "\033[0m"
-                )
-                return torch.Tensor([]), torch.Tensor([]), torch.Tensor([])
-
-            num_cameras = np.random.randint(
-                low=self.min_num_cameras, high=self.max_num_cameras + 1
-            )
-            sampled_camera_idxs = np.random.choice(4, num_cameras, replace=False)
-            valid_idxs = np.isin(camera_idxs, sampled_camera_idxs)
-            points_raw_np = points_raw_np[valid_idxs]
-            classes_raw_np = classes_raw_np[valid_idxs]
-
-        points_action_np = points_raw_np[classes_raw_np == action_class].copy()
-        points_action_mean_np = points_action_np.mean(axis=0)
-        points_action_np = points_action_np - points_action_mean_np
-
-        points_anchor_np = points_raw_np[classes_raw_np == anchor_class].copy()
-        points_anchor_np = points_anchor_np - points_action_mean_np
-        points_anchor_mean_np = points_anchor_np.mean(axis=0)
-
-        points_action = torch.from_numpy(points_action_np).float().unsqueeze(0)
-        points_anchor = torch.from_numpy(points_anchor_np).float().unsqueeze(0)
-
-        symmetric_cls = torch.Tensor([])
-
-        return points_action, points_anchor, symmetric_cls
-
-    def go_through_list(self):
-        bad_demo_id = []
-        filenames = [
-            self.dataset_root / f"{idx}_{self.cloud_type}_obj_points.npz"
-            for idx in self.dataset_indices
-        ]
-        for i in range(len(filenames)):
-            filename = filenames[i]
-            if i == 0:
-                print(filename)
-            if not os.path.exists(filename):
-                bad_demo_id.append(i)
-                continue
-            points_action, points_anchor, _ = self.load_data(
-                filename,
-                action_class=self.action_class,
-                anchor_class=self.anchor_class,
-            )
-            if (points_action.shape[1] < self.num_points) or (
-                points_anchor.shape[1] < self.num_points
-            ):
-                bad_demo_id.append(i)
-
-        return bad_demo_id
+    # def get_fixed_transforms(self):
+    #     points_action, points_anchor, _ = self.load_data(
+    #         self.filenames[0],
+    #         action_class=self.action_class,
+    #         anchor_class=self.anchor_class,
+    #     )
+    #     if self.overfit:
+    #         # torch.random.manual_seed(0)
+    #         for i in range(self.num_overfit_transforms):
+    #             a = random_se3(
+    #                 1,
+    #                 rot_var=self.rot_var,
+    #                 trans_var=self.trans_var,
+    #                 device=points_action.device,
+    #             )
+    #             b = random_se3(
+    #                 1,
+    #                 rot_var=self.rot_var,
+    #                 trans_var=self.trans_var,
+    #                 device=points_anchor.device,
+    #             )
+    #             self.T0_list.append(a)
+    #             self.T1_list.append(b)
+    #     return
 
     def project_to_xy(self, vector):
         """
@@ -226,12 +295,11 @@ class PointCloudDataset(Dataset):
         return sym_cls
 
     def __getitem__(self, index):
-        filename = self.filenames[torch.randint(len(self.filenames), [1])]
-        points_action, points_anchor, symmetric_cls = self.load_data(
-            filename,
-            action_class=self.action_class,
-            anchor_class=self.anchor_class,
-        )
+        data_ix = torch.randint(len(self.dataset), [1])
+        data = self.dataset[data_ix]
+        points_action = torch.from_numpy(data["points_action"])
+        points_anchor = torch.from_numpy(data["points_anchor"])
+        symmetric_cls = torch.from_numpy(data["symmetric_cls"])
 
         # if self.overfit:
         #     transform_idx = torch.randint(
