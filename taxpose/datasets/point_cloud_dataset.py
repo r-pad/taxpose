@@ -161,71 +161,53 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
 
 @dataclass
 class PointClassDatasetConfig:
-    dset_config: Any
+    dset_config: Any  # Config for actually loading the underlying demo dataset.
+
+    # Config for the dataset wrapper.
+    num_points: int = 1024
+    rotation_variance: float = np.pi
+    translation_variance: float = 0.5
+    dataset_size: int = 1000
+    angle_degree: int = 180
+    synthetic_occlusion: bool = False
+    ball_radius: Optional[float] = None
+    plane_occlusion: bool = False
+    ball_occlusion: bool = False
+    plane_standoff: Optional[float] = None
+    occlusion_class: int = 2
+
+    # Unused.
+    overfit: bool = False
+    num_overfit_transforms: int = 3
+    gripper_lr_label: bool = False
 
 
 class PointCloudDataset(Dataset):
-    def __init__(
-        self,
-        dataset_root,
-        dataset_indices=[10],
-        cloud_type="final",
-        action_class=0,
-        anchor_class=1,
-        num_points=1024,
-        dataset_size=1000,
-        rotation_variance=np.pi,
-        translation_variance=0.5,
-        symmetric_class=None,
-        angle_degree=180,
-        overfit=False,
-        num_overfit_transforms=3,
-        gripper_lr_label=False,
-        synthetic_occlusion=False,
-        ball_radius=None,
-        plane_occlusion=False,
-        ball_occlusion=False,
-        plane_standoff=None,
-        occlusion_class=2,
-        num_demo=12,
-        min_num_cameras=4,
-        max_num_cameras=4,
-    ):
-        dset_cfg = NDFPointCloudDatasetConfig(
-            dataset_root=dataset_root,
-            dataset_indices=dataset_indices,
-            cloud_type=cloud_type,
-            num_demo=num_demo,
-            min_num_points=num_points,
-            action_class=action_class,
-            anchor_class=anchor_class,
-            min_num_cameras=min_num_cameras,
-            max_num_cameras=max_num_cameras,
-        )
-        self.dataset = NDFPointCloudDataset(dset_cfg)
-        self.dataset_size = dataset_size
-        self.num_points = num_points
+    def __init__(self, cfg: PointClassDatasetConfig):
+        self.dataset = NDFPointCloudDataset(cfg.dset_config)
+        self.dataset_size = cfg.dataset_size
+        self.num_points = cfg.num_points
         # Path('/home/bokorn/src/ndf_robot/notebooks')
-        self.dataset_root = Path(dataset_root)
-        self.rot_var = rotation_variance
-        self.trans_var = translation_variance
-        self.action_class = action_class
-        self.anchor_class = anchor_class
-        self.symmetric_class = symmetric_class  # None if no symmetric class exists
-        self.angle_degree = angle_degree
+        self.dataset_root = Path(cfg.dataset_root)
+        self.rot_var = cfg.rotation_variance
+        self.trans_var = cfg.translation_variance
+        self.action_class = cfg.action_class
+        self.anchor_class = cfg.anchor_class
+        self.symmetric_class = cfg.symmetric_class  # None if no symmetric class exists
+        self.angle_degree = cfg.angle_degree
 
-        self.overfit = overfit
-        self.gripper_lr_label = gripper_lr_label
-        self.dataset_indices = dataset_indices
-        self.num_overfit_transforms = num_overfit_transforms
+        self.overfit = cfg.overfit
+        self.gripper_lr_label = cfg.gripper_lr_label
+        self.dataset_indices = cfg.dataset_indices
+        self.num_overfit_transforms = cfg.num_overfit_transforms
         self.T0_list = []
         self.T1_list = []
-        self.synthetic_occlusion = synthetic_occlusion
-        self.ball_radius = ball_radius
-        self.plane_standoff = plane_standoff
-        self.plane_occlusion = plane_occlusion
-        self.ball_occlusion = ball_occlusion
-        self.occlusion_class = occlusion_class
+        self.synthetic_occlusion = cfg.synthetic_occlusion
+        self.ball_radius = cfg.ball_radius
+        self.plane_standoff = cfg.plane_standoff
+        self.plane_occlusion = cfg.plane_occlusion
+        self.ball_occlusion = cfg.ball_occlusion
+        self.occlusion_class = cfg.occlusion_class
 
     # def get_fixed_transforms(self):
     #     points_action, points_anchor, _ = self.load_data(

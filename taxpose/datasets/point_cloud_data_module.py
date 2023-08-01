@@ -2,7 +2,11 @@ import numpy as np
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 
-from taxpose.datasets.point_cloud_dataset import PointCloudDataset
+from taxpose.datasets.point_cloud_dataset import (
+    NDFPointCloudDatasetConfig,
+    PointClassDatasetConfig,
+    PointCloudDataset,
+)
 from taxpose.datasets.point_cloud_dataset_test import TestPointCloudDataset
 
 
@@ -79,6 +83,10 @@ class MultiviewDataModule(pl.LightningDataModule):
         if stage == "fit" or stage is None:
             print("TRAIN Dataset")
             self.train_dataset = PointCloudDataset(
+                cfg=PointClassDatasetConfig(
+                    dset_config=NDFPointCloudDatasetConfig(),
+                    # TODO: RESUME HERRRRREEEEEEEE
+                ),
                 dataset_root=self.dataset_root,
                 dataset_indices=self.dataset_index,  # [self.dataset_index],
                 action_class=self.action_class,
