@@ -3,7 +3,7 @@ import functools
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, List, Optional, TypedDict
+from typing import ClassVar, List, Optional, TypedDict
 
 import numpy as np
 import numpy.typing as npt
@@ -161,7 +161,7 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
 
 @dataclass
 class PointClassDatasetConfig:
-    dset_config: Any  # Config for actually loading the underlying demo dataset.
+    demo_dset: NDFPointCloudDataset  # Config for actually loading the underlying demo dataset.
 
     # Config for the dataset wrapper.
     num_points: int = 1024
@@ -175,6 +175,7 @@ class PointClassDatasetConfig:
     ball_occlusion: bool = False
     plane_standoff: Optional[float] = None
     occlusion_class: int = 2
+    symmetric_class: Optional[int] = None
 
     # Unused.
     overfit: bool = False
@@ -184,21 +185,20 @@ class PointClassDatasetConfig:
 
 class PointCloudDataset(Dataset):
     def __init__(self, cfg: PointClassDatasetConfig):
-        self.dataset = NDFPointCloudDataset(cfg.dset_config)
+        self.dataset = NDFPointCloudDataset(cfg.demo_dset)
         self.dataset_size = cfg.dataset_size
         self.num_points = cfg.num_points
         # Path('/home/bokorn/src/ndf_robot/notebooks')
-        self.dataset_root = Path(cfg.dataset_root)
         self.rot_var = cfg.rotation_variance
         self.trans_var = cfg.translation_variance
-        self.action_class = cfg.action_class
-        self.anchor_class = cfg.anchor_class
+        self.action_class = cfg.demo_dset.action_class
+        self.anchor_class = cfg.demo_dset.anchor_class
         self.symmetric_class = cfg.symmetric_class  # None if no symmetric class exists
         self.angle_degree = cfg.angle_degree
 
         self.overfit = cfg.overfit
         self.gripper_lr_label = cfg.gripper_lr_label
-        self.dataset_indices = cfg.dataset_indices
+        self.dataset_indices = cfg.demo_dset.dataset_indices
         self.num_overfit_transforms = cfg.num_overfit_transforms
         self.T0_list = []
         self.T1_list = []

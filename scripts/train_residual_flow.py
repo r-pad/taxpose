@@ -26,7 +26,7 @@ def write_to_file(file_name, string):
 def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
 
-    # breakpoint()
+    breakpoint()
     # torch.set_float32_matmul_precision("medium")
     pl.seed_everything(cfg.seed)
     logger = WandbLogger(project=cfg.job_name)
@@ -67,6 +67,7 @@ def main(cfg):
         plane_occlusion=cfg.plane_occlusion,
         num_demo=cfg.num_demo,
         occlusion_class=cfg.occlusion_class,
+        cfg=cfg.dm,
     )
 
     dm.setup()

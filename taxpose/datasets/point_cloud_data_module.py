@@ -2,11 +2,7 @@ import numpy as np
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 
-from taxpose.datasets.point_cloud_dataset import (
-    NDFPointCloudDatasetConfig,
-    PointClassDatasetConfig,
-    PointCloudDataset,
-)
+from taxpose.datasets.point_cloud_dataset import PointCloudDataset
 from taxpose.datasets.point_cloud_dataset_test import TestPointCloudDataset
 
 
@@ -37,6 +33,7 @@ class MultiviewDataModule(pl.LightningDataModule):
         plane_standoff=None,
         num_demo=12,
         occlusion_class=0,
+        cfg=None,
     ):
         super().__init__()
         self.dataset_root = dataset_root
@@ -70,6 +67,8 @@ class MultiviewDataModule(pl.LightningDataModule):
         self.num_demo = num_demo
         self.occlusion_class = occlusion_class
 
+        self.cfg = cfg
+
     def pass_loss(self, loss):
         self.loss = loss.to(self.device)
 
@@ -81,56 +80,58 @@ class MultiviewDataModule(pl.LightningDataModule):
         # we set up only relevant datasets when stage is specified (automatically set by Pytorch-Lightning)
 
         if stage == "fit" or stage is None:
-            print("TRAIN Dataset")
-            self.train_dataset = PointCloudDataset(
-                cfg=PointClassDatasetConfig(
-                    dset_config=NDFPointCloudDatasetConfig(),
-                    # TODO: RESUME HERRRRREEEEEEEE
-                ),
-                dataset_root=self.dataset_root,
-                dataset_indices=self.dataset_index,  # [self.dataset_index],
-                action_class=self.action_class,
-                anchor_class=self.anchor_class,
-                dataset_size=self.dataset_size,
-                rotation_variance=self.rotation_variance,
-                translation_variance=self.translation_variance,
-                cloud_type=self.cloud_type,
-                symmetric_class=self.symmetric_class,
-                num_points=self.num_points,
-                overfit=self.overfit,
-                gripper_lr_label=self.gripper_lr_label,
-                synthetic_occlusion=self.synthetic_occlusion,
-                ball_radius=self.ball_radius,
-                plane_occlusion=self.plane_occlusion,
-                ball_occlusion=self.ball_occlusion,
-                plane_standoff=self.plane_standoff,
-                num_demo=self.num_demo,
-                occlusion_class=self.occlusion_class,
-            )
+            # self.train_dataset = PointCloudDataset(
+            #     cfg=PointClassDatasetConfig(
+            #         demo_dset=NDFPointCloudDatasetConfig(
+            #             dataset_root=self.dataset_root,
+            #             dataset_indices=self.dataset_index,  # [self.dataset_index],
+            #             num_demo=self.num_demo,
+            #             min_num_points=self.num_points,
+            #             cloud_type=self.cloud_type,
+            #             action_class=self.action_class,
+            #             anchor_class=self.anchor_class,
+            #         ),
+            #         num_points=self.num_points,
+            #         rotation_variance=self.rotation_variance,
+            #         translation_variance=self.translation_variance,
+            #         dataset_size=self.dataset_size,
+            #         synthetic_occlusion=self.synthetic_occlusion,
+            #         ball_radius=self.ball_radius,
+            #         plane_occlusion=self.plane_occlusion,
+            #         ball_occlusion=self.ball_occlusion,
+            #         plane_standoff=self.plane_standoff,
+            #         occlusion_class=self.occlusion_class,
+            #         overfit=self.overfit,
+            #     )
+            # )
+            self.train_dataset = PointCloudDataset(self.cfg.train_dset)
 
         if stage == "val" or stage is None:
-            print("VAL Dataset")
-            self.val_dataset = PointCloudDataset(
-                dataset_root=self.test_dataset_root,
-                dataset_indices=self.dataset_index,  # [self.dataset_index],
-                action_class=self.action_class,
-                anchor_class=self.anchor_class,
-                dataset_size=self.dataset_size,
-                rotation_variance=self.rotation_variance,
-                translation_variance=self.translation_variance,
-                cloud_type=self.cloud_type,
-                symmetric_class=self.symmetric_class,
-                num_points=self.num_points,
-                overfit=self.overfit,
-                gripper_lr_label=self.gripper_lr_label,
-                synthetic_occlusion=self.synthetic_occlusion,
-                ball_radius=self.ball_radius,
-                plane_occlusion=self.plane_occlusion,
-                ball_occlusion=self.ball_occlusion,
-                plane_standoff=self.plane_standoff,
-                num_demo=None,
-                occlusion_class=self.occlusion_class,
-            )
+            # self.val_dataset = PointCloudDataset(
+            #     cfg=PointClassDatasetConfig(
+            #         demo_dset=NDFPointCloudDatasetConfig(
+            #             dataset_root=self.test_dataset_root,
+            #             dataset_indices=self.dataset_index,  # [self.dataset_index],
+            #             num_demo=None,
+            #             min_num_points=self.num_points,
+            #             cloud_type=self.cloud_type,
+            #             action_class=self.action_class,
+            #             anchor_class=self.anchor_class,
+            #         ),
+            #         num_points=self.num_points,
+            #         rotation_variance=self.rotation_variance,
+            #         translation_variance=self.translation_variance,
+            #         dataset_size=self.dataset_size,
+            #         synthetic_occlusion=self.synthetic_occlusion,
+            #         ball_radius=self.ball_radius,
+            #         plane_occlusion=self.plane_occlusion,
+            #         ball_occlusion=self.ball_occlusion,
+            #         plane_standoff=self.plane_standoff,
+            #         occlusion_class=self.occlusion_class,
+            #         overfit=self.overfit,
+            #     )
+            # )
+            self.val_dataset = PointCloudDataset(self.cfg.val_dset)
         if stage == "test":
             self.test_dataset = TestPointCloudDataset(
                 dataset_root=self.test_dataset_root,
