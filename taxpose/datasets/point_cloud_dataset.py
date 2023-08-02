@@ -2,6 +2,7 @@ import fnmatch
 import functools
 import os
 from dataclasses import dataclass
+from enum import IntEnum
 from pathlib import Path
 from typing import ClassVar, List, Optional, TypedDict
 
@@ -13,6 +14,12 @@ from torch.utils.data import Dataset
 
 from taxpose.utils.occlusion_utils import ball_occlusion, plane_occlusion
 from taxpose.utils.se3 import random_se3
+
+
+class ObjectClass(IntEnum):
+    MUG = 0
+    RACK = 1
+    GRIPPER = 2
 
 
 class PlacementPointCloudData(TypedDict):
@@ -29,9 +36,9 @@ class NDFPointCloudDatasetConfig:
     num_demo: int = 12
     min_num_points: int = 1024
 
-    cloud_type: str = "final"
-    action_class: int = 0
-    anchor_class: int = 1
+    cloud_type: str = "teleport"
+    action_class: ObjectClass = ObjectClass.MUG
+    anchor_class: ObjectClass = ObjectClass.RACK
     min_num_cameras: int = 4
     max_num_cameras: int = 4
 
@@ -174,7 +181,7 @@ class PointClassDatasetConfig:
     plane_occlusion: bool = False
     ball_occlusion: bool = False
     plane_standoff: Optional[float] = None
-    occlusion_class: int = 2
+    occlusion_class: ObjectClass = ObjectClass.GRIPPER
     symmetric_class: Optional[int] = None
 
     # Unused.
