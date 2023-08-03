@@ -26,7 +26,7 @@ def write_to_file(file_name, string):
 def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
 
-    breakpoint()
+    # breakpoint()
     # torch.set_float32_matmul_precision("medium")
     pl.seed_everything(cfg.seed)
     logger = WandbLogger(project=cfg.job_name)

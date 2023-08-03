@@ -3,6 +3,7 @@
 
 train_dset:
   demo_dset:
+    dataset_type: ${benchmark.name}
     dataset_root: ${benchmark.dataset_root}/${task.name}/train_data/renders
     dataset_indices: ???
     num_demo: ???
@@ -15,6 +16,7 @@ train_dset:
 
 val_dset:
   demo_dset:
+    dataset_type: ${benchmark.name}
     dataset_root: ${benchmark.dataset_root}/${task.name}/test_data/renders
     dataset_indices: ???
     num_demo: ???
@@ -27,6 +29,7 @@ val_dset:
 
 test_dset:
   demo_dset:
+    dataset_type: ${benchmark.name}
     dataset_root: ${benchmark.dataset_root}/${task.name}/test_data/renders
     dataset_indices: ???
     num_demo: ???
