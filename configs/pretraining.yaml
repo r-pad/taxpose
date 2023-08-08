@@ -1,29 +1,34 @@
 # Logging Settings
-job_name: embedding_pretraining_mug
+job_type: pretraining_${object_class.name}
 image_logging_period: 1000
 
 defaults:
+  - object_class: mug
+  - _logging
   - _self_
-  - hydra_logging
 
 seed: 0
 
 training:
   dataset:
     root: ${hydra:runtime.cwd}/data/mug_place/train_data/renders
-    pretraining_data_path: ${hydra:runtime.cwd}/third_party/ndf_robot/src/ndf_robot/data
+    pretraining_data_path: /home/beisner/code/multi_project/taxpose/third_party/ndf_robot/src/ndf_robot/data
     num_points: 1024
     dataset_index: None
     cloud_class: 0 # 0 for mug, 1 for rack, 2 for gripper
     cloud_type: init
     overfit: false
 
-  loader:
-    batch_size: 8
-    num_workers: 4
+  batch_size: 8
+  epochs: 100
 
+resources:
+  num_workers: 4
+  gpus:
+    - 0
 
-
+wandb:
+  group: Null
 
 
 # Network Settings

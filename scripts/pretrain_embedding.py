@@ -1,6 +1,7 @@
-import os
+import json
 
 import hydra
+import omegaconf
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.loggers import WandbLogger
@@ -19,10 +20,27 @@ from taxpose.utils.callbacks import SaverCallbackEmbnn
 
 @hydra.main(config_path="../configs", config_name="pretraining")
 def main(cfg):
+    print(
+        json.dumps(
+            omegaconf.OmegaConf.to_container(cfg, resolve=True, throw_on_missing=False),
+            sort_keys=True,
+            indent=4,
+        )
+    )
     pl.seed_everything(cfg.seed)
-    logger = WandbLogger(project=cfg.job_name)
-    logger.log_hyperparams(cfg)
-    logger.log_hyperparams({"working_dir": os.getcwd()})
+    logger = WandbLogger(
+        entity=cfg.wandb.entity,
+        project=cfg.wandb.project,
+        job_type=cfg.job_type,
+        save_code=True,
+        log_model=True,
+        save_dir=cfg.wandb.save_dir,
+        config=omegaconf.OmegaConf.to_container(
+            cfg, resolve=True, throw_on_missing=True
+        ),
+    )
+    # logger.log_hyperparams(cfg)
+    # logger.log_hyperparams({"working_dir": os.getcwd()})
     trainer = pl.Trainer(
         logger=logger,
         gpus=1,
@@ -33,14 +51,14 @@ def main(cfg):
         callbacks=[SaverCallbackEmbnn()],
     )
     dm = PretrainingMultiviewDataModule(
-        batch_size=cfg.batch_size,
-        num_workers=cfg.num_workers,
-        cloud_class=cfg.cloud_class,
-        dataset_root=cfg.dataset_root,
-        dataset_index=cfg.dataset_index,
-        cloud_type=cfg.cloud_type,
+        batch_size=cfg.training.batch_size,
+        num_workers=cfg.resources.num_workers,
+        cloud_class=cfg.training.dataset.cloud_class,
+        dataset_root=cfg.training.dataset.root,
+        dataset_index=cfg.training.dataset.dataset_index,
+        cloud_type=cfg.training.dataset.cloud_type,
         # overfit=cfg.overfit,
-        pretraining_data_path=cfg.pretraining_data_path,
+        pretraining_data_path=cfg.training.dataset.pretraining_data_path,
     )
 
     dm.setup()
