@@ -23,3 +23,22 @@ class PlacementPointCloudDataset(Protocol):
 
     def __getitem__(self, index: int) -> PlacementPointCloudData:
         ...
+
+
+class PretrainingPointCloudData(TypedDict):
+    pass
+
+
+class PretrainingPointCloudDatasetConfig(Protocol):
+    dataset_type: str
+
+
+class PretrainingPointCloudDataset(Protocol):
+    def __init__(self, cfg: PretrainingPointCloudDatasetConfig):
+        ...
+
+    def __len__(self) -> int:
+        ...
+
+    def __getitem__(self, index: int) -> PretrainingPointCloudData:
+        ...

@@ -1,0 +1,39 @@
+job_type: pretraining_${object_class.name}
+
+defaults:
+  - benchmark: ndf # {ndf, rlbench}
+  - object_class: mug # {mug, bottle, bowl}
+  - dataset: ndf_pretraining/${object_class}
+  - _logging
+  - _self_
+
+seed: 0
+
+training:
+  batch_size: 32
+  epochs: 100
+
+resources:
+  num_workers: 16
+  gpus:
+    - 0
+
+wandb:
+  group: Null
+
+image_logging_period: 1000
+
+# Network Settings
+emb_dims: 512
+emb_nn: dgcnn
+inital_sampling_ratio: 1
+normalize_features: true
+
+# Loss Settings
+con_weighting: dist
+l2_reg_weight: 0
+temperature: 0.1
+
+# Training Settings
+checkpoint_file: Null
+lr: 1e-4

@@ -1,5 +1,7 @@
 import os
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import ClassVar
 
 import numpy as np
 import torch
@@ -7,15 +9,32 @@ from pytorch3d.ops import sample_farthest_points
 from torch.utils.data import Dataset
 
 
-class PretrainingPointCloudDataset(Dataset):
+@dataclass
+class NDFPretrainingPointCloudDatasetConfig:
+    dataset_type: ClassVar[str] = "ndf_pretraining"
+    dataset_root: str
+    dataset_indices: list = field(default_factory=lambda: [10])
+    cloud_type: str = "final"
+    action_class: int = 0
+    num_points: int = 1000
+
+
+class NDFPretrainingPointCloudDataset(Dataset):
     def __init__(
         self,
-        dataset_root,
-        dataset_indices=[10],
-        cloud_type="final",
-        action_class=0,
-        num_points=1000,
+        config: NDFPretrainingPointCloudDatasetConfig,
+        # dataset_root,
+        # dataset_indices=[10],
+        # cloud_type="final",
+        # action_class=0,
+        # num_points=1000,
     ):
+        dataset_root = config.dataset_root
+        dataset_indices = config.dataset_indices
+        cloud_type = config.cloud_type
+        action_class = config.action_class
+        num_points = config.num_points
+
         self.dataset_root = Path(dataset_root)
         self.cloud_type = cloud_type
         self.num_points = num_points

@@ -18,7 +18,7 @@ from taxpose.utils.callbacks import SaverCallbackEmbnn
 # chuerp conda env: pytorch3d_38
 
 
-@hydra.main(config_path="../configs", config_name="pretraining")
+@hydra.main(config_path="../configs", config_name="pretraining_new")
 def main(cfg):
     print(
         json.dumps(
@@ -27,6 +27,7 @@ def main(cfg):
             indent=4,
         )
     )
+    # breakpoint()
     pl.seed_everything(cfg.seed)
     logger = WandbLogger(
         entity=cfg.wandb.entity,
@@ -51,14 +52,18 @@ def main(cfg):
         callbacks=[SaverCallbackEmbnn()],
     )
     dm = PretrainingMultiviewDataModule(
+        # batch_size=cfg.training.batch_size,
+        # num_workers=cfg.resources.num_workers,
+        # cloud_class=cfg.training.dataset.cloud_class,
+        # dataset_root=cfg.training.dataset.root,
+        # dataset_index=cfg.training.dataset.dataset_index,
+        # cloud_type=cfg.training.dataset.cloud_type,
+        # # overfit=cfg.overfit,
+        # pretraining_data_path=cfg.training.dataset.pretraining_data_path,
+        # obj_class=cfg.training.dataset.obj_class,
+        cfg=cfg.dataset,
         batch_size=cfg.training.batch_size,
         num_workers=cfg.resources.num_workers,
-        cloud_class=cfg.training.dataset.cloud_class,
-        dataset_root=cfg.training.dataset.root,
-        dataset_index=cfg.training.dataset.dataset_index,
-        cloud_type=cfg.training.dataset.cloud_type,
-        # overfit=cfg.overfit,
-        pretraining_data_path=cfg.training.dataset.pretraining_data_path,
     )
 
     dm.setup()
