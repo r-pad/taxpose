@@ -4,9 +4,7 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 
 from taxpose.datasets.base import PretrainingPointCloudDatasetConfig
-from taxpose.datasets.pretraining_point_cloud_dataset import (
-    NDFPretrainingPointCloudDataset,
-)
+from taxpose.datasets.ndf_pretraining import NDFPretrainingPointCloudDataset
 from taxpose.datasets.shapenet_pretraining import ShapeNetPretrainingPointCloudDataset
 
 
