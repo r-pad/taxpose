@@ -12,6 +12,22 @@ docker://beisner/taxpose \
 ```
 
 
+Pretraining.
+
+```bash
+SINGULARITYENV_CUDA_VISIBLE_DEVICES=0 \
+SINGULARITYENV_WANDB_DOCKER_IMAGE=taxpose \
+singularity exec \
+--nv \
+-B /scratch/$(whoami)/data:/data \
+-B /scratch/$(whoami)/logs:/opt/logs \
+docker://beisner/taxpose \
+python scripts/train_residual_flow.py \
+    log_dir=/opt/logs
+```
+
+
+
 Training the model.
 
 ```bash
