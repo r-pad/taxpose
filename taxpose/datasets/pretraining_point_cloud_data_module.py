@@ -83,11 +83,8 @@ class PretrainingMultiviewDataModule(pl.LightningDataModule):
     #             )
     #         )
 
-    def setup(self, stage=None):
-        """called one each GPU separately - stage defines if we are at fit or test step"""
-        # we set up only relevant datasets when stage is specified (automatically set by Pytorch-Lightning)
-
-        if stage == "fit" or stage is None:
+    def setup(self, stage: str):
+        if stage == "fit":
             print("TRAIN Dataset")
             self.train_dataset = make_dataset(self.cfg.train_dset)
             # if self.obj_class != "non_mug":
@@ -107,8 +104,6 @@ class PretrainingMultiviewDataModule(pl.LightningDataModule):
             #             action_class=self.cloud_class,
             #         )
             #     )
-
-        if stage == "val" or stage is None:
             print("VAL Dataset")
             self.val_dataset = make_dataset(self.cfg.val_dset)
             # if self.obj_class != "non_mug":
@@ -150,15 +145,24 @@ class PretrainingMultiviewDataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         return DataLoader(
-            self.train_dataset, batch_size=self.batch_size, num_workers=self.num_workers
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            pin_memory=True,
         )
 
     def val_dataloader(self):
         return DataLoader(
-            self.val_dataset, batch_size=self.batch_size, num_workers=self.num_workers
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            pin_memory=True,
         )
 
     def test_dataloader(self):
         return DataLoader(
-            self.test_dataset, batch_size=self.batch_size, num_workers=self.num_workers
+            self.test_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            pin_memory=True,
         )

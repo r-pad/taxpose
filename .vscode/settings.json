@@ -11,6 +11,9 @@
     "files.exclude": {
         "data/*": true,
     },
+    "python.analysis.exclude": [
+        "logs/**",
+    ],
     "python.linting.enabled": true,
     "files.watcherExclude": {
         "**/.git/objects/**": true,

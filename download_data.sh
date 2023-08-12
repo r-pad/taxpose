@@ -85,3 +85,13 @@ fi
 
 BOTTLE_PLACE_TEST_URL="https://docs.google.com/uc?export=download&id=1V8VmZ4gzCX2ub22wYfOJTlqSEESBW1LA"
 BOTTLE_PLACE_TRAIN_URL="https://docs.google.com/uc?export=download&id=1WGs6znQRRT8rAzdkYC--pGFxgv257cwG"
+
+if [ -d "$output_dir"/bottle_place ]; then
+  echo "bottle_place data already downloaded."
+else
+    mkdir "$output_dir"/bottle_place
+    gdown "$BOTTLE_PLACE_TEST_URL" -O "$output_dir"/bottle_place/test_data.zip
+    gdown "$BOTTLE_PLACE_TRAIN_URL" -O "$output_dir"/bottle_place/train_data.zip
+    unzip "$output_dir"/bottle_place/train_data.zip -d "$output_dir"/bottle_place && rm -rf "$output_dir"/bottle_place/train_data.zip
+    unzip "$output_dir"/bottle_place/test_data.zip -d "$output_dir"/bottle_place && rm -rf "$output_dir"/bottle_place/test_data.zip
+fi
