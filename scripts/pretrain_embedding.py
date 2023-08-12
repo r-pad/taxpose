@@ -58,7 +58,6 @@ def main(cfg):
         logger=logger,
         accelerator="gpu",
         devices=[0],
-        precision="16-mixed",
         # reload_dataloaders_every_n_epochs=1,
         # val_check_interval=0.2,
         # val_check_interval=10,
