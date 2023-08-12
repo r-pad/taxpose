@@ -17,6 +17,7 @@ SINGULARITYENV_CUDA_VISIBLE_DEVICES=$GPU_INDEX \
 SINGULARITYENV_WANDB_DOCKER_IMAGE=taxpose \
 singularity exec \
 --nv \
+-B /home/$(whoami)/code/rpad/taxpose:/opt/$(whoami)/code \
 -B /scratch/$(whoami)/data:/data \
 -B /scratch/$(whoami)/logs:/opt/logs \
 docker://beisner/taxpose \

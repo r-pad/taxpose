@@ -45,6 +45,7 @@ def main(cfg):
     logger = WandbLogger(
         entity=cfg.wandb.entity,
         project=cfg.wandb.project,
+        group=cfg.wandb.group,
         save_dir=cfg.wandb.save_dir,
         job_type=cfg.job_type,
         save_code=True,
