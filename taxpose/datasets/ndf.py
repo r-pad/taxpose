@@ -2,20 +2,46 @@ import fnmatch
 import functools
 import os
 from dataclasses import dataclass
-from enum import IntEnum
+from enum import Enum
 from pathlib import Path
-from typing import ClassVar, List, Optional
+from typing import ClassVar, Dict, List, Optional
 
 import numpy as np
+import torch
 from torch.utils.data import Dataset
 
 from taxpose.datasets.base import PlacementPointCloudData
+from taxpose.utils.symmetry_utils import (
+    get_sym_label_pca_grasp,
+    get_sym_label_pca_place,
+)
 
 
-class ObjectClass(IntEnum):
-    MUG = 0
-    RACK = 1
-    GRIPPER = 2
+class ObjectClass(str, Enum):
+    MUG = "mug"
+    RACK = "rack"
+    GRIPPER = "gripper"
+    BOTTLE = "bottle"
+    BOWL = "bowl"
+    SLAB = "slab"
+
+
+class Phase(str, Enum):
+    GRASP = "grasp"
+    PLACE = "place"
+
+
+#  0 for mug, 1 for rack, 2 for gripper
+# These are the labels used in the NDF dataset
+# inside demos.
+OBJECT_DEMO_LABELS: Dict[ObjectClass, int] = {
+    ObjectClass.MUG: 0,
+    ObjectClass.RACK: 1,
+    ObjectClass.GRIPPER: 2,
+    ObjectClass.BOTTLE: 0,
+    ObjectClass.BOWL: 0,
+    ObjectClass.SLAB: 1,
+}
 
 
 @dataclass
@@ -27,10 +53,15 @@ class NDFPointCloudDatasetConfig:
     min_num_points: int = 1024
 
     cloud_type: str = "teleport"
-    action_class: ObjectClass = ObjectClass.MUG
-    anchor_class: ObjectClass = ObjectClass.RACK
+    action_class: int = OBJECT_DEMO_LABELS[ObjectClass.MUG]
+    anchor_class: int = OBJECT_DEMO_LABELS[ObjectClass.RACK]
     min_num_cameras: int = 4
     max_num_cameras: int = 4
+
+    # Symmetry parameters.
+    normalize_dist: bool = True
+    object_type: ObjectClass = ObjectClass.MUG
+    action: Phase = Phase.GRASP
 
 
 class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
@@ -44,6 +75,9 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
         self.anchor_class = cfg.anchor_class
         self.min_num_cameras = cfg.min_num_cameras
         self.max_num_cameras = cfg.max_num_cameras
+        self.normalize_dist = cfg.normalize_dist
+        self.object_type = cfg.object_type
+        self.action = cfg.action
 
         if self.dataset_indices is None or self.dataset_indices == "None":
             dataset_indices = self.get_existing_data_indices()
@@ -87,10 +121,11 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
             if not os.path.exists(filename):
                 bad_demo_id.append(i)
                 continue
-            points_action, points_anchor, _ = self.load_data(
+            points_action, points_anchor, _, _, _, _ = self.load_data(
                 filename,
                 action_class=self.action_class,
                 anchor_class=self.anchor_class,
+                skip_symmetry=True,
             )
             if (points_action.shape[1] < self.min_num_points) or (
                 points_anchor.shape[1] < self.min_num_points
@@ -100,7 +135,7 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
         return bad_demo_id
 
     @functools.cache
-    def load_data(self, filename, action_class, anchor_class):
+    def load_data(self, filename, action_class, anchor_class, skip_symmetry=False):
         point_data = np.load(filename, allow_pickle=True)
         points_raw_np = point_data["clouds"]
         classes_raw_np = point_data["classes"]
@@ -134,22 +169,106 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
         points_action = points_action_np.astype(np.float32)[None, ...]
         points_anchor = points_anchor_np.astype(np.float32)[None, ...]
 
-        # Not really sure what this is...
-        symmetric_cls = np.asarray([], dtype=np.float32)
+        # Handle symmetry.
+        if self.object_type in ["bottle", "bowl"] and not skip_symmetry:
+            if self.action == "grasp":
+                sym_dict = get_sym_label_pca_grasp(
+                    action_cloud=torch.as_tensor(points_action),
+                    anchor_cloud=torch.as_tensor(points_anchor),
+                    action_class=self.action_class,
+                    anchor_class=self.anchor_class,
+                    object_type=self.object_type,
+                    normalize_dist=self.normalize_dist,
+                )
 
-        return points_action, points_anchor, symmetric_cls
+            elif self.action == "place":
+                sym_dict = get_sym_label_pca_place(
+                    action_cloud=torch.as_tensor(points_action),
+                    anchor_cloud=torch.as_tensor(points_anchor),
+                    action_class=self.action_class,
+                    anchor_class=self.anchor_class,
+                    normalize_dist=self.normalize_dist,
+                )
+
+            symmetric_cls = sym_dict["cts_cls"]  # 1, num_points
+            symmetric_cls = symmetric_cls.unsqueeze(-1).numpy()  # 1, 1, num_points
+
+            # We want to color the gripper somehow...
+            if self.action_class == OBJECT_DEMO_LABELS[ObjectClass.GRIPPER]:
+                nonsymmetric_cls = sym_dict["cts_cls_nonsym"]  # 1, num_points
+                # 1, 1, num_points
+                nonsymmetric_cls = nonsymmetric_cls.unsqueeze(-1).numpy()
+            else:
+                nonsymmetric_cls = np.ones(symmetric_cls.shape)
+
+            symmetry_xyzrgb = sym_dict["fig"]
+            if self.action_class == 0:
+                action_symmetry_features = symmetric_cls
+                anchor_symmetry_features = nonsymmetric_cls
+                action_symmetry_rgb = symmetry_xyzrgb[: points_action.shape[1], 3:][
+                    None
+                ]
+                anchor_symmetry_rgb = symmetry_xyzrgb[points_action.shape[1] :, 3:][
+                    None
+                ]
+                # assert not isinstance(action_symmetry_features, torch.Tensor)
+                # assert not isinstance(anchor_symmetry_features, torch.Tensor)
+
+            elif self.anchor_class == 0:
+                action_symmetry_features = nonsymmetric_cls
+                anchor_symmetry_features = symmetric_cls
+                action_symmetry_rgb = symmetry_xyzrgb[points_anchor.shape[1] :, 3:][
+                    None
+                ]
+                anchor_symmetry_rgb = symmetry_xyzrgb[: points_anchor.shape[1], 3:][
+                    None
+                ]
+                # assert not isinstance(action_symmetry_features, torch.Tensor)
+                # assert not isinstance(anchor_symmetry_features, torch.Tensor)
+            else:
+                raise ValueError("this should not happen")
+        else:
+            action_symmetry_features = np.ones((1, points_action.shape[2], 1))
+            anchor_symmetry_features = np.ones((1, points_anchor.shape[2], 1))
+            action_symmetry_rgb = None
+            anchor_symmetry_rgb = None
+
+        assert not isinstance(action_symmetry_features, torch.Tensor)
+        assert not isinstance(anchor_symmetry_features, torch.Tensor)
+
+        return (
+            points_action,
+            points_anchor,
+            action_symmetry_features,
+            anchor_symmetry_features,
+            action_symmetry_rgb,
+            anchor_symmetry_rgb,
+        )
 
     def __getitem__(self, index: int) -> PlacementPointCloudData:
         filename = self.filenames[index]
 
-        points_action, points_anchor, symmetric_cls = self.load_data(
-            filename, action_class=self.action_class, anchor_class=self.anchor_class
+        (
+            points_action,
+            points_anchor,
+            action_symmetry_features,
+            anchor_symmetry_features,
+            action_symmetry_rgb,
+            anchor_symmetry_rgb,
+        ) = self.load_data(
+            filename,
+            action_class=self.action_class,
+            anchor_class=self.anchor_class,
+            skip_symmetry=False,
         )
 
         return {
             "points_action": points_action,
             "points_anchor": points_anchor,
-            "symmetric_cls": symmetric_cls,
+            "action_symmetry_features": action_symmetry_features,
+            "anchor_symmetry_features": anchor_symmetry_features,
+            "action_symmetry_rgb": action_symmetry_rgb,
+            "anchor_symmetry_rgb": anchor_symmetry_rgb,
         }
 
     def __len__(self) -> int:

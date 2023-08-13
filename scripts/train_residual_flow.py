@@ -22,11 +22,20 @@ def write_to_file(file_name, string):
     f.close()
 
 
+def maybe_load_from_wandb(checkpoint_reference, wandb_cfg, run):
+    if checkpoint_reference.startswith(wandb_cfg.entity):
+        # download checkpoint locally (if not already cached)
+        artifact_dir = wandb_cfg.artifact_dir
+        artifact = run.use_artifact(checkpoint_reference, type="model")
+        ckpt_file = artifact.get_path("model.ckpt").download(root=artifact_dir)
+    else:
+        ckpt_file = checkpoint_reference
+
+
 @hydra.main(config_path="../configs", config_name="train_ndf")
 def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
 
-    # breakpoint()
     # torch.set_float32_matmul_precision("medium")
     pl.seed_everything(cfg.seed)
     logger = WandbLogger(project=cfg.job_name)
@@ -34,7 +43,8 @@ def main(cfg):
     logger.log_hyperparams({"working_dir": os.getcwd()})
     trainer = pl.Trainer(
         logger=logger,
-        gpus=1,
+        accelerator="gpu",
+        devices=[0],
         reload_dataloaders_every_n_epochs=1,
         callbacks=[SaverCallbackModel(), SaverCallbackEmbnnActionAnchor()],
         max_epochs=cfg.max_epochs,
@@ -78,6 +88,7 @@ def main(cfg):
         return_flow_component=cfg.return_flow_component,
         center_feature=cfg.center_feature,
         pred_weight=cfg.pred_weight,
+        break_symmetry=cfg.break_symmetry,
     )
 
     model = EquivarianceTrainingModule(
@@ -104,6 +115,13 @@ def main(cfg):
 
     else:
         if cfg.pretraining.checkpoint_file_action is not None:
+            # # Check to see if it's a wandb checkpoint.
+            # TODO: need to retrain a few things... checkpoint didn't stick...
+
+            # checkpoint_file_fn = maybe_load_from_wandb(
+            #     cfg.pretraining.checkpoint_file_action, cfg.wandb, logger.experiment.run
+            # )
+
             model.model.emb_nn_action.load_state_dict(
                 torch.load(
                     hydra.utils.to_absolute_path(cfg.pretraining.checkpoint_file_action)

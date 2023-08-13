@@ -1,10 +1,13 @@
 
 # This is the general structure of the datamodule for NDF tasks.
 
+train_folder: train_data
+test_folder: test_data
+
 train_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
-    dataset_root: ${benchmark.dataset_root}/${task.name}/train_data/renders
+    dataset_root: ${benchmark.dataset_root}/${task.name}/${...train_folder}/renders
     dataset_indices: ???
     num_demo: ???
     min_num_points: 1024
@@ -13,11 +16,14 @@ train_dset:
     anchor_class: ${task.anchor_class}
     min_num_cameras: 4
     max_num_cameras: 4
+    normalize_dist: True
+    object_type: ${object_class.name}
+    action: ${relationship.name}
 
 val_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
-    dataset_root: ${benchmark.dataset_root}/${task.name}/test_data/renders
+    dataset_root: ${benchmark.dataset_root}/${task.name}/${...test_folder}/renders
     dataset_indices: ???
     num_demo: ???
     min_num_points: ${...train_dset.demo_dset.min_num_points}
@@ -26,11 +32,14 @@ val_dset:
     anchor_class: ${...train_dset.demo_dset.anchor_class}
     min_num_cameras: ${...train_dset.demo_dset.min_num_cameras}
     max_num_cameras: ${...train_dset.demo_dset.max_num_cameras}
+    normalize_dist: ${...train_dset.demo_dset.normalize_dist}
+    object_type: ${object_class.name}
+    action: ${relationship.name}
 
 test_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
-    dataset_root: ${benchmark.dataset_root}/${task.name}/test_data/renders
+    dataset_root: ${benchmark.dataset_root}/${task.name}/${...test_folder}/renders
     dataset_indices: ???
     num_demo: ???
     min_num_points: ${...train_dset.demo_dset.min_num_points}
@@ -39,3 +48,6 @@ test_dset:
     anchor_class: ${...train_dset.demo_dset.anchor_class}
     min_num_cameras: ${...train_dset.demo_dset.min_num_cameras}
     max_num_cameras: ${...train_dset.demo_dset.max_num_cameras}
+    normalize_dist: ${...train_dset.demo_dset.normalize_dist}
+    object_type: ${object_class.name}
+    action: ${relationship.name}

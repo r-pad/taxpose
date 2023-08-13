@@ -7,7 +7,8 @@ import numpy.typing as npt
 class PlacementPointCloudData(TypedDict):
     points_action: npt.NDArray[np.float32]  # (1, num_points, 3)
     points_anchor: npt.NDArray[np.float32]  # (1, num_points, 3)
-    symmetric_cls: npt.NDArray[np.float32]  # Not really sure what this is...
+    action_symmetry_features: npt.NDArray[np.float32]  # (1, num_points, 1)
+    anchor_symmetry_features: npt.NDArray[np.float32]  # (1, num_points, 1)
 
 
 class PlacementPointCloudDatasetConfig(Protocol):

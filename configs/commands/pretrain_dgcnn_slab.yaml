@@ -2,7 +2,7 @@
 
 defaults:
   - /pretraining_new
-  - override /object_class: table
+  - override /object_class: slab
   - _self_
 
 dataset:

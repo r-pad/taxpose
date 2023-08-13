@@ -152,7 +152,11 @@ class PointCloudDataset(Dataset):
         data = self.dataset[data_ix]
         points_action = torch.from_numpy(data["points_action"])
         points_anchor = torch.from_numpy(data["points_anchor"])
-        symmetric_cls = torch.from_numpy(data["symmetric_cls"])
+        action_symmetry_features = torch.from_numpy(data["action_symmetry_features"])
+        anchor_symmetry_features = torch.from_numpy(data["anchor_symmetry_features"])
+        action_symmetry_rgb = torch.from_numpy(data["action_symmetry_rgb"])
+        anchor_symmetry_rgb = torch.from_numpy(data["anchor_symmetry_rgb"])
+        # symmetric_cls = torch.from_numpy(data["symmetric_cls"])
 
         # if self.overfit:
         #     transform_idx = torch.randint(
@@ -176,25 +180,44 @@ class PointCloudDataset(Dataset):
         if points_action.shape[1] > self.num_points:
             if self.synthetic_occlusion and self.action_class == self.occlusion_class:
                 if self.ball_occlusion:
-                    points_action = ball_occlusion(
+                    points_action, mask = ball_occlusion(
                         points_action[0], radius=self.ball_radius
-                    ).unsqueeze(0)
+                    )
+                    points_action = points_action.unsqueeze(0)
+                    action_symmetry_features = action_symmetry_features[mask]
+
+                    if action_symmetry_rgb is not None:
+                        action_symmetry_rgb = action_symmetry_rgb[mask]
+
                 if self.plane_occlusion:
-                    points_action = plane_occlusion(
+                    points_action, mask = plane_occlusion(
                         points_action[0], stand_off=self.plane_standoff
-                    ).unsqueeze(0)
+                    )
+                    points_action = points_action.unsqueeze(0)
+                    action_symmetry_features = action_symmetry_features[mask]
+
+                    if action_symmetry_rgb is not None:
+                        action_symmetry_rgb = action_symmetry_rgb[mask]
 
             if points_action.shape[1] > self.num_points:
                 points_action, action_ids = sample_farthest_points(
                     points_action, K=self.num_points, random_start_point=True
                 )
+                action_symmetry_features = action_symmetry_features[
+                    0, action_ids.view(-1)
+                ][None]
+
+                if action_symmetry_rgb is not None:
+                    action_symmetry_rgb = action_symmetry_rgb[0, action_ids.view(-1)][
+                        None
+                    ]
             elif points_action.shape[1] < self.num_points:
                 raise NotImplementedError(
                     f"Action point cloud is smaller than cloud size ({points_action.shape[1]} < {self.num_points})"
                 )
 
-            if len(symmetric_cls) > 0:
-                symmetric_cls = symmetric_cls[action_ids.view(-1)]
+            # if len(symmetric_cls) > 0:
+            #     symmetric_cls = symmetric_cls[action_ids.view(-1)]
         elif points_action.shape[1] < self.num_points:
             raise NotImplementedError(
                 f"Action point cloud is smaller than cloud size ({points_action.shape[1]} < {self.num_points})"
@@ -203,17 +226,36 @@ class PointCloudDataset(Dataset):
         if points_anchor.shape[1] > self.num_points:
             if self.synthetic_occlusion and self.anchor_class == self.occlusion_class:
                 if self.ball_occlusion:
-                    points_anchor = ball_occlusion(
+                    points_anchor, mask = ball_occlusion(
                         points_anchor[0], radius=self.ball_radius
-                    ).unsqueeze(0)
+                    )
+                    points_anchor = points_anchor.unsqueeze(0)
+                    anchor_symmetry_features = anchor_symmetry_features[mask]
+
+                    if anchor_symmetry_rgb is not None:
+                        anchor_symmetry_rgb = anchor_symmetry_rgb[mask]
+
                 if self.plane_occlusion:
-                    points_anchor = plane_occlusion(
+                    points_anchor, mask = plane_occlusion(
                         points_anchor[0], stand_off=self.plane_standoff
-                    ).unsqueeze(0)
+                    )
+                    points_anchor = points_anchor.unsqueeze(0)
+                    anchor_symmetry_features = anchor_symmetry_features[mask]
+
+                    if anchor_symmetry_rgb is not None:
+                        anchor_symmetry_rgb = anchor_symmetry_rgb[mask]
             if points_anchor.shape[1] > self.num_points:
-                points_anchor, _ = sample_farthest_points(
+                points_anchor, anchor_ids = sample_farthest_points(
                     points_anchor, K=self.num_points, random_start_point=True
                 )
+                anchor_symmetry_features = anchor_symmetry_features[
+                    0, anchor_ids.view(-1)
+                ][None]
+
+                if anchor_symmetry_rgb is not None:
+                    anchor_symmetry_rgb = anchor_symmetry_rgb[0, anchor_ids.view(-1)][
+                        None
+                    ]
             elif points_anchor.shape[1] < self.num_points:
                 raise NotImplementedError(
                     f"Anchor point cloud is smaller than cloud size ({points_anchor.shape[1]} < {self.num_points})"
@@ -226,7 +268,8 @@ class PointCloudDataset(Dataset):
         points_action_trans = T0.transform_points(points_action)
         points_anchor_trans = T1.transform_points(points_anchor)
 
-        if self.symmetric_class is not None:
+        # if self.symmetric_class is not None:
+        if False:
             symmetric_cls = self.get_sym_label(
                 action_cloud=points_action,
                 anchor_cloud=points_anchor,
@@ -267,7 +310,11 @@ class PointCloudDataset(Dataset):
             "points_anchor_trans": points_anchor_trans.squeeze(0),
             "T0": T0.get_matrix().squeeze(0),
             "T1": T1.get_matrix().squeeze(0),
-            "symmetric_cls": symmetric_cls,
+            # "symmetric_cls": symmetric_cls,
+            "action_symmetry_features": action_symmetry_features.squeeze(0),
+            "anchor_symmetry_features": anchor_symmetry_features.squeeze(0),
+            "action_symmetry_rgb": action_symmetry_rgb.squeeze(0),
+            "anchor_symmetry_rgb": anchor_symmetry_rgb.squeeze(0),
         }
 
         return data

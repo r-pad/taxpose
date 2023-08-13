@@ -47,6 +47,7 @@ gripper_lr_label: False
 occlusion_class: 0
 overfit: False
 seed: 0
+break_symmetry: False
 
 # Network Settings
 center_feature: ${model.center_feature}

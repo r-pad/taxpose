@@ -55,6 +55,52 @@ def get_color(tensor_list, color_list, axis=False):
     return points_color_stacked
 
 
+def get_color_sym_dist(tensor_list, color_list):
+    """
+    @param tensor_list: list of tensors of shape (num_points, 3)
+    @param color_list: list of strings of color names that should be within color_scheme.keys(), eg, 'red', 'blue'
+    @return points_color_stacked: numpy array of shape (num_points*len(tensor_list), 6)
+    """
+
+    stacked_list = []
+    assert len(tensor_list) == len(
+        color_list
+    ), "len(tensor_list) should match len(color_list)"
+
+    for i in range(len(tensor_list)):
+        tensor = tensor_list[i].detach().cpu().numpy()
+        if color_list[i] == None:
+            color = color_scheme["blue"]
+            color_tensor = torch.from_numpy(color).unsqueeze(0)  # 1,3
+            N = tensor.shape[0]
+            color_tensor = (
+                torch.repeat_interleave(color_tensor, N, dim=0).detach().cpu().numpy()
+            )  # N,3
+
+        else:
+            color_tensor = color_list[i]
+        assert len(tensor.shape) == 2, "tensor should be of shape of (num_points, 3)"
+        assert (
+            tensor.shape[-1] == 3
+        ), "tensor.shape[-1] should be of shape 3, for point coordinates"
+        assert (
+            len(color_tensor.shape) == 2
+        ), "color_tensor should be of shape of (num_points, 3)"
+        assert (
+            color_tensor.shape[-1] == 3
+        ), "color_tensor.shape[-1] should be of shape 3, for point coordinates"
+
+        points_color = np.concatenate((tensor, color_tensor), axis=-1)  # num_points, 6
+
+        stacked_list.append(points_color)
+
+    points_color_stacked = np.concatenate(
+        stacked_list, axis=0
+    )  # num_points*len(tensor_list), 6
+
+    return points_color_stacked
+
+
 def create_axis(length=1.0, num_points=100):
     pts = np.linspace(0, length, num_points)
     x_axis_pts = np.stack([pts, np.zeros(num_points), np.zeros(num_points)], axis=1)
