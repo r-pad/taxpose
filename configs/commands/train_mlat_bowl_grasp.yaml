@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+  - /commands/_train_ndf@_here_
+  - override /model: mlat_s256_vnn
+  - override /object_class: bowl
+  - override /relationship: grasp
+  - _self_
