@@ -170,7 +170,10 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
         points_anchor = points_anchor_np.astype(np.float32)[None, ...]
 
         # Handle symmetry.
-        if self.object_type in ["bottle", "bowl"] and not skip_symmetry:
+        if (
+            self.object_type in {ObjectClass.BOTTLE, ObjectClass.BOWL}
+            and not skip_symmetry
+        ):
             if self.action == "grasp":
                 sym_dict = get_sym_label_pca_grasp(
                     action_cloud=torch.as_tensor(points_action),
@@ -199,10 +202,14 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
                 # 1, 1, num_points
                 nonsymmetric_cls = nonsymmetric_cls.unsqueeze(-1).numpy()
             else:
-                nonsymmetric_cls = np.ones(symmetric_cls.shape)
+                nonsymmetric_cls = None
 
             symmetry_xyzrgb = sym_dict["fig"]
             if self.action_class == 0:
+                if nonsymmetric_cls is None:
+                    nonsymmetric_cls = np.ones(
+                        (1, points_anchor.shape[1], 1), dtype=np.float32
+                    )
                 action_symmetry_features = symmetric_cls
                 anchor_symmetry_features = nonsymmetric_cls
                 action_symmetry_rgb = symmetry_xyzrgb[: points_action.shape[1], 3:][
@@ -211,12 +218,26 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
                 anchor_symmetry_rgb = symmetry_xyzrgb[points_action.shape[1] :, 3:][
                     None
                 ]
+                # if points_action.shape[1] != action_symmetry_features.shape[1]:
+                #     breakpoint()
+
+                # if points_anchor.shape[1] != anchor_symmetry_features.shape[1]:
+                #     breakpoint()
                 # assert not isinstance(action_symmetry_features, torch.Tensor)
                 # assert not isinstance(anchor_symmetry_features, torch.Tensor)
 
             elif self.anchor_class == 0:
+                if nonsymmetric_cls is None:
+                    nonsymmetric_cls = np.ones(
+                        (1, points_action.shape[1], 1), dtype=np.float32
+                    )
                 action_symmetry_features = nonsymmetric_cls
                 anchor_symmetry_features = symmetric_cls
+                # if points_action.shape[1] != action_symmetry_features.shape[1]:
+                #     breakpoint()
+
+                # if points_anchor.shape[1] != anchor_symmetry_features.shape[1]:
+                #     breakpoint()
                 action_symmetry_rgb = symmetry_xyzrgb[points_anchor.shape[1] :, 3:][
                     None
                 ]
@@ -228,13 +249,25 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
             else:
                 raise ValueError("this should not happen")
         else:
-            action_symmetry_features = np.ones((1, points_action.shape[2], 1))
-            anchor_symmetry_features = np.ones((1, points_anchor.shape[2], 1))
+            action_symmetry_features = np.ones(
+                (1, points_action.shape[1], 1), dtype=np.float32
+            )
+            anchor_symmetry_features = np.ones(
+                (1, points_anchor.shape[1], 1), dtype=np.float32
+            )
+            # if points_action.shape[1] != action_symmetry_features.shape[1]:
+            #     breakpoint()
+
+            # if points_anchor.shape[1] != anchor_symmetry_features.shape[1]:
+            #     breakpoint()
             action_symmetry_rgb = None
             anchor_symmetry_rgb = None
 
         assert not isinstance(action_symmetry_features, torch.Tensor)
         assert not isinstance(anchor_symmetry_features, torch.Tensor)
+
+        assert points_action.shape[1] == action_symmetry_features.shape[1]
+        assert points_anchor.shape[1] == anchor_symmetry_features.shape[1]
 
         return (
             points_action,

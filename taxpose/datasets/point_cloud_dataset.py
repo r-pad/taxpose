@@ -231,6 +231,7 @@ class PointCloudDataset(Dataset):
                     )
                     points_anchor = points_anchor.unsqueeze(0)
                     anchor_symmetry_features = anchor_symmetry_features[mask]
+                    breakpoint()
 
                     if anchor_symmetry_rgb is not None:
                         anchor_symmetry_rgb = anchor_symmetry_rgb[mask]
@@ -241,17 +242,21 @@ class PointCloudDataset(Dataset):
                     )
                     points_anchor = points_anchor.unsqueeze(0)
                     anchor_symmetry_features = anchor_symmetry_features[mask]
+                    breakpoint()
 
                     if anchor_symmetry_rgb is not None:
                         anchor_symmetry_rgb = anchor_symmetry_rgb[mask]
             if points_anchor.shape[1] > self.num_points:
+                points_anchor_pre = points_anchor
                 points_anchor, anchor_ids = sample_farthest_points(
                     points_anchor, K=self.num_points, random_start_point=True
                 )
-                anchor_symmetry_features = anchor_symmetry_features[
-                    0, anchor_ids.view(-1)
-                ][None]
-
+                try:
+                    anchor_symmetry_features = anchor_symmetry_features[
+                        0, anchor_ids.view(-1)
+                    ][None]
+                except:
+                    breakpoint()
                 if anchor_symmetry_rgb is not None:
                     anchor_symmetry_rgb = anchor_symmetry_rgb[0, anchor_ids.view(-1)][
                         None
