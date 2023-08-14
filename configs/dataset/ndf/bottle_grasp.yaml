@@ -2,8 +2,8 @@ defaults:
   - ndf/_default@_here_
   - _self_
 
-train_folder: bowl_train_new_3_pregrasp
-test_folder: bowl_test_new_3_pregrasp
+train_folder: bottle_train_new_3_pregrasp
+test_folder: bottle_test_new_3_pregrasp
 
 # Dataset Settings
 train_dset:
