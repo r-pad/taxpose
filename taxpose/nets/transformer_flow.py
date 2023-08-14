@@ -477,10 +477,12 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         multilaterate=False,
         sample: bool = False,
         mlat_nkps: int = 100,
+        break_symmetry=False,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.emb_dims = emb_dims
         self.cycle = cycle
+        self.break_symmetry = break_symmetry
         if emb_nn == "dgcnn":
             self.emb_nn_action = DGCNN(emb_dims=self.emb_dims)
             self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims)
@@ -527,6 +529,18 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 residual_on=self.residual_on,
             )
 
+        if self.break_symmetry:
+            # We're basically putting a few MLP layers in on top of the invariant module.
+            emb_dims_sym = self.emb_dims + 1
+            self.proj_flow_symmetry_labels_action = nn.Sequential(
+                PointNet([emb_dims_sym, emb_dims_sym * 2, emb_dims_sym * 4]),
+                nn.Conv1d(emb_dims_sym * 4, self.emb_dims, kernel_size=1, bias=False),
+            )
+            self.proj_flow_symmetry_labels_anchor = nn.Sequential(
+                PointNet([emb_dims_sym, emb_dims_sym * 2, emb_dims_sym * 4]),
+                nn.Conv1d(emb_dims_sym * 4, self.emb_dims, kernel_size=1, bias=False),
+            )
+
     def forward(self, *input):
         action_points = input[0].permute(0, 2, 1)[:, :3]  # B,3,num_points
         anchor_points = input[1].permute(0, 2, 1)[:, :3]
@@ -545,6 +559,26 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         if self.freeze_embnn:
             action_embedding = action_embedding.detach()
             anchor_embedding = anchor_embedding.detach()
+
+        if self.break_symmetry:
+            # Add a symmetry label to the embeddings.
+            action_sym_cls = input[2].permute(0, 2, 1)
+            anchor_sym_cls = input[3].permute(0, 2, 1)
+
+            action_embedding_stack = torch.cat(
+                [action_embedding, action_sym_cls], axis=1
+            )
+            anchor_embedding_stack = torch.cat(
+                [anchor_embedding, anchor_sym_cls], axis=1
+            )
+
+            action_embedding = self.proj_flow_symmetry_labels_action(
+                action_embedding_stack
+            )
+
+            anchor_embedding = self.proj_flow_symmetry_labels_anchor(
+                anchor_embedding_stack
+            )
 
         # tilde_phi, phi are both B,512,N
         # Get the new cross-attention embeddings.

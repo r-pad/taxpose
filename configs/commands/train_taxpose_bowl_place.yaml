@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+  - /commands/_train_ndf@_here_
+  - override /model: taxpose
+  - override /object_class: bowl
+  - override /relationship: place
+  - _self_

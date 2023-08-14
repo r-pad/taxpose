@@ -4,6 +4,13 @@ wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download
 unzip train_data.zip && rm -rf train_data.zip
 unzip test_data.zip && rm -rf test_data.zip
 
+# Download from a google drive link:
+
+# https://docs.google.com/uc?export=download&id=1capE6VBNZu5yKjL525mMYuhVUqnLmT9S
+gdown instead
+
+wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1capE6VBNZu5yKjL525mMYuhVUqnLmT9S' -O train_data.zip
+
 cd .. && mkdir bowl_place && cd bowl_place
 wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1Djx3DZKccF6oBBcKl1Jezs2LNDEzegMG' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1Djx3DZKccF6oBBcKl1Jezs2LNDEzegMG" -O test_data.zip && rm -rf /tmp/cookies.txt
 wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1KxAsV33uOMsXgFCCTxcvPq0DkpU5S_z7' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1KxAsV33uOMsXgFCCTxcvPq0DkpU5S_z7" -O train_data.zip && rm -rf /tmp/cookies.txt

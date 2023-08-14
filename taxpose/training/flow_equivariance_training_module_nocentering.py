@@ -349,11 +349,18 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
     def module_step(self, batch, batch_idx):
         points_trans_action = batch["points_action_trans"]
         points_trans_anchor = batch["points_anchor_trans"]
+        action_symmetry_features = batch["action_symmetry_features"]
+        anchor_symmetry_features = batch["anchor_symmetry_features"]
 
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
 
-        model_output = self.model(points_trans_action, points_trans_anchor)
+        model_output = self.model(
+            points_trans_action,
+            points_trans_anchor,
+            action_symmetry_features,
+            anchor_symmetry_features,
+        )
 
         log_values = {}
         loss, log_values = self.compute_loss(
@@ -369,11 +376,20 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         # points_trans = batch['points_trans']
         points_trans_action = batch["points_action_trans"]
         points_trans_anchor = batch["points_anchor_trans"]
+        action_symmetry_features = batch["action_symmetry_features"]
+        anchor_symmetry_features = batch["anchor_symmetry_features"]
+        action_symmetry_rgb = batch["action_symmetry_rgb"]
+        anchor_symmetry_rgb = batch["anchor_symmetry_rgb"]
 
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
 
-        model_output = self.model(points_trans_action, points_trans_anchor)
+        model_output = self.model(
+            points_trans_action,
+            points_trans_anchor,
+            action_symmetry_features,
+            anchor_symmetry_features,
+        )
         x_action = model_output["flow_action"]
         x_anchor = model_output["flow_anchor"]
 
@@ -533,5 +549,11 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
             color_list=["green", "red"],
         )
         res_images["loss_points_action"] = wandb.Object3D(loss_points_action)
+
+        # Stack points and colors
+        action_xyzrgb = torch.cat([points_action[0], action_symmetry_rgb[0]], dim=1)
+        anchor_xyzrgb = torch.cat([points_anchor[0], anchor_symmetry_rgb[0]], dim=1)
+        xyzrgb = torch.cat([action_xyzrgb, anchor_xyzrgb], dim=0)
+        res_images["symmetry_vis"] = wandb.Object3D(xyzrgb.cpu().numpy())
 
         return res_images

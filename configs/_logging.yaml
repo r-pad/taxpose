@@ -1,0 +1,32 @@
+# Where logs go, i.e. the top folder.
+log_dir: ${hydra:runtime.cwd}/logs
+
+output_dir: ${hydra:runtime.output_dir}
+
+# This has to come from above.
+job_type: ???
+
+hydra:
+  run:
+    dir: ${log_dir}/${hydra.job.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/${hydra.job.name}/sweep/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+  job:
+    chdir: True
+    name: ${job_type}
+
+lightning:
+  checkpoint_dir: ${output_dir}/checkpoints
+
+wandb:
+  entity: r-pad
+  project: taxpose
+
+  # Group is for grouping runs together (i.e. a train run and an eval run).
+  group: ???
+
+  # Where to dump wandb logs, etc.
+  save_dir: ${output_dir}
+  # Put artifacts at the toplevel so that we don't have to re-download each time...
+  artifact_dir: ${hydra:runtime.cwd}/wandb_artifacts

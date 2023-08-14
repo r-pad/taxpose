@@ -1,8 +1,10 @@
+import dataclasses
 import glob
 import os.path as osp
 import pickle
 import random
 from pathlib import Path
+from typing import ClassVar, Optional
 
 import numpy as np
 import torch
@@ -12,17 +14,38 @@ from torch.utils.data import Dataset
 from taxpose.utils import ndf_geometry
 
 
-class JointOccTrainDataset(Dataset):
+@dataclasses.dataclass
+class ShapeNetPretrainingPointCloudDatasetConfig:
+    dataset_type: ClassVar[str] = "shapenet_pretraining"
+    ndf_data_path: Optional[str] = None
+    sidelength: Optional[int] = None
+    depth_aug: bool = False
+    multiview_aug: bool = False
+    phase: str = "train"
+    obj_class: str = "all"
+    train_num: Optional[int] = None
+
+
+class ShapeNetPretrainingPointCloudDataset(Dataset):
     def __init__(
         self,
-        ndf_data_path=None,
-        sidelength=None,
-        depth_aug=False,
-        multiview_aug=False,
-        phase="train",
-        obj_class="all",
-        train_num=None,
+        cfg: ShapeNetPretrainingPointCloudDatasetConfig,
+        # ndf_data_path=None,
+        # sidelength=None,
+        # depth_aug=False,
+        # multiview_aug=False,
+        # phase="train",
+        # obj_class="all",
+        # train_num=None,
     ):
+        ndf_data_path = cfg.ndf_data_path
+        sidelength = cfg.sidelength
+        depth_aug = cfg.depth_aug
+        multiview_aug = cfg.multiview_aug
+        phase = cfg.phase
+        obj_class = cfg.obj_class
+        train_num = cfg.train_num
+
         self.ndf_data_path = Path(ndf_data_path)
         # Path setup (change to folder where your training data is kept)
         # these are the names of the full dataset folders
@@ -55,7 +78,7 @@ class JointOccTrainDataset(Dataset):
             if "bottle" in obj_class:
                 paths.append(bottle_path)
 
-        # print('Loading from paths: ', paths)
+        print("Loading from paths: ", paths)
 
         files_total = []
         for path in paths:
@@ -116,6 +139,9 @@ class JointOccTrainDataset(Dataset):
 
     def __len__(self):
         return len(self.files)
+
+    def load(self, index):
+        data = np.load(self.files[index], allow_pickle=True)
 
     def get_item(self, index):
         try:

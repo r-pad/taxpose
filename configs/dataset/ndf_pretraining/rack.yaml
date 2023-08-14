@@ -1,0 +1,6 @@
+defaults:
+  - ndf_pretraining/_ndf_default@_here_
+  - _self_
+
+task: "mug_place"
+action_class: 1
