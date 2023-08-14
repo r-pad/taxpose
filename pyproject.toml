@@ -20,6 +20,7 @@ dependencies = [
   "hydra-core",
   "imageio",
   "jupyterlab",
+  "open3d",
   "opencv-python",
   "pybullet",
   "pyg_lib ~= 0.1; sys_platform == 'linux'",
