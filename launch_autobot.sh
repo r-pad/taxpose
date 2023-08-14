@@ -20,5 +20,6 @@ singularity exec \
 -B /home/$(whoami)/code/rpad/taxpose:/opt/$(whoami)/code \
 -B /scratch/$(whoami)/data:/data \
 -B /scratch/$(whoami)/logs:/opt/logs \
+-B /scratch/$(whoami)/artifacts:/opt/artifacts \
 docker://beisner/taxpose \
 $COMMAND
