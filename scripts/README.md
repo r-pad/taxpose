@@ -23,3 +23,9 @@ If you write some scripts which are meant to be run stand-alone, and not importe
 
 
 ## Full training.
+./launch_autobot.sh 0 python scripts/train_residual_flow.py --config-name commands/train_taxpose_mug_grasp +mode=train wandb.group=taxpose
+./launch_autobot.sh 1 python scripts/train_residual_flow.py --config-name commands/train_taxpose_mug_place +mode=train wandb.group=taxpose
+./launch_autobot.sh 2 python scripts/train_residual_flow.py --config-name commands/train_taxpose_bottle_grasp +mode=train wandb.group=taxpose
+./launch_autobot.sh 3 python scripts/train_residual_flow.py --config-name commands/train_taxpose_bottle_place +mode=train wandb.group=taxpose
+./launch_autobot.sh 4 python scripts/train_residual_flow.py --config-name commands/train_taxpose_bowl_grasp +mode=train wandb.group=taxpose
+./launch_autobot.sh 5 python scripts/train_residual_flow.py --config-name commands/train_taxpose_bowl_place +mode=train wandb.group=taxpose

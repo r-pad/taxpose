@@ -260,8 +260,12 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
 
             # if points_anchor.shape[1] != anchor_symmetry_features.shape[1]:
             #     breakpoint()
-            action_symmetry_rgb = None
-            anchor_symmetry_rgb = None
+            action_symmetry_rgb = np.zeros(
+                (1, points_action.shape[1], 3), dtype=np.uint8
+            )
+            anchor_symmetry_rgb = np.zeros(
+                (1, points_anchor.shape[1], 3), dtype=np.uint8
+            )
 
         assert not isinstance(action_symmetry_features, torch.Tensor)
         assert not isinstance(anchor_symmetry_features, torch.Tensor)
