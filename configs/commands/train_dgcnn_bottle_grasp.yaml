@@ -2,6 +2,9 @@
 
 defaults:
   - /train_ndf
+  - override /model: taxpose
+  - override /object_class: bottle
+  - override /relationship: grasp
   - _self_
 
 benchmark:
@@ -12,11 +15,19 @@ log_dir: /opt/logs
 wandb:
   artifact_dir: /opt/artifacts
 
+break_symmetry: True
+
+model.emb_nn: dgcnn
+
 resources:
   num_workers: 16
 
+
+max_epochs: 10
+batch_size: 4
+
 training:
-  epochs: 200
-  batch_size: 4
   check_val_every_n_epoch: 10
   log_every_n_steps: 100
+
+# python scripts/train_residual_flow.py +mode=train model=taxpose object_class=bowl relationship=grasp benchmark.dataset_root=/data/ndf break_symmetry=True max_epochs=10 model=taxpose model.emb_nn=vn_dgcnn batch_size=4
