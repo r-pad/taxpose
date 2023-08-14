@@ -1,6 +1,6 @@
 
 
-job_name: residual_flow_occlusion
+job_type: train_${task.name}
 image_logging_period: 100
 
 log_txt_file:  ${hydra:runtime.cwd}/recent_training_paths.txt # absolute path for text file for logging
@@ -9,7 +9,8 @@ log_txt_file:  ${hydra:runtime.cwd}/recent_training_paths.txt # absolute path fo
 
 defaults:
   - _self_
-  - hydra_logging
+  # - hydra_logging
+  - _logging
   - datamodule  # This loops in the dataset.
   - benchmark: ndf # {ndf, rlbench}
   - object_class: mug # {mug, bottle, bowl}
@@ -21,7 +22,12 @@ defaults:
   - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
   - checkpoints/pretraining@checkpoints.pretraining
 
+training:
+  log_every_n_steps: 100
+  check_val_every_n_epoch: 5
 
+wandb:
+  group: Null
 
 ### TO BE CHANGED ###
 
@@ -79,4 +85,4 @@ load_from_checkpoint: False
 checkpoint_file: null
 freeze_embnn: False
 lr: 1e-4
-max_epochs: 1000
+max_epochs: 500

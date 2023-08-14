@@ -2,9 +2,11 @@ import os
 
 import hydra
 import numpy as np
+import omegaconf
 import pytorch_lightning as pl
 import torch
 from omegaconf import OmegaConf
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
@@ -12,7 +14,6 @@ from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
-from taxpose.utils.callbacks import SaverCallbackEmbnnActionAnchor, SaverCallbackModel
 
 
 def write_to_file(file_name, string):
@@ -22,11 +23,26 @@ def write_to_file(file_name, string):
     f.close()
 
 
+def load_emb_weights(checkpoint_reference, wandb_cfg=None, run=None):
+    if checkpoint_reference.startswith(wandb_cfg.entity):
+        artifact_dir = os.path.join(wandb_cfg.artifact_dir, checkpoint_reference)
+        artifact = run.use_artifact(checkpoint_reference)
+        checkpoint_path = artifact.get_path("model.ckpt").download(root=artifact_dir)
+        weights = torch.load(checkpoint_path)["state_dict"]
+        # remove "model.emb_nn" prefix from keys
+        weights = {k.replace("model.emb_nn.", ""): v for k, v in weights.items()}
+        return weights
+    else:
+        return torch.load(hydra.utils.to_absolute_path(checkpoint_reference))[
+            "embnn_state_dict"
+        ]
+
+
 def maybe_load_from_wandb(checkpoint_reference, wandb_cfg, run):
     if checkpoint_reference.startswith(wandb_cfg.entity):
         # download checkpoint locally (if not already cached)
         artifact_dir = wandb_cfg.artifact_dir
-        artifact = run.use_artifact(checkpoint_reference, type="model")
+        artifact = run.use_artifact(checkpoint_reference)
         ckpt_file = artifact.get_path("model.ckpt").download(root=artifact_dir)
     else:
         ckpt_file = checkpoint_reference
@@ -35,18 +51,53 @@ def maybe_load_from_wandb(checkpoint_reference, wandb_cfg, run):
 @hydra.main(config_path="../configs", config_name="train_ndf")
 def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
+    # breakpoint()
 
     # torch.set_float32_matmul_precision("medium")
     pl.seed_everything(cfg.seed)
-    logger = WandbLogger(project=cfg.job_name)
-    logger.log_hyperparams(cfg)
-    logger.log_hyperparams({"working_dir": os.getcwd()})
+    logger = WandbLogger(
+        entity=cfg.wandb.entity,
+        project=cfg.wandb.project,
+        group=cfg.wandb.group,
+        save_dir=cfg.wandb.save_dir,
+        job_type=cfg.job_type,
+        save_code=True,
+        log_model=True,
+        config=omegaconf.OmegaConf.to_container(
+            cfg, resolve=True, throw_on_missing=True
+        ),
+    )
+    # logger.log_hyperparams(cfg)
+    # logger.log_hyperparams({"working_dir": os.getcwd()})
     trainer = pl.Trainer(
         logger=logger,
         accelerator="gpu",
         devices=[0],
-        reload_dataloaders_every_n_epochs=1,
-        callbacks=[SaverCallbackModel(), SaverCallbackEmbnnActionAnchor()],
+        log_every_n_steps=cfg.training.log_every_n_steps,
+        check_val_every_n_epoch=cfg.training.check_val_every_n_epoch,
+        # reload_dataloaders_every_n_epochs=1,
+        # callbacks=[SaverCallbackModel(), SaverCallbackEmbnnActionAnchor()],
+        callbacks=[
+            # This checkpoint callback saves the latest model during training, i.e. so we can resume if it crashes.
+            # It saves everything, and you can load by referencing last.ckpt.
+            ModelCheckpoint(
+                dirpath=cfg.lightning.checkpoint_dir,
+                filename="{epoch}-{step}",
+                monitor="step",
+                mode="max",
+                save_weights_only=False,
+                save_last=True,
+                every_n_epochs=1,
+            ),
+            # This checkpoint will get saved to WandB. The Callback mechanism in lightning is poorly designed, so we have to put it last.
+            ModelCheckpoint(
+                dirpath=cfg.lightning.checkpoint_dir,
+                filename="{epoch}-{step}-{train_loss:.2f}-weights-only",
+                monitor="val_loss",
+                mode="min",
+                save_weights_only=True,
+            ),
+        ],
         max_epochs=cfg.max_epochs,
     )
     log_txt_file = cfg.log_txt_file
@@ -117,16 +168,14 @@ def main(cfg):
         if cfg.pretraining.checkpoint_file_action is not None:
             # # Check to see if it's a wandb checkpoint.
             # TODO: need to retrain a few things... checkpoint didn't stick...
-
+            emb_nn_action_state_dict = load_emb_weights(
+                cfg.pretraining.checkpoint_file_action, cfg.wandb, logger.experiment
+            )
             # checkpoint_file_fn = maybe_load_from_wandb(
             #     cfg.pretraining.checkpoint_file_action, cfg.wandb, logger.experiment.run
             # )
 
-            model.model.emb_nn_action.load_state_dict(
-                torch.load(
-                    hydra.utils.to_absolute_path(cfg.pretraining.checkpoint_file_action)
-                )["embnn_state_dict"]
-            )
+            model.model.emb_nn_action.load_state_dict(emb_nn_action_state_dict)
             print(
                 "-----------------------Pretrained EmbNN Action Model Loaded!-----------------------"
             )
@@ -136,11 +185,10 @@ def main(cfg):
                 )
             )
         if cfg.pretraining.checkpoint_file_anchor is not None:
-            model.model.emb_nn_anchor.load_state_dict(
-                torch.load(
-                    hydra.utils.to_absolute_path(cfg.pretraining.checkpoint_file_anchor)
-                )["embnn_state_dict"]
+            emb_nn_anchor_state_dict = load_emb_weights(
+                cfg.pretraining.checkpoint_file_anchor, cfg.wandb, logger.experiment
             )
+            model.model.emb_nn_anchor.load_state_dict(emb_nn_anchor_state_dict)
             print(
                 "-----------------------Pretrained EmbNN Anchor Model Loaded!-----------------------"
             )

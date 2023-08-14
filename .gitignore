@@ -377,6 +377,8 @@ results/
 rollouts/
 wandb/
 trained_models/ndf/
+artifacts/
+wandb_artifacts/
 recent_training_paths.txt
 
 # Ignore all checkpoint configs except for release files.
