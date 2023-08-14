@@ -11,7 +11,7 @@ import torch.nn.functional as F
 
 from taxpose.nets.pointnet import PointNet
 from taxpose.nets.transformer_flow_pm import CustomTransformer
-from taxpose.nets.tv_mlp import TVMLP
+from taxpose.nets.tv_mlp import MLP as TVMLP
 from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
 from taxpose.utils.multilateration import estimate_p
 from third_party.dcp.model import DGCNN

@@ -400,12 +400,24 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
             points_trans_action = torch.take_along_dim(
                 points_trans_action, ixs_action, dim=1
             )
+            action_symmetry_rgb = torch.take_along_dim(
+                action_symmetry_rgb, ixs_action, dim=1
+            )
+            action_symmetry_features = torch.take_along_dim(
+                action_symmetry_features, ixs_action, dim=1
+            )
 
         if "sampled_ixs_anchor" in model_output:
             ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
             points_anchor = torch.take_along_dim(points_anchor, ixs_anchor, dim=1)
             points_trans_anchor = torch.take_along_dim(
                 points_trans_anchor, ixs_anchor, dim=1
+            )
+            anchor_symmetry_rgb = torch.take_along_dim(
+                anchor_symmetry_rgb, ixs_anchor, dim=1
+            )
+            anchor_symmetry_features = torch.take_along_dim(
+                anchor_symmetry_features, ixs_anchor, dim=1
             )
 
         pred_flow_action = x_action[:, :, :3]
