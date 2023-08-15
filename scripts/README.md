@@ -35,7 +35,7 @@ If you write some scripts which are meant to be run stand-alone, and not importe
 ### Multilateration.
 ./launch_autobot.sh 6 python scripts/train_residual_flow.py --config-name commands/train_mlat_mug_grasp +mode=train wandb.group=mlat_s256_vnn
 ./launch_autobot.sh 7 python scripts/train_residual_flow.py --config-name commands/train_mlat_mug_place +mode=train wandb.group=mlat_s256_vnn
-./launch_autobot.sh 2 python scripts/train_residual_flow.py --config-name commands/train_mlat_bottle_grasp +mode=train wandb.group=mlat_s256_vnn
-./launch_autobot.sh 3 python scripts/train_residual_flow.py --config-name commands/train_mlat_bottle_place +mode=train wandb.group=mlat_s256_vnn
-./launch_autobot.sh 4 python scripts/train_residual_flow.py --config-name commands/train_mlat_bowl_grasp +mode=train wandb.group=mlat_s256_vnn
-./launch_autobot.sh 5 python scripts/train_residual_flow.py --config-name commands/train_mlat_bowl_place +mode=train wandb.group=mlat_s256_vnn
+./launch_autobot.sh 0 python scripts/train_residual_flow.py --config-name commands/train_mlat_bottle_grasp +mode=train wandb.group=mlat_s256_vnn
+./launch_autobot.sh 1 python scripts/train_residual_flow.py --config-name commands/train_mlat_bottle_place +mode=train wandb.group=mlat_s256_vnn
+./launch_autobot.sh 2 python scripts/train_residual_flow.py --config-name commands/train_mlat_bowl_grasp +mode=train wandb.group=mlat_s256_vnn
+./launch_autobot.sh 3 python scripts/train_residual_flow.py --config-name commands/train_mlat_bowl_place +mode=train wandb.group=mlat_s256_vnn
