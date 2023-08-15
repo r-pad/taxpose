@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+  - /commands/ablations/se3_augmentation/_base@_here_
+  - override /model: taxpose
+  - override /object_class: mug
+  - override /relationship: grasp
+  - _self_
