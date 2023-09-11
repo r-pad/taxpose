@@ -10,3 +10,4 @@ multilaterate: False
 mlat_sample: null
 mlat_nkps: null
 num_points: 1024
+break_symmetry: True

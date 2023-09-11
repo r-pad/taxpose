@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+  - /commands/ndf_evals/_base@_here_
+  - override /model: mlat_s256_vnn
+  - override /object_class: bottle
+  - override /pose_dist: upright
+  - _self_

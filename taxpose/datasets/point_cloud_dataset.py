@@ -52,6 +52,12 @@ def make_dataset(
         return rlbench.RLBenchPointCloudDataset(
             cast(rlbench.RLBenchPointCloudDatasetConfig, cfg)
         )
+    elif cfg.dataset_type == "real_world_mug":
+        import taxpose.datasets.real_world_mug as real_world_mug
+
+        return real_world_mug.RealWorldMugPointCloudDataset(
+            cast(real_world_mug.RealWorldMugPointCloudDatasetConfig, cfg)
+        )
 
 
 class PointCloudDataset(Dataset):

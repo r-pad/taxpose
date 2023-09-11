@@ -1,0 +1,49 @@
+# Dataset Settings
+train_dset:
+  demo_dset:
+    dataset_type: real_world_mug
+    dataset_root: ${benchmark.dataset_root}
+    dataset_indices:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+    start_anchor: True
+    min_num_cameras: 4
+    max_num_cameras: 4
+    num_points: 1024
+    action_class: ${task.action_class}
+    anchor_class: ${task.anchor_class}
+
+val_dset:
+  demo_dset:
+    dataset_type: ${...train_dset.demo_dset.dataset_type}
+    dataset_root: ${benchmark.dataset_root}
+    dataset_indices:
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 17
+      - 18
+      - 19
+    start_anchor: ${...train_dset.demo_dset.start_anchor}
+    min_num_cameras: ${...train_dset.demo_dset.min_num_cameras}
+    max_num_cameras: ${...train_dset.demo_dset.max_num_cameras}
+    num_points: ${...train_dset.demo_dset.num_points}
+    action_class: ${task.action_class}
+    anchor_class: ${task.anchor_class}
+
+test_dset:
+  demo_dset:
+    dataset_indices: null
+    num_demo: null

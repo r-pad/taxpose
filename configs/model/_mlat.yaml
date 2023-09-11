@@ -4,3 +4,4 @@ defaults:
 multilaterate: True
 mlat_sample: True
 mlat_nkps: 256
+break_symmetry: True
