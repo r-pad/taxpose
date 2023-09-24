@@ -8,12 +8,15 @@ train_dset:
     dataset_type: ${benchmark.name}
     dataset_indices: null
     n_demos: 1
+    start_ix: 0
+
 
 val_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
     dataset_indices: null
     n_demos: 1
+    start_ix: 1
 
 test_dset:
   demo_dset:
