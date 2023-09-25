@@ -73,14 +73,9 @@ class EquivarianceTestingModule(PointCloudTrainingModule):
 
     def get_transform(self, points_trans_action, points_trans_anchor):
         for i in range(self.loop):
-            if self.model.return_flow_component:
-                res = self.model(points_trans_action, points_trans_anchor)
-                x_action = res["flow_action"]
-                x_anchor = res["flow_anchor"]
-            else:
-                x_action, x_anchor = self.model(
-                    points_trans_action, points_trans_anchor
-                )
+            res = self.model(points_trans_action, points_trans_anchor)
+            x_action = res["flow_action"]
+            x_anchor = res["flow_anchor"]
 
             points_trans_action = points_trans_action[:, :, :3]
             points_trans_anchor = points_trans_anchor[:, :, :3]
@@ -108,8 +103,7 @@ class EquivarianceTestingModule(PointCloudTrainingModule):
             T_trans = pure_translation_se3(
                 1, points_action_mean.squeeze(), device=points_trans_action.device
             )
-            if self.model.return_flow_component:
-                ans_dict["flow_components"] = res
+            ans_dict["flow_components"] = res
         return ans_dict
 
     def predict(self, x_action, x_anchor, points_trans_action, points_trans_anchor):

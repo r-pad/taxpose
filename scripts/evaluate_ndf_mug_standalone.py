@@ -49,6 +49,7 @@ from ndf_robot.utils.util import np2img
 from omegaconf import OmegaConf
 from pytorch3d.ops import sample_farthest_points
 from pytorch3d.transforms import Rotate, Transform3d
+from rpad.visualize_3d.plots import segmentation_fig
 from torch import nn
 from torch.nn import functional as F
 from torchvision.transforms import ToTensor
@@ -547,12 +548,22 @@ class EquivarianceTestingModule(PointCloudTrainingModule):
         for i in range(self.loop):
             # TODO: fix for bottle bowl.
 
-            action_symm = torch.ones_like(
-                points_trans_action[:, :, :1], device=points_trans_action.device
+            # action_symm = torch.ones_like(
+            #     points_trans_action[:, :, :1], device=points_trans_action.device
+            # )
+            # anchor_symm = torch.ones_like(
+            #     points_trans_anchor[:, :, :1], device=points_trans_anchor.device
+            # )
+            symm_feats = self.get_symmetry_labels(
+                points_trans_action.cpu().numpy(), points_trans_anchor.cpu().numpy()
             )
-            anchor_symm = torch.ones_like(
-                points_trans_anchor[:, :, :1], device=points_trans_anchor.device
+            action_symm = torch.as_tensor(symm_feats["action_symmetry_features"]).to(
+                points_trans_action.device
             )
+            anchor_symm = torch.as_tensor(symm_feats["anchor_symmetry_features"]).to(
+                points_trans_anchor.device
+            )
+            # breakpoint()
 
             model_output = self.model(
                 points_trans_action, points_trans_anchor, action_symm, anchor_symm
@@ -1606,6 +1617,10 @@ def main(hydra_cfg):
         # time.sleep(1.5)
         step_for_time(robot, 1.5)
 
+        # Open gripper.
+        robot.arm.eetool.open()
+        step_for_time(robot, 2.0)
+
         teleport_rgb = robot.cam.get_images(get_rgb=True)[0]
         teleport_img_fname = osp.join(eval_teleport_imgs_dir, "%d_init.png" % iteration)
         np2img(teleport_rgb.astype(np.uint8), teleport_img_fname)
@@ -1637,6 +1652,33 @@ def main(hydra_cfg):
         )
 
         ans = place_model.get_transform(points_mug, points_rack)  # 1, 4, 4
+
+        # Create a plotly figure.
+        fig = segmentation_fig(
+            torch.cat(
+                [
+                    points_mug.squeeze(0),
+                    points_rack.squeeze(0),
+                    ans["pred_points_action"].squeeze(0),
+                ],
+                dim=0,
+            )
+            .cpu()
+            .numpy(),
+            torch.cat(
+                [
+                    torch.ones(points_mug.shape[1]),
+                    2 * torch.ones(points_rack.shape[1]),
+                    3 * torch.ones(ans["pred_points_action"].shape[1]),
+                ],
+                dim=0,
+            )
+            .int()
+            .cpu()
+            .numpy(),
+            labelmap={1: "mug", 2: "rack", 3: "pred"},
+        )
+        fig.show()
 
         if hydra_cfg.checkpoint_file_place_refinement is not None:
             assert False
@@ -1698,6 +1740,37 @@ def main(hydra_cfg):
             pred_T_action_mat_gripper2mug, ee_pose_world, points_gripper_raw
         )  # transform from gripper to mug in world frame
         pre_grasp_ee_pose = util.pose_stamped2list(gripper_relative_pose)
+
+        # Create a plotly figure.
+        fig = segmentation_fig(
+            torch.cat(
+                [
+                    points_mug.squeeze(0),
+                    points_gripper.squeeze(0),
+                    ans_grasp["pred_points_action"].squeeze(0),
+                ],
+                dim=0,
+            )
+            .cpu()
+            .numpy(),
+            torch.cat(
+                [
+                    torch.ones(points_mug.shape[1]),
+                    2 * torch.ones(points_gripper.shape[1]),
+                    3 * torch.ones(ans_grasp["pred_points_action"].shape[1]),
+                ],
+                dim=0,
+            )
+            .int()
+            .cpu()
+            .numpy(),
+            labelmap={1: "mug", 2: "gripper", 3: "pred"},
+        )
+        fig.show()
+
+        breakpoint()
+
+        # breakpoint()
 
         # np.savez(
         #     f"{eval_pointclouds_dir}/{iteration}_init_all_points.npz",
