@@ -6,3 +6,5 @@ defaults:
   - override /object_class: mug
   - override /relationship: place
   - _self_
+
+break_symmetry: False
