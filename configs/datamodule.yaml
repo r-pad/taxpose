@@ -4,6 +4,13 @@ defaults:
   - dataset@dm: ${benchmark}/${object_class}_${relationship}
 
 
+# plane_occlusion: True
+# plane_standoff: 0.04
+# ball_occlusion: True
+# ball_radius: 0.1
+# gripper_lr_label: False
+# occlusion_class: 0
+
 dm:
 
   train_dset:
@@ -14,12 +21,12 @@ dm:
     translation_variance: 0.5
     dataset_size: 1000
     angle_degree: 180
-    synthetic_occlusion: False
-    ball_radius: null
-    plane_occlusion: False
-    ball_occlusion: False
-    plane_standoff: null
-    occlusion_class: 2
+    synthetic_occlusion: True
+    plane_occlusion: True
+    plane_standoff: 0.04
+    ball_occlusion: True
+    ball_radius: 0.1
+    occlusion_class: 0
     symmetric_class: null
     overfit: False
     num_overfit_transforms: 3

@@ -264,14 +264,16 @@ class PointCloudDataset(Dataset):
         def apply_occlusion(points, obj_class):
             if self.synthetic_occlusion and obj_class == self.occlusion_class:
                 if self.ball_occlusion:
-                    points, _ = ball_occlusion(points[0], radius=self.ball_radius)
-                    points = points.unsqueeze(0)
+                    if np.random.rand() > 0.5:
+                        points, _ = ball_occlusion(points[0], radius=self.ball_radius)
+                        points = points.unsqueeze(0)
 
                 if self.plane_occlusion:
-                    points, _ = plane_occlusion(
-                        points[0], stand_off=self.plane_standoff
-                    )
-                    points = points.unsqueeze(0)
+                    if np.random.rand() > 0.5:
+                        points, _ = plane_occlusion(
+                            points[0], stand_off=self.plane_standoff
+                        )
+                        points = points.unsqueeze(0)
             return points
 
         # Apply occlusions.

@@ -26,11 +26,6 @@ class MultiviewDataModule(pl.LightningDataModule):
         gripper_lr_label=False,
         no_transform_applied=False,
         init_distribution_tranform_file="",
-        synthetic_occlusion=False,
-        ball_radius=None,
-        plane_occlusion=False,
-        ball_occlusion=False,
-        plane_standoff=None,
         num_demo=12,
         occlusion_class=0,
         cfg=None,
@@ -59,11 +54,6 @@ class MultiviewDataModule(pl.LightningDataModule):
         self.gripper_lr_label = gripper_lr_label
         self.index_list = []
         self.init_distribution_tranform_file = init_distribution_tranform_file
-        self.synthetic_occlusion = synthetic_occlusion
-        self.ball_radius = ball_radius
-        self.plane_occlusion = plane_occlusion
-        self.ball_occlusion = ball_occlusion
-        self.plane_standoff = plane_standoff
         self.num_demo = num_demo
         self.occlusion_class = occlusion_class
 

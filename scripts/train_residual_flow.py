@@ -121,13 +121,7 @@ def main(cfg):
         cloud_type=cfg.task.cloud_type,
         num_points=cfg.num_points,
         overfit=cfg.overfit,
-        synthetic_occlusion=cfg.synthetic_occlusion,
-        ball_radius=cfg.ball_radius,
-        ball_occlusion=cfg.ball_occlusion,
-        plane_standoff=cfg.plane_standoff,
-        plane_occlusion=cfg.plane_occlusion,
         num_demo=cfg.num_demo,
-        occlusion_class=cfg.occlusion_class,
         cfg=cfg.dm,
     )
 
