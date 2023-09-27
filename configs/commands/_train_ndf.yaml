@@ -17,8 +17,8 @@ break_symmetry: True
 resources:
   num_workers: 16
 
-max_epochs: 500
-batch_size: 4
+max_epochs: 375
+batch_size: 3
 
 training:
   check_val_every_n_epoch: 10
