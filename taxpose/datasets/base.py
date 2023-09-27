@@ -1,4 +1,4 @@
-from typing import Protocol, TypedDict
+from typing import Optional, Protocol, TypedDict
 
 import numpy as np
 import numpy.typing as npt
@@ -7,8 +7,8 @@ import numpy.typing as npt
 class PlacementPointCloudData(TypedDict):
     points_action: npt.NDArray[np.float32]  # (1, num_points, 3)
     points_anchor: npt.NDArray[np.float32]  # (1, num_points, 3)
-    action_symmetry_features: npt.NDArray[np.float32]  # (1, num_points, 1)
-    anchor_symmetry_features: npt.NDArray[np.float32]  # (1, num_points, 1)
+    action_symmetry_features: Optional[npt.NDArray[np.float32]]  # (1, num_points, 1)
+    anchor_symmetry_features: Optional[npt.NDArray[np.float32]]  # (1, num_points, 1)
 
 
 class PlacementPointCloudDatasetConfig(Protocol):

@@ -1,0 +1,82 @@
+
+
+job_type: eval_metrics_${task.name}
+
+defaults:
+  - _self_
+  - _logging
+  - datamodule  # This loops in the dataset.
+  - benchmark: ndf # {ndf, rlbench}
+  - object_class: mug # {mug, bottle, bowl}
+  - relationship: place # {place, grasp}
+  - pose_dist: upright # {upright, arbitrary}
+  - model: release
+  - task: ${object_class}_${relationship}
+  - optional mode: train # $mode \in {train, train_val, validation}
+  - checkpoints/ndf@checkpoints: ${object_class}/${model}
+
+inference: Null
+split: "train"
+
+checkpoint: ${checkpoints.${pose_dist.name}.${relationship.name}}
+
+### TO BE CHANGED ###
+
+# Dataset Settings
+dataset_root: ${hydra:runtime.cwd}/data
+train_data_dir: ${dataset_root}/${task.name}/train_data/renders
+test_data_dir: ${dataset_root}/${task.name}/test_data/renders
+num_workers: 52
+batch_size: 8
+num_points: ${model.num_points}
+num_demo: 10
+dataset_index: None
+object_type: mug
+dataset_size: 1000
+rotation_variance: 180
+translation_variance: 0.5
+synthetic_occlusion: True
+plane_occlusion: True
+plane_standoff: 0.04
+ball_occlusion: True
+ball_radius: 0.1
+gripper_lr_label: False
+occlusion_class: 0
+overfit: False
+seed: 0
+break_symmetry: False
+
+# Network Settings
+center_feature: ${model.center_feature}
+diff_emb: True
+diff_transformer: True
+emb_nn: ${model.emb_nn}
+emb_dims: ${model.emb_dims}
+inital_sampling_ratio: ${model.inital_sampling_ratio}
+flow_compute_type: 0
+residual_on: ${model.residual_on}
+pred_weight: ${model.pred_weight}
+sigmoid_on: True
+return_flow_component: ${model.return_flow_component}
+mlp: False
+multilaterate: ${model.multilaterate}
+mlat_sample: ${model.mlat_sample}
+mlat_nkps: ${model.mlat_nkps}
+
+# pretraining:
+#   mode: nce_loss
+#   checkpoint_file_action: ${checkpoints.pretraining.${model.emb_nn}.${pretraining.mode}.${task.action_name}}
+#   checkpoint_file_anchor: ${checkpoints.pretraining.${model.emb_nn}.${pretraining.mode}.${task.anchor_name}}
+# # Loss Settings
+# flow_supervision: both
+# displace_loss_weight: 1
+# direct_correspondence_loss_weight: 1
+# consistency_loss_weight: 0.1
+
+# # Training Settings
+# load_from_checkpoint: False
+# # checkpoint_file: ${checkpoints.ckpt_file}
+# checkpoint_file: null
+# freeze_embnn: False
+# lr: 1e-4
+# max_epochs: 500

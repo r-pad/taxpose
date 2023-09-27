@@ -118,7 +118,7 @@ def color_dist_symmetric_plane_red_green(cts_cls, points_sym):
     @param cts_cls: distance to symmetric normal per point, (num_points)
     @param points_sym: shape of the color_cts which should be, (num_points,3)
     """
-    color = (cts_cls / torch.abs(torch.max(cts_cls)) * (255 / 2)) + (255 / 2)
+    color = (cts_cls / torch.max(torch.abs(cts_cls)) * (255 / 2)) + (255 / 2)
     color_cts = torch.zeros(points_sym.shape).to(points_sym.device).double()
     color_cts[:, 0] = torch.minimum(
         torch.ones(color.shape).to(color.device) * 255, color * 2
@@ -191,7 +191,7 @@ def get_sym_label_pca_grasp(
     ).float()
     nonsym_vec = points_nonsym - non_sym_center
 
-    cts_cls_nonsym = torch.matmul(nonsym_vec, nonsym_major_axis) / torch.norm(
+    cts_cls_nonsym = torch.matmul(nonsym_vec.float(), nonsym_major_axis) / torch.norm(
         nonsym_major_axis
     )
 

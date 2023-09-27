@@ -19,6 +19,7 @@ train_dset:
     normalize_dist: True
     object_type: ${object_class.name}
     action: ${relationship.name}
+    symmetry_after_transform: True
 
 val_dset:
   demo_dset:
@@ -35,6 +36,7 @@ val_dset:
     normalize_dist: ${...train_dset.demo_dset.normalize_dist}
     object_type: ${object_class.name}
     action: ${relationship.name}
+    symmetry_after_transform: ${...train_dset.demo_dset.symmetry_after_transform}
 
 test_dset:
   demo_dset:
@@ -51,3 +53,4 @@ test_dset:
     normalize_dist: ${...train_dset.demo_dset.normalize_dist}
     object_type: ${object_class.name}
     action: ${relationship.name}
+    symmetry_after_transform: ${...train_dset.demo_dset.symmetry_after_transform}
