@@ -11,10 +11,9 @@ from taxpose.datasets.base import (
     PlacementPointCloudDataset,
     PlacementPointCloudDatasetConfig,
 )
-from taxpose.datasets.ndf import (
+from taxpose.datasets.ndf import (  # compute_demo_symmetry_features,
     OBJECT_LABELS_TO_CLASS,
     ObjectClass,
-    compute_demo_symmetry_features,
 )
 from taxpose.datasets.symmetry_utils import (
     gripper_symmetry_labels,

@@ -7,6 +7,7 @@ import hydra
 import matplotlib.pyplot as plt
 import ndf_robot.model.vnn_occupancy_net_pointnet_dgcnn as vnn_occupancy_network
 import numpy as np
+import numpy.typing as npt
 import omegaconf
 import PIL
 import pybullet as p
@@ -54,7 +55,15 @@ from torch import nn
 from torch.nn import functional as F
 from torchvision.transforms import ToTensor
 
-from taxpose.datasets.ndf import compute_demo_symmetry_features
+from taxpose.datasets.ndf import OBJECT_LABELS_TO_CLASS, ObjectClass
+from taxpose.datasets.symmetry_utils import (
+    gripper_symmetry_labels,
+    nonsymmetric_labels,
+    rotational_symmetry_labels,
+    scalars_to_rgb,
+)
+
+# from taxpose.datasets.ndf import compute_demo_symmetry_features
 from taxpose.models.taxpose_reasoning import TAXPoseReasoning, TAXPoseReasoningConfig
 from taxpose.nets.transformer_flow import CustomTransformer as Transformer
 from taxpose.nets.transformer_flow import MultilaterationHead
@@ -439,6 +448,51 @@ def get_world_transform(pred_T_action_mat, obj_start_pose, point_cloud, invert=F
     return final_pose
 
 
+def compute_inference_symmetry_features(
+    points_action: npt.NDArray[np.float32],
+    points_anchor: npt.NDArray[np.float32],
+    action_class: ObjectClass,
+    anchor_class: ObjectClass,
+):
+    """The only difference between this and compute_demo_symmetry_features is that
+    this function RANDOMLY breaks symmetries. This allows the computation
+    of the two objects to be independent."""
+    assert len(points_action.shape) == 2
+    assert len(points_anchor.shape) == 2
+    assert points_action.shape[1] == 3
+    assert points_anchor.shape[1] == 3
+
+    if anchor_class == ObjectClass.GRIPPER:
+        raise ValueError("Anchor class cannot be the gripper.")
+
+    if action_class == ObjectClass.GRIPPER:
+        action_sym_feats, _, _ = gripper_symmetry_labels(points_action)
+    elif action_class in {ObjectClass.BOTTLE, ObjectClass.BOWL}:
+        # Change here! Notice no input.
+        action_sym_feats, _, _, _ = rotational_symmetry_labels(
+            points_action, action_class, look_at=None
+        )
+    else:
+        action_sym_feats, _ = nonsymmetric_labels(points_action)
+
+    if anchor_class in {ObjectClass.BOTTLE, ObjectClass.BOWL}:
+        anchor_sym_feats, _, _, _ = rotational_symmetry_labels(
+            points_anchor, anchor_class, look_at=None
+        )
+    else:
+        anchor_sym_feats, _ = nonsymmetric_labels(points_anchor)
+
+    anchor_sym_rgb = scalars_to_rgb(anchor_sym_feats[..., 0])
+    action_sym_rgb = scalars_to_rgb(action_sym_feats[..., 0])
+
+    return (
+        action_sym_feats,
+        anchor_sym_feats,
+        action_sym_rgb,
+        anchor_sym_rgb,
+    )
+
+
 def load_data(
     num_points, clouds, classes, action_class, anchor_class, object_type, action
 ):
@@ -458,46 +512,47 @@ def load_data(
         anchor_symmetry_features,
         action_symmetry_rgb,
         anchor_symmetry_rgb,
-    ) = compute_demo_symmetry_features(
-        points_action_np[None, ...],
-        points_anchor_np[None, ...],
-        object_type,
-        action,
-        action_class,
-        anchor_class,
-        True,
-        skip_symmetry=False,
+    ) = compute_inference_symmetry_features(
+        points_action_np,
+        points_anchor_np,
+        action_class=OBJECT_LABELS_TO_CLASS[(object_type, action_class)],
+        anchor_class=OBJECT_LABELS_TO_CLASS[(object_type, anchor_class)],
     )
 
-    if action == "grasp":
-        np.savez(
-            "/home/beisner/code/rpad/taxpose/notebooks/data/ndfeval_data.npz",
-            points_action_np=points_action_np,
-            points_anchor_np=points_anchor_np,
-        )
-        exit()
+    # np.savez(
+    #     f"/home/beisner/code/rpad/taxpose/notebooks/data/ndfeval_{action}_data.npz",
+    #     points_action_np=points_action_np,
+    #     points_anchor_np=points_anchor_np,
+    #     action_symmetry_features=action_symmetry_features,
+    #     anchor_symmetry_features=anchor_symmetry_features,
+    #     action_symmetry_rgb=action_symmetry_rgb,
+    # )
 
     # Visualize the symmetry features
-    fig = pointcloud_fig(
-        points_action_np,
-        downsample=1,
-        colors=action_symmetry_rgb[0],
-    )
-    fig.show()
+    # fig = pointcloud_fig(
+    #     points_action_np,
+    #     downsample=1,
+    #     colors=action_symmetry_rgb,
+    # )
+    # fig.show()
 
-    fig = pointcloud_fig(
-        points_anchor_np,
-        downsample=1,
-        colors=anchor_symmetry_rgb[0],
-    )
-    fig.show()
+    # fig = pointcloud_fig(
+    #     points_anchor_np,
+    #     downsample=1,
+    #     colors=anchor_symmetry_rgb,
+    # )
+    # fig.show()
 
     points_action = torch.from_numpy(points_action_np).float().unsqueeze(0)
     points_anchor = torch.from_numpy(points_anchor_np).float().unsqueeze(0)
-    action_symmetry_features = torch.from_numpy(action_symmetry_features).float()
-    anchor_symmetry_features = torch.from_numpy(anchor_symmetry_features).float()
-    action_symmetry_rgb = torch.from_numpy(action_symmetry_rgb).float()
-    anchor_symmetry_rgb = torch.from_numpy(anchor_symmetry_rgb).float()
+    action_symmetry_features = (
+        torch.from_numpy(action_symmetry_features).float().unsqueeze(0)
+    )
+    anchor_symmetry_features = (
+        torch.from_numpy(anchor_symmetry_features).float().unsqueeze(0)
+    )
+    action_symmetry_rgb = torch.from_numpy(action_symmetry_rgb).float().unsqueeze(0)
+    anchor_symmetry_rgb = torch.from_numpy(anchor_symmetry_rgb).float().unsqueeze(0)
 
     # rng_state = torch.get_rng_state()
     # torch.manual_seed(123456)
@@ -1418,17 +1473,23 @@ def main(hydra_cfg):
             )
             fig.show()
 
+            # Both on the same plot.
             fig = pointcloud_fig(
-                points_mug[0].cpu(),
+                torch.cat(
+                    [
+                        points_mug[0].cpu(),
+                        points_rack[0].cpu(),
+                        ans["pred_points_action"][0].cpu(),
+                    ],
+                ),
                 downsample=1,
-                colors=sym_rgb_mug[0].cpu().numpy(),
-            )
-            fig.show()
-
-            fig = pointcloud_fig(
-                points_rack[0].cpu(),
-                downsample=1,
-                colors=sym_rgb_rack[0].cpu().numpy(),
+                colors=torch.cat(
+                    [
+                        sym_rgb_mug[0].cpu(),
+                        sym_rgb_rack[0].cpu(),
+                        sym_rgb_mug[0].cpu(),
+                    ],
+                ),
             )
             fig.show()
 
@@ -1532,18 +1593,23 @@ def main(hydra_cfg):
             )
             fig.show()
 
-            # breakpoint()
+            # Both on the same plot.
             fig = pointcloud_fig(
-                points_mug[0].cpu(),
+                torch.cat(
+                    [
+                        points_mug[0].cpu(),
+                        points_gripper[0].cpu(),
+                        ans_grasp["pred_points_action"][0].cpu(),
+                    ],
+                ),
                 downsample=1,
-                colors=sym_rgb_mug[0].cpu().numpy(),
-            )
-            fig.show()
-
-            fig = pointcloud_fig(
-                points_gripper[0].cpu(),
-                downsample=1,
-                colors=sym_rgb_gripper[0].cpu().numpy(),
+                colors=torch.cat(
+                    [
+                        sym_rgb_mug[0].cpu(),
+                        sym_rgb_gripper[0].cpu(),
+                        sym_rgb_gripper[0].cpu(),
+                    ],
+                ),
             )
             fig.show()
 
