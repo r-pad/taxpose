@@ -64,15 +64,16 @@ from taxpose.datasets.symmetry_utils import (
 )
 
 # from taxpose.datasets.ndf import compute_demo_symmetry_features
-from taxpose.models.taxpose_reasoning import TAXPoseReasoning, TAXPoseReasoningConfig
 from taxpose.nets.transformer_flow import CustomTransformer as Transformer
 from taxpose.nets.transformer_flow import MultilaterationHead
 from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer as RF_DET
 from taxpose.nets.transformer_flow import ResidualMLPHead
 from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
+from taxpose.training.flow_equivariance_training_module_nocentering import (
+    EquivarianceTrainingModule,
+)
 
 # from taxpose.training.equivariance_testing_model2 import EquivarianceTestingModule
-from taxpose.training.taxpose_inference import TAXPoseInferenceModule
 from taxpose.utils.compile_result import get_result_df
 from taxpose.utils.load_model import get_weights_path
 from taxpose.utils.ndf_sim_utils import get_clouds, get_object_clouds
@@ -465,6 +466,19 @@ def compute_inference_symmetry_features(
     if anchor_class == ObjectClass.GRIPPER:
         raise ValueError("Anchor class cannot be the gripper.")
 
+    if anchor_class == ObjectClass.MUG or action_class == ObjectClass.MUG:
+        # No symmetry.
+        action_sym_feats, _ = nonsymmetric_labels(points_action)
+        anchor_sym_feats, _ = nonsymmetric_labels(points_anchor)
+        anchor_sym_rgb = scalars_to_rgb(anchor_sym_feats[..., 0])
+        action_sym_rgb = scalars_to_rgb(action_sym_feats[..., 0])
+        return (
+            action_sym_feats,
+            anchor_sym_feats,
+            action_sym_rgb,
+            anchor_sym_rgb,
+        )
+
     if action_class == ObjectClass.GRIPPER:
         action_sym_feats, _, _ = gripper_symmetry_labels(points_action)
     elif action_class in {ObjectClass.BOTTLE, ObjectClass.BOWL}:
@@ -507,18 +521,6 @@ def load_data(
     points_anchor_np = points_anchor_np - points_action_mean_np
     points_anchor_mean_np = points_anchor_np.mean(axis=0)
 
-    (
-        action_symmetry_features,
-        anchor_symmetry_features,
-        action_symmetry_rgb,
-        anchor_symmetry_rgb,
-    ) = compute_inference_symmetry_features(
-        points_action_np,
-        points_anchor_np,
-        action_class=OBJECT_LABELS_TO_CLASS[(object_type, action_class)],
-        anchor_class=OBJECT_LABELS_TO_CLASS[(object_type, anchor_class)],
-    )
-
     # np.savez(
     #     f"/home/beisner/code/rpad/taxpose/notebooks/data/ndfeval_{action}_data.npz",
     #     points_action_np=points_action_np,
@@ -528,23 +530,42 @@ def load_data(
     #     action_symmetry_rgb=action_symmetry_rgb,
     # )
 
-    # Visualize the symmetry features
-    # fig = pointcloud_fig(
-    #     points_action_np,
-    #     downsample=1,
-    #     colors=action_symmetry_rgb,
-    # )
-    # fig.show()
-
-    # fig = pointcloud_fig(
-    #     points_anchor_np,
-    #     downsample=1,
-    #     colors=anchor_symmetry_rgb,
-    # )
-    # fig.show()
-
     points_action = torch.from_numpy(points_action_np).float().unsqueeze(0)
     points_anchor = torch.from_numpy(points_anchor_np).float().unsqueeze(0)
+
+    # rng_state = torch.get_rng_state()
+    # torch.manual_seed(123456)
+    points_action, points_anchor, ixs_action, ixs_anchor = subsample(
+        num_points, points_action, points_anchor
+    )
+
+    (
+        action_symmetry_features,
+        anchor_symmetry_features,
+        action_symmetry_rgb,
+        anchor_symmetry_rgb,
+    ) = compute_inference_symmetry_features(
+        points_action[0].numpy(),
+        points_anchor[0].numpy(),
+        action_class=OBJECT_LABELS_TO_CLASS[(object_type, action_class)],
+        anchor_class=OBJECT_LABELS_TO_CLASS[(object_type, anchor_class)],
+    )
+
+    # Visualize the symmetry features
+    fig = pointcloud_fig(
+        points_action_np,
+        downsample=1,
+        colors=action_symmetry_rgb,
+    )
+    fig.show()
+
+    fig = pointcloud_fig(
+        points_anchor_np,
+        downsample=1,
+        colors=anchor_symmetry_rgb,
+    )
+    fig.show()
+
     action_symmetry_features = (
         torch.from_numpy(action_symmetry_features).float().unsqueeze(0)
     )
@@ -554,25 +575,20 @@ def load_data(
     action_symmetry_rgb = torch.from_numpy(action_symmetry_rgb).float().unsqueeze(0)
     anchor_symmetry_rgb = torch.from_numpy(anchor_symmetry_rgb).float().unsqueeze(0)
 
-    # rng_state = torch.get_rng_state()
-    # torch.manual_seed(123456)
-    points_action, points_anchor, ixs_action, ixs_anchor = subsample(
-        num_points, points_action, points_anchor
-    )
-    assert ixs_action is not None
-    action_symmetry_features = torch.take_along_dim(
-        action_symmetry_features, ixs_action[..., None], dim=1
-    )
-    anchor_symmetry_features = torch.take_along_dim(
-        anchor_symmetry_features, ixs_anchor[..., None], dim=1
-    )
+    # assert ixs_action is not None
+    # action_symmetry_features = torch.take_along_dim(
+    #     action_symmetry_features, ixs_action[..., None], dim=1
+    # )
+    # anchor_symmetry_features = torch.take_along_dim(
+    #     anchor_symmetry_features, ixs_anchor[..., None], dim=1
+    # )
 
-    action_symmetry_rgb = torch.take_along_dim(
-        action_symmetry_rgb, ixs_action[..., None], dim=1
-    )
-    anchor_symmetry_rgb = torch.take_along_dim(
-        anchor_symmetry_rgb, ixs_anchor[..., None], dim=1
-    )
+    # action_symmetry_rgb = torch.take_along_dim(
+    #     action_symmetry_rgb, ixs_action[..., None], dim=1
+    # )
+    # anchor_symmetry_rgb = torch.take_along_dim(
+    #     anchor_symmetry_rgb, ixs_anchor[..., None], dim=1
+    # )
 
     # torch.set_rng_state(rng_state)
 
@@ -1089,16 +1105,24 @@ def main(hydra_cfg):
 
     network = create_network(hydra_cfg.model)
 
-    place_reasoning_module = TAXPoseReasoning(
-        network,
-        TAXPoseReasoningConfig(
-            loop=1,
-            weight_normalize=hydra_cfg.place_task.weight_normalize,
-            softmax_temperature=hydra_cfg.place_task.softmax_temperature,
-        ),
-    )
+    # place_reasoning_module = TAXPoseReasoning(
+    #     network,
+    #     TAXPoseReasoningConfig(
+    #         loop=1,
+    #         weight_normalize=hydra_cfg.place_task.weight_normalize,
+    #         softmax_temperature=hydra_cfg.place_task.softmax_temperature,
+    #     ),
+    # )
 
-    place_model = TAXPoseInferenceModule(place_reasoning_module, symmetry_cfg=None)
+    # place_model = TAXPoseInferenceModule(place_reasoning_module, symmetry_cfg=None)
+
+    place_model = EquivarianceTrainingModule(
+        model=network,
+        weight_normalize=hydra_cfg.place_task.weight_normalize,
+        softmax_temperature=hydra_cfg.place_task.softmax_temperature,
+        sigmoid_on=True,
+        flow_supervision="both",
+    )
 
     # place_model = EquivarianceTestingModule(
     #     network,
@@ -1115,9 +1139,6 @@ def main(hydra_cfg):
     # )
 
     place_model.cuda()
-
-    if hydra_cfg.model_eval_on:
-        place_model.eval()
 
     if hydra_cfg.checkpoint_file_place is not None:
         # weights = load_network_weights(
@@ -1136,6 +1157,9 @@ def main(hydra_cfg):
             place_model.model.load_state_dict(weights)
 
         log_info("Model Loaded from " + str(hydra_cfg.checkpoint_file_place))
+
+    if hydra_cfg.model_eval_on:
+        place_model.eval()
 
     if hydra_cfg.checkpoint_file_place_refinement is not None:
         assert False
@@ -1161,16 +1185,24 @@ def main(hydra_cfg):
         )
 
     network = create_network(hydra_cfg.model)
-    grasp_reasoning_module = TAXPoseReasoning(
-        network,
-        TAXPoseReasoningConfig(
-            loop=1,
-            weight_normalize=hydra_cfg.grasp_task.weight_normalize,
-            softmax_temperature=hydra_cfg.grasp_task.softmax_temperature,
-        ),
+    # grasp_reasoning_module = TAXPoseReasoning(
+    #     network,
+    #     TAXPoseReasoningConfig(
+    #         loop=1,
+    #         weight_normalize=hydra_cfg.grasp_task.weight_normalize,
+    #         softmax_temperature=hydra_cfg.grasp_task.softmax_temperature,
+    #     ),
+    # )
+
+    grasp_model = EquivarianceTrainingModule(
+        model=network,
+        weight_normalize=hydra_cfg.grasp_task.weight_normalize,
+        softmax_temperature=hydra_cfg.grasp_task.softmax_temperature,
+        sigmoid_on=True,
+        flow_supervision="both",
     )
 
-    grasp_model = TAXPoseInferenceModule(grasp_reasoning_module, symmetry_cfg=None)
+    # grasp_model = TAXPoseInferenceModule(grasp_reasoning_module, symmetry_cfg=None)
     # grasp_model = EquivarianceTestingModule(
     #     network,
     #     lr=hydra_cfg.lr,
@@ -1445,7 +1477,7 @@ def main(hydra_cfg):
             points_mug, points_rack, features_mug, features_rack
         )  # 1, 4, 4
 
-        if True:
+        if hydra_cfg.pybullet_viz:
             # Create a plotly figure.
             fig = segmentation_fig(
                 torch.cat(
@@ -1566,7 +1598,7 @@ def main(hydra_cfg):
         pre_grasp_ee_pose = util.pose_stamped2list(gripper_relative_pose)
 
         # Create a plotly figure.
-        if True:
+        if hydra_cfg.pybullet_viz:
             fig = segmentation_fig(
                 torch.cat(
                     [

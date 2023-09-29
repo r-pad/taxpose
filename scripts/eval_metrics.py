@@ -1,3 +1,4 @@
+import logging
 import os
 
 import hydra
@@ -10,13 +11,10 @@ from omegaconf import OmegaConf
 from rpad.visualize_3d.plots import pointcloud_fig
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
-from taxpose.models.taxpose_reasoning import (
-    SymmetryConfig,
-    TAXPoseReasoning,
-    TAXPoseReasoningConfig,
-)
 from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
-from taxpose.training.taxpose_inference import TAXPoseInferenceModule
+from taxpose.training.flow_equivariance_training_module_nocentering import (
+    EquivarianceTrainingModule,
+)
 from taxpose.utils.load_model import get_weights_path
 
 
@@ -68,17 +66,11 @@ def main(cfg):
         cloud_type=cfg.task.cloud_type,
         num_points=cfg.num_points,
         overfit=cfg.overfit,
-        synthetic_occlusion=cfg.synthetic_occlusion,
-        ball_radius=cfg.ball_radius,
-        ball_occlusion=cfg.ball_occlusion,
-        plane_standoff=cfg.plane_standoff,
-        plane_occlusion=cfg.plane_occlusion,
         num_demo=cfg.num_demo,
-        occlusion_class=cfg.occlusion_class,
         cfg=cfg.dm,
     )
 
-    dm.setup()
+    dm.setup(stage=cfg.split)
 
     network = ResidualFlow_DiffEmbTransformer(
         emb_dims=cfg.emb_dims,
@@ -92,24 +84,32 @@ def main(cfg):
         break_symmetry=cfg.break_symmetry,
     )
 
-    reasoning_module = TAXPoseReasoning(
-        network,
-        TAXPoseReasoningConfig(
-            loop=1,
-            weight_normalize=cfg.task.weight_normalize,
-            softmax_temperature=cfg.task.softmax_temperature,
-        ),
-    )
+    # reasoning_module = TAXPoseReasoning(
+    #     network,
+    #     TAXPoseReasoningConfig(
+    #         loop=1,
+    #         weight_normalize=cfg.task.weight_normalize,
+    #         softmax_temperature=cfg.task.softmax_temperature,
+    #     ),
+    # )
 
-    model = TAXPoseInferenceModule(
-        reasoning_module,
-        symmetry_cfg=SymmetryConfig(
-            action_class=cfg.task.action_class,
-            anchor_class=cfg.task.anchor_class,
-            object_type=cfg.object_class.name,
-            normalize_dist=True,
-            action=cfg.relationship.name,
-        ),
+    # model = TAXPoseInferenceModule(
+    #     reasoning_module,
+    #     symmetry_cfg=SymmetryConfig(
+    #         action_class=cfg.task.action_class,
+    #         anchor_class=cfg.task.anchor_class,
+    #         object_type=cfg.object_class.name,
+    #         normalize_dist=True,
+    #         action=cfg.relationship.name,
+    #     ),
+    # )
+
+    model = EquivarianceTrainingModule(
+        model=network,
+        weight_normalize=cfg.task.weight_normalize,
+        softmax_temperature=cfg.task.softmax_temperature,
+        sigmoid_on=cfg.sigmoid_on,
+        flow_supervision="both",
     )
 
     run = wandb.init(
@@ -134,6 +134,8 @@ def main(cfg):
             # manually.
             model.model.load_state_dict(weights)
 
+        logging.info(f"Loaded checkpoint from {ckpt_file}")
+
     model.cuda()
     model.eval()
 
@@ -144,7 +146,6 @@ def main(cfg):
     elif cfg.split == "test":
         loader = dm.test_dataloader()
 
-    loader = dm.train_dataloader()
     for batch in loader:
         points_anchor = batch["points_anchor"].cuda()
         points_action = batch["points_action"].cuda()
@@ -161,6 +162,15 @@ def main(cfg):
             action_symmetry_features,
             anchor_symmetry_features,
         )
+
+        if "sampled_ixs_action" in res:
+            ixs_action = res["sampled_ixs_action"]
+            points_action = torch.take_along_dim(
+                points_action, ixs_action.unsqueeze(-1), dim=1
+            )
+            action_symmetry_rgb = torch.take_along_dim(
+                action_symmetry_rgb, ixs_action.unsqueeze(-1), dim=1
+            )
 
         # Evaluate the model on the prediction.
 
@@ -192,6 +202,23 @@ def main(cfg):
                 [
                     points_action[0].cpu(),
                     points_anchor[0].cpu(),
+                ]
+            ),
+            downsample=1,
+            colors=np.concatenate(
+                [
+                    action_symmetry_rgb[0].cpu().numpy(),
+                    anchor_symmetry_rgb[0].cpu().numpy(),
+                ]
+            ),
+        )
+        fig.show()
+
+        fig = pointcloud_fig(
+            np.concatenate(
+                [
+                    res["pred_points_action"][0].cpu(),
+                    points_anchor_trans[0].cpu(),
                 ]
             ),
             downsample=1,

@@ -61,6 +61,9 @@ def gripper_symmetry_labels(
     # Compute the dot product of each vector with the principal axis.
     l_gripper = np.dot(v_gripper, principal_axis)
 
+    # Normalize.
+    l_gripper = l_gripper / np.max(np.abs(l_gripper))
+
     return l_gripper[..., None], principal_axis, centroid
 
 
@@ -133,6 +136,9 @@ def rotational_symmetry_labels(
 
     # Compute the dot product of each centered point with s_obj.
     l_obj = np.dot(v_obj, s_obj)
+
+    # Normalize.
+    l_obj = l_obj / np.max(np.abs(l_obj))
 
     return l_obj[..., None], principal_axis, s_obj, centroid
 

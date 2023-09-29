@@ -1,3 +1,5 @@
+from typing import Any
+
 import torch
 import wandb
 from pytorch3d.transforms import Transform3d
@@ -367,6 +369,76 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
             model_output, batch, log_values=log_values, loss_prefix=""
         )
         return loss, log_values
+
+    def forward(
+        self, points_trans_action, points_trans_anchor, action_features, anchor_features
+    ) -> Any:
+        model_output = self.model(
+            points_trans_action,
+            points_trans_anchor,
+            action_features,
+            anchor_features,
+        )
+
+        # If we've applied some sampling, we need to extract the predictions too...
+        if "sampled_ixs_action" in model_output:
+            ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+            points_trans_action = torch.take_along_dim(
+                points_trans_action, ixs_action, dim=1
+            )
+
+        if "sampled_ixs_anchor" in model_output:
+            ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+            points_trans_anchor = torch.take_along_dim(
+                points_trans_anchor, ixs_anchor, dim=1
+            )
+
+        x_action = model_output["flow_action"]
+        x_anchor = model_output["flow_anchor"]
+
+        pred_flow_action = x_action[:, :, :3]
+        if x_action.shape[2] > 3:
+            if self.sigmoid_on:
+                pred_w_action = torch.sigmoid(x_action[:, :, 3])
+            else:
+                pred_w_action = x_action[:, :, 3]
+        else:
+            pred_w_action = None
+
+        pred_flow_anchor = x_anchor[:, :, :3]
+        if x_anchor.shape[2] > 3:
+            if self.sigmoid_on:
+                pred_w_anchor = torch.sigmoid(x_anchor[:, :, 3])
+            else:
+                pred_w_anchor = x_anchor[:, :, 3]
+        else:
+            pred_w_anchor = None
+
+        pred_T_action = dualflow2pose(
+            xyz_src=points_trans_action,
+            xyz_tgt=points_trans_anchor,
+            flow_src=pred_flow_action,
+            flow_tgt=pred_flow_anchor,
+            weights_src=pred_w_action,
+            weights_tgt=pred_w_anchor,
+            return_transform3d=True,
+            normalization_scehme=self.weight_normalize,
+            temperature=self.softmax_temperature,
+        )
+
+        pred_points_action = pred_T_action.transform_points(points_trans_action)
+
+        res = {
+            "pred_points_action": pred_points_action,
+            "pred_flow_action": pred_flow_action,
+            "pred_w_action": pred_w_action,
+            "pred_T_action": pred_T_action,
+        }
+
+        if "sampled_ixs_action" in model_output:
+            res["sampled_ixs_action"] = model_output["sampled_ixs_action"]
+
+        return res
 
     def visualize_results(self, batch, batch_idx):
         # classes = batch['classes']

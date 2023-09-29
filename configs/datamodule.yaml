@@ -31,6 +31,7 @@ dm:
     overfit: False
     num_overfit_transforms: 3
     gripper_lr_label: False
+    testing_symmetry: False
 
   val_dset:
     demo_dset: ???
@@ -50,7 +51,24 @@ dm:
     overfit: ${..train_dset.overfit}
     num_overfit_transforms: ${..train_dset.num_overfit_transforms}
     gripper_lr_label: ${..train_dset.gripper_lr_label}
+    testing_symmetry: ${..train_dset.testing_symmetry}
 
   test_dset:
     demo_dset: ???
     # extra parameters...
+    num_points: ${..train_dset.num_points}
+    rotation_variance: ${..train_dset.rotation_variance}
+    translation_variance: ${..train_dset.translation_variance}
+    dataset_size: ${..train_dset.dataset_size}
+    angle_degree: ${..train_dset.angle_degree}
+    synthetic_occlusion: ${..train_dset.synthetic_occlusion}
+    ball_radius: ${..train_dset.ball_radius}
+    plane_occlusion: ${..train_dset.plane_occlusion}
+    ball_occlusion: ${..train_dset.ball_occlusion}
+    plane_standoff: ${..train_dset.plane_standoff}
+    occlusion_class: ${..train_dset.occlusion_class}
+    symmetric_class: ${..train_dset.symmetric_class}
+    overfit: ${..train_dset.overfit}
+    num_overfit_transforms: ${..train_dset.num_overfit_transforms}
+    gripper_lr_label: ${..train_dset.gripper_lr_label}
+    testing_symmetry: True

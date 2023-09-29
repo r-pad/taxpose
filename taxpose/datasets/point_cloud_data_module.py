@@ -3,7 +3,6 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 
 from taxpose.datasets.point_cloud_dataset import PointCloudDataset
-from taxpose.datasets.point_cloud_dataset_test import TestPointCloudDataset
 
 
 class MultiviewDataModule(pl.LightningDataModule):
@@ -69,7 +68,7 @@ class MultiviewDataModule(pl.LightningDataModule):
         """called one each GPU separately - stage defines if we are at fit or test step"""
         # we set up only relevant datasets when stage is specified (automatically set by Pytorch-Lightning)
 
-        if stage == "fit" or stage is None:
+        if stage == "train" or stage is None:
             # self.train_dataset = PointCloudDataset(
             #     cfg=PointClassDatasetConfig(
             #         demo_dset=NDFPointCloudDatasetConfig(
@@ -123,23 +122,24 @@ class MultiviewDataModule(pl.LightningDataModule):
             # )
             self.val_dataset = PointCloudDataset(self.cfg.val_dset)
         if stage == "test":
-            self.test_dataset = TestPointCloudDataset(
-                dataset_root=self.test_dataset_root,
-                dataset_indices=self.dataset_index,  # [self.dataset_index],
-                action_class=self.action_class,
-                anchor_class=self.anchor_class,
-                dataset_size=self.dataset_size,
-                rotation_variance=self.rotation_variance,
-                translation_variance=self.translation_variance,
-                cloud_type=self.cloud_type,
-                symmetric_class=self.symmetric_class,
-                num_points=self.num_points,
-                overfit=self.overfit,
-                gripper_lr_label=self.gripper_lr_label,
-                index_list=self.index_list,
-                no_transform_applied=self.no_transform_applied,
-                init_distribution_tranform_file=self.init_distribution_tranform_file,
-            )
+            self.test_dataset = PointCloudDataset(self.cfg.test_dset)
+            # self.test_dataset = TestPointCloudDataset(
+            #     dataset_root=self.test_dataset_root,
+            #     dataset_indices=self.dataset_index,  # [self.dataset_index],
+            #     action_class=self.action_class,
+            #     anchor_class=self.anchor_class,
+            #     dataset_size=self.dataset_size,
+            #     rotation_variance=self.rotation_variance,
+            #     translation_variance=self.translation_variance,
+            #     cloud_type=self.cloud_type,
+            #     symmetric_class=self.symmetric_class,
+            #     num_points=self.num_points,
+            #     overfit=self.overfit,
+            #     gripper_lr_label=self.gripper_lr_label,
+            #     index_list=self.index_list,
+            #     no_transform_applied=self.no_transform_applied,
+            #     init_distribution_tranform_file=self.init_distribution_tranform_file,
+            # )
 
     def return_index_list_test(self):
         return self.test_dataset.return_index_list()

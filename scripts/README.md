@@ -64,13 +64,13 @@ If you write some scripts which are meant to be run stand-alone, and not importe
 CUDA_VISIBLE_DEVICES=0 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/taxpose_mug_upright seed=10 wandb.group=taxpose
 CUDA_VISIBLE_DEVICES=0 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/taxpose_mug_arbitrary seed=10 wandb.group=taxpose
 CUDA_VISIBLE_DEVICES=0 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/taxpose_bottle_upright seed=10 wandb.group=taxpose
-CUDA_VISIBLE_DEVICES=0 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/taxpose_bottle_arbitrary seed=10 wandb.group=taxpose
-CUDA_VISIBLE_DEVICES=0 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/taxpose_bowl_upright seed=10 wandb.group=taxpose
-CUDA_VISIBLE_DEVICES=0 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/taxpose_bowl_arbitrary seed=10 wandb.group=taxpose
+CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/taxpose_bottle_arbitrary seed=10 wandb.group=taxpose
+CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/taxpose_bowl_upright seed=10 wandb.group=taxpose
+CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/taxpose_bowl_arbitrary seed=10 wandb.group=taxpose
 
-CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/mlat_mug_upright seed=10 wandb.group=mlat_s256_vnn
-CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/mlat_mug_arbitrary seed=10 wandb.group=mlat_s256_vnn
-CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/mlat_bottle_upright seed=10 wandb.group=mlat_s256_vnn
+CUDA_VISIBLE_DEVICES=0 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/mlat_mug_upright seed=10 wandb.group=mlat_s256_vnn
+CUDA_VISIBLE_DEVICES=0 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/mlat_mug_arbitrary seed=10 wandb.group=mlat_s256_vnn
+CUDA_VISIBLE_DEVICES=0 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/mlat_bottle_upright seed=10 wandb.group=mlat_s256_vnn
 CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/mlat_bottle_arbitrary seed=10 wandb.group=mlat_s256_vnn
 CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/mlat_bowl_upright seed=10 wandb.group=mlat_s256_vnn
 CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/mlat_bowl_arbitrary seed=10 wandb.group=mlat_s256_vnn

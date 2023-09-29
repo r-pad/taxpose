@@ -42,6 +42,7 @@ class PointCloudDatasetConfig:
     plane_standoff: Optional[float] = None
     occlusion_class: ObjectClass = ObjectClass.GRIPPER
     symmetric_class: Optional[int] = None
+    testing_symmetry: bool = False
 
     # Unused.
     overfit: bool = False
@@ -114,6 +115,64 @@ def compute_demo_symmetry_features(
     )
 
 
+def compute_inference_symmetry_features(
+    points_action: npt.NDArray[np.float32],
+    points_anchor: npt.NDArray[np.float32],
+    action_class: ObjectClass,
+    anchor_class: ObjectClass,
+):
+    """The only difference between this and compute_demo_symmetry_features is that
+    this function RANDOMLY breaks symmetries. This allows the computation
+    of the two objects to be independent."""
+    assert len(points_action.shape) == 2
+    assert len(points_anchor.shape) == 2
+    assert points_action.shape[1] == 3
+    assert points_anchor.shape[1] == 3
+
+    if anchor_class == ObjectClass.GRIPPER:
+        raise ValueError("Anchor class cannot be the gripper.")
+
+    if anchor_class == ObjectClass.MUG or action_class == ObjectClass.MUG:
+        # No symmetry.
+        action_sym_feats, _ = nonsymmetric_labels(points_action)
+        anchor_sym_feats, _ = nonsymmetric_labels(points_anchor)
+        anchor_sym_rgb = scalars_to_rgb(anchor_sym_feats[..., 0])
+        action_sym_rgb = scalars_to_rgb(action_sym_feats[..., 0])
+        return (
+            action_sym_feats,
+            anchor_sym_feats,
+            action_sym_rgb,
+            anchor_sym_rgb,
+        )
+
+    if action_class == ObjectClass.GRIPPER:
+        action_sym_feats, _, _ = gripper_symmetry_labels(points_action)
+    elif action_class in {ObjectClass.BOTTLE, ObjectClass.BOWL}:
+        # Change here! Notice no input.
+        action_sym_feats, _, _, _ = rotational_symmetry_labels(
+            points_action, action_class, look_at=None
+        )
+    else:
+        action_sym_feats, _ = nonsymmetric_labels(points_action)
+
+    if anchor_class in {ObjectClass.BOTTLE, ObjectClass.BOWL}:
+        anchor_sym_feats, _, _, _ = rotational_symmetry_labels(
+            points_anchor, anchor_class, look_at=None
+        )
+    else:
+        anchor_sym_feats, _ = nonsymmetric_labels(points_anchor)
+
+    anchor_sym_rgb = scalars_to_rgb(anchor_sym_feats[..., 0])
+    action_sym_rgb = scalars_to_rgb(action_sym_feats[..., 0])
+
+    return (
+        action_sym_feats,
+        anchor_sym_feats,
+        action_sym_rgb,
+        anchor_sym_rgb,
+    )
+
+
 class PointCloudDataset(Dataset):
     def __init__(self, cfg: PointCloudDatasetConfig):
         self.dataset = make_dataset(cfg.demo_dset)
@@ -139,6 +198,7 @@ class PointCloudDataset(Dataset):
         self.plane_occlusion = cfg.plane_occlusion
         self.ball_occlusion = cfg.ball_occlusion
         self.occlusion_class = cfg.occlusion_class
+        self.testing_symmetry = cfg.testing_symmetry
 
     # def get_fixed_transforms(self):
     #     points_action, points_anchor, _ = self.load_data(
@@ -333,17 +393,31 @@ class PointCloudDataset(Dataset):
         action_class = OBJECT_LABELS_TO_CLASS[(ot, self.action_class)]
         anchor_class = OBJECT_LABELS_TO_CLASS[(ot, self.anchor_class)]
         # print(f"Action class: {action_class}, Anchor class: {anchor_class}")
-        (
-            action_sym_feats,
-            anchor_sym_feats,
-            action_sym_rgb,
-            anchor_sym_rgb,
-        ) = compute_demo_symmetry_features(
-            points_action[0].cpu().numpy(),
-            points_anchor[0].cpu().numpy(),
-            action_class,
-            anchor_class,
-        )
+
+        if self.testing_symmetry:
+            (
+                action_sym_feats,
+                anchor_sym_feats,
+                action_sym_rgb,
+                anchor_sym_rgb,
+            ) = compute_inference_symmetry_features(
+                points_action[0].cpu().numpy(),
+                points_anchor[0].cpu().numpy(),
+                action_class,
+                anchor_class,
+            )
+        else:
+            (
+                action_sym_feats,
+                anchor_sym_feats,
+                action_sym_rgb,
+                anchor_sym_rgb,
+            ) = compute_demo_symmetry_features(
+                points_action[0].cpu().numpy(),
+                points_anchor[0].cpu().numpy(),
+                action_class,
+                anchor_class,
+            )
 
         action_sym_feats = torch.from_numpy(action_sym_feats).float()
         anchor_sym_feats = torch.from_numpy(anchor_sym_feats).float()
