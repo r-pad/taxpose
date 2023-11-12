@@ -9,8 +9,9 @@ def main(
     rlbench_root: Path = typer.Argument(..., exists=True, file_okay=False),
     out_dir: Path = typer.Argument(..., file_okay=False),
     task_name: str = "stack_wine",
+    phase: str = "grasp",
 ):
-    out_task_dir = out_dir / task_name
+    out_task_dir = out_dir / task_name / phase
     if not out_task_dir.exists():
         out_task_dir.mkdir(parents=True)
 
@@ -19,7 +20,10 @@ def main(
     n_files = len(list(task_folder.iterdir()))
 
     dset = RLBenchPlacementDataset(
-        dataset_root=str(rlbench_root), task_name=task_name, n_demos=n_files
+        dataset_root=str(rlbench_root),
+        task_name=task_name,
+        n_demos=n_files,
+        phase=phase,
     )
 
     # Iterate over the dataset.

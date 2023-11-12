@@ -1,0 +1,22 @@
+defaults:
+  - rlbench/_default@_here_
+  - _self_
+
+# Dataset Settings
+train_dset:
+  demo_dset:
+    dataset_type: ${benchmark.name}
+    dataset_indices: null
+    n_demos: 1
+
+val_dset:
+  demo_dset:
+    dataset_type: ${benchmark.name}
+    dataset_indices: null
+    n_demos: 1
+
+test_dset:
+  demo_dset:
+    dataset_type: ${benchmark.name}
+    dataset_indices: null
+    n_demos: 1

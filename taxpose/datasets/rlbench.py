@@ -5,7 +5,7 @@ from typing import ClassVar
 
 import numpy as np
 import torch
-from rpad.rlbench_utils.placement_dataset import RLBenchPlacementDataset
+from rpad.rlbench_utils.placement_dataset import RLBenchPlacementDataset, StackWinePhase
 from torch.utils.data import Dataset
 
 from taxpose.datasets.base import PlacementPointCloudData
@@ -18,14 +18,20 @@ class RLBenchPointCloudDatasetConfig:
     task_name: str = "stack_wine"
     n_demos: int = 10
     cached: bool = True
+    phase: StackWinePhase = "grasp"
 
 
 class RLBenchPlacementDatasetCached(Dataset[PlacementPointCloudData]):
-    def __init__(self, dataset_root: Path, task_name: str, n_demos: int):
+    def __init__(
+        self, dataset_root: Path, task_name: str, n_demos: int, phase: StackWinePhase
+    ):
         super().__init__()
 
         self.files = [
-            Path(str(dataset_root) + "_processed") / task_name / f"episode{i}.npz"
+            Path(str(dataset_root) + "_processed")
+            / task_name
+            / phase
+            / f"episode{i}.npz"
             for i in range(n_demos)
         ]
 
@@ -56,12 +62,14 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
                 dataset_root=cfg.dataset_root,
                 task_name=cfg.task_name,
                 n_demos=cfg.n_demos,
+                phase=cfg.phase,
             )
         else:
             self.dataset = RLBenchPlacementDataset(
                 dataset_root=cfg.dataset_root,
                 task_name=cfg.task_name,
                 n_demos=cfg.n_demos,
+                phase=cfg.phase,
             )
 
     def __len__(self):

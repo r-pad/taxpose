@@ -23,3 +23,18 @@ def merge_table(table1, table2):
             # Merge the two cells.
             table1.iloc[i, j] = f"{table1.iloc[i, j]}/{table2.iloc[i, j]}"
     return table1
+
+
+# A function which takes a list of columns and a table, and returns a new table
+# with only the specified columns.
+def filter_table(columns, table):
+    """Filter a table by columns.
+
+    Args:
+        columns (List[str]): A list of columns to keep.
+        table (pd.DataFrame): A table.
+
+    Returns:
+        pd.DataFrame: A filtered table.
+    """
+    return table[columns]
