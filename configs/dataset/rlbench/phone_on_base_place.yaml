@@ -8,15 +8,23 @@ train_dset:
     dataset_type: ${benchmark.name}
     episodes:
       - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
 
 val_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
     episodes:
-      - 1
+      - 8
+      - 9
 
 test_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
     episodes:
-      - 2
+      - 0
