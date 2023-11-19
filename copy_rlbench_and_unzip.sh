@@ -6,7 +6,7 @@
 rsync -av --progress /project_data/held/baeisner/rlbench.zip /scratch/baeisner/data/rlbench.zip
 
 # Unzip
-unzip /scratch/baeisner/data/rlbench.zip -d /scratch/baeisner/data/rlbench
+unzip /scratch/baeisner/data/rlbench.zip -d /scratch/baeisner/data
 
 # Delete
 rm /scratch/baeisner/data/rlbench.zip
