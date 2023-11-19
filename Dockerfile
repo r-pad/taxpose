@@ -36,6 +36,24 @@ RUN pip install torch-scatter==2.0.9 torch-sparse==0.6.15 torch-cluster==1.6.0 t
 RUN pip install fvcore iopath && \
     pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py39_cu116_pyt1130/download.html
 
+# Download CoppeliaSim
+RUN mkdir $CODING_ROOT/.coppelia
+WORKDIR $CODING_ROOT/.coppelia
+RUN curl https://www.coppeliarobotics.com/files/V4_1_0/CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz -o CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz && \
+    tar -xf CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz && \
+    rm CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz
+
+# modify environment variables
+ENV COPPELIASIM_ROOT="$CODING_ROOT/.coppelia/CoppeliaSim_Edu_V4_1_0_Ubuntu20_04"
+ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$COPPELIASIM_ROOT"
+ENV QT_QPA_PLATFORM_PLUGIN_PATH="$COPPELIASIM_ROOT"
+
+# Install CFFI
+RUN pip install cffi==1.14.2 wheel
+
+# Install PyRep
+RUN pip install --no-build-isolation "pyrep @ git+https://github.com/stepjam/PyRep.git"
+
 # Make the working directory the home directory
 RUN mkdir $CODING_ROOT/code
 WORKDIR $CODING_ROOT/code

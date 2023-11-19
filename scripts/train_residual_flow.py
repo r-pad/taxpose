@@ -1,7 +1,6 @@
 import os
 
 import hydra
-import numpy as np
 import omegaconf
 import pytorch_lightning as pl
 import torch
@@ -104,66 +103,51 @@ def main(cfg):
                 save_weights_only=True,
             ),
         ],
-        max_epochs=cfg.max_epochs,
+        max_epochs=cfg.training.max_epochs,
     )
-    log_txt_file = cfg.log_txt_file
-    write_to_file(log_txt_file, "-----------------------")
-    write_to_file(log_txt_file, "Project: {}".format(logger._project))
-    write_to_file(log_txt_file, "Experiment: {}".format(logger.experiment.name))
-    write_to_file(log_txt_file, "working_dir: {}".format(os.getcwd()))
-    write_to_file(log_txt_file, "")
+
     dm = MultiviewDataModule(
-        dataset_root=hydra.utils.to_absolute_path(cfg.train_data_dir),
-        test_dataset_root=hydra.utils.to_absolute_path(cfg.test_data_dir),
-        dataset_index=cfg.dataset_index,
-        action_class=cfg.task.action_class,
-        anchor_class=cfg.task.anchor_class,
-        dataset_size=cfg.dataset_size,
-        rotation_variance=np.pi / 180 * cfg.rotation_variance,
-        translation_variance=cfg.translation_variance,
-        batch_size=cfg.batch_size,
-        num_workers=cfg.num_workers,
-        cloud_type=cfg.task.cloud_type,
-        num_points=cfg.num_points,
-        overfit=cfg.overfit,
-        num_demo=cfg.num_demo,
+        batch_size=cfg.training.batch_size,
+        num_workers=cfg.resources.num_workers,
         cfg=cfg.dm,
     )
 
     dm.setup()
 
     network = ResidualFlow_DiffEmbTransformer(
-        emb_dims=cfg.emb_dims,
-        emb_nn=cfg.emb_nn,
-        return_flow_component=cfg.return_flow_component,
-        center_feature=cfg.center_feature,
-        pred_weight=cfg.pred_weight,
-        multilaterate=cfg.multilaterate,
-        sample=cfg.mlat_sample,
-        mlat_nkps=cfg.mlat_nkps,
+        emb_dims=cfg.model.emb_dims,
+        emb_nn=cfg.model.emb_nn,
+        return_flow_component=cfg.model.return_flow_component,
+        center_feature=cfg.model.center_feature,
+        pred_weight=cfg.model.pred_weight,
+        multilaterate=cfg.model.multilaterate,
+        sample=cfg.model.mlat_sample,
+        mlat_nkps=cfg.model.mlat_nkps,
         break_symmetry=cfg.break_symmetry,
     )
 
     model = EquivarianceTrainingModule(
         network,
-        lr=cfg.lr,
-        image_log_period=cfg.image_logging_period,
-        displace_loss_weight=cfg.displace_loss_weight,
-        consistency_loss_weight=cfg.consistency_loss_weight,
-        direct_correspondence_loss_weight=cfg.direct_correspondence_loss_weight,
+        lr=cfg.training.lr,
+        image_log_period=cfg.training.image_logging_period,
+        displace_loss_weight=cfg.training.displace_loss_weight,
+        consistency_loss_weight=cfg.training.consistency_loss_weight,
+        direct_correspondence_loss_weight=cfg.training.direct_correspondence_loss_weight,
         weight_normalize=cfg.task.weight_normalize,
-        sigmoid_on=cfg.sigmoid_on,
+        sigmoid_on=cfg.training.sigmoid_on,
         softmax_temperature=cfg.task.softmax_temperature,
-        flow_supervision=cfg.flow_supervision,
+        flow_supervision=cfg.training.flow_supervision,
     )
 
     model.cuda()
     model.train()
-    if cfg.load_from_checkpoint:
+    if cfg.training.load_from_checkpoint:
         print("loaded checkpoint from")
-        print(cfg.checkpoint_file)
+        print(cfg.training.checkpoint_file)
         model.load_state_dict(
-            torch.load(hydra.utils.to_absolute_path(cfg.checkpoint_file))["state_dict"]
+            torch.load(hydra.utils.to_absolute_path(cfg.training.checkpoint_file))[
+                "state_dict"
+            ]
         )
 
     else:
