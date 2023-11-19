@@ -16,7 +16,7 @@ wandb:
 break_symmetry: False
 
 resources:
-  num_workers: 8
+  num_workers: 4
 
 max_epochs: 375
 batch_size: 6
