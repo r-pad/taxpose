@@ -2,7 +2,7 @@
 
 defaults:
   - /commands/_train_rlbench@_here_
-  - override /model: taxpose
+  - override /model: mlat_s256_vnn
   - override /object_class: stack_wine
   - override /relationship: place
   - _self_
