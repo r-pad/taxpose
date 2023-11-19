@@ -2,7 +2,7 @@
 
 defaults:
   - /train_ndf
-  - /benchmark: rlbench
+  - override /benchmark: rlbench
   - _self_
 
 benchmark:
@@ -21,7 +21,8 @@ resources:
 max_epochs: 375
 batch_size: 3
 
-pretraining: null
+pretraining:
+  mode: none
 
 training:
   check_val_every_n_epoch: 10
