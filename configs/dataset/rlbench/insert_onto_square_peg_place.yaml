@@ -10,7 +10,7 @@ train_dset:
       - 0
       - 1
       - 2
-      - 3
+      # - 3 # This episode is broken, too few points on the peg.
       - 4
       # - 5 # This episode is broken, too few points on the peg.
       # - 6  # This episode is broken, too few points on the peg.
