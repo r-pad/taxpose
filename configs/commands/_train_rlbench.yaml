@@ -27,3 +27,7 @@ pretraining:
 training:
   check_val_every_n_epoch: 10
   log_every_n_steps: 100
+
+dm:
+  train_dset:
+    num_points: 256

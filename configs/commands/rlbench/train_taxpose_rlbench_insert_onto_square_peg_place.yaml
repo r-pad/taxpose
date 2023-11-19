@@ -8,3 +8,7 @@ defaults:
   - _self_
 
 break_symmetry: False
+
+dm:
+  train_dset:
+    num_points: 100
