@@ -5,6 +5,7 @@ import numpy as np
 import omegaconf
 import pytorch_lightning as pl
 import torch
+import wandb
 from omegaconf import OmegaConf
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
@@ -26,7 +27,12 @@ def write_to_file(file_name, string):
 def load_emb_weights(checkpoint_reference, wandb_cfg=None, run=None):
     if checkpoint_reference.startswith(wandb_cfg.entity):
         artifact_dir = os.path.join(wandb_cfg.artifact_dir, checkpoint_reference)
-        artifact = run.use_artifact(checkpoint_reference)
+        if run is None or not isinstance(run, wandb.sdk.wandb_run.Run):
+            # Download without a run
+            api = wandb.Api()
+            artifact = api.artifact(checkpoint_reference, type="model")
+        else:
+            artifact = run.use_artifact(checkpoint_reference)
         checkpoint_path = artifact.get_path("model.ckpt").download(root=artifact_dir)
         weights = torch.load(checkpoint_path)["state_dict"]
         # remove "model.emb_nn" prefix from keys

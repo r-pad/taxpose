@@ -188,7 +188,6 @@ class PointCloudDataset(Dataset):
 
         self.overfit = cfg.overfit
         self.gripper_lr_label = cfg.gripper_lr_label
-        self.dataset_indices = cfg.demo_dset.dataset_indices
         self.num_overfit_transforms = cfg.num_overfit_transforms
         self.T0_list = []
         self.T1_list = []
@@ -270,7 +269,7 @@ class PointCloudDataset(Dataset):
         return sym_cls
 
     def __getitem__(self, index):
-        data_ix = torch.randint(len(self.dataset), [1])
+        data_ix = torch.randint(len(self.dataset), [1]).item()
         data = self.dataset[data_ix]
         points_action = torch.from_numpy(data["points_action"])
         points_anchor = torch.from_numpy(data["points_anchor"])

@@ -1,0 +1,11 @@
+# task: stack_wine_place
+name: stack_wine_place
+action_class: 0
+anchor_class: 1
+cloud_type: teleport
+softmax_temperature: 1
+weight_normalize: l1
+action_name: square
+anchor_name: base
+checkpoint_file_action: null
+checkpoint_file_anchor: null

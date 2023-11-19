@@ -1,10 +1,8 @@
-import functools
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, List, Literal, Union
 
 import numpy as np
-import torch
 from rpad.rlbench_utils.placement_dataset import RLBenchPlacementDataset, StackWinePhase
 from torch.utils.data import Dataset
 
@@ -16,70 +14,57 @@ class RLBenchPointCloudDatasetConfig:
     dataset_type: ClassVar[str] = "rlbench"
     dataset_root: Path
     task_name: str = "stack_wine"
-    n_demos: int = 10
+    episodes: Union[List[int], Literal["all"]] = "all"
     cached: bool = True
     phase: StackWinePhase = "grasp"
-
-
-class RLBenchPlacementDatasetCached(Dataset[PlacementPointCloudData]):
-    def __init__(
-        self, dataset_root: Path, task_name: str, n_demos: int, phase: StackWinePhase
-    ):
-        super().__init__()
-
-        self.files = [
-            Path(str(dataset_root) + "_processed")
-            / task_name
-            / phase
-            / f"episode{i}.npz"
-            for i in range(n_demos)
-        ]
-
-        # Check that all files exist.
-        for f in self.files:
-            if not f.exists():
-                raise FileNotFoundError(f"File {f} does not exist.")
-
-    @functools.cache
-    def __getitem__(self, index) -> PlacementPointCloudData:
-        data = np.load(self.files[index])
-
-        return {
-            "action_pc": torch.as_tensor(data["action_pc"]),
-            "anchor_pc": torch.as_tensor(data["anchor_pc"]),
-        }
-
-    def __len__(self):
-        return len(self.files)
 
 
 class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
     def __init__(self, cfg: RLBenchPointCloudDatasetConfig):
         super().__init__()
 
-        if cfg.cached:
-            self.dataset = RLBenchPlacementDatasetCached(
-                dataset_root=cfg.dataset_root,
-                task_name=cfg.task_name,
-                n_demos=cfg.n_demos,
-                phase=cfg.phase,
-            )
-        else:
-            self.dataset = RLBenchPlacementDataset(
-                dataset_root=cfg.dataset_root,
-                task_name=cfg.task_name,
-                n_demos=cfg.n_demos,
-                phase=cfg.phase,
-            )
+        self.dataset = RLBenchPlacementDataset(
+            dataset_root=cfg.dataset_root,
+            task_name=cfg.task_name,
+            n_demos=-1,
+            phase=cfg.phase,
+        )
+
+        # Induce a subset if necessary.
+        self.episode_ixs = (
+            list(range(len(self.dataset))) if cfg.episodes == "all" else cfg.episodes
+        )
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.episode_ixs)
 
-    def __getitem__(self, index) -> PlacementPointCloudData:
-        data = self.dataset[index]
+    def __getitem__(self, index: int) -> PlacementPointCloudData:
+        data = self.dataset[self.episode_ixs[index]]
+
+        # This dataset should really be about the keyframes, but there are some
+        # occlusions at keyframes. We may want to switch to using an "imagined"
+        # version of point clouds.
+        points_action = data["key_action_pc"].numpy().astype(np.float32)[None, ...]
+        points_anchor = data["key_anchor_pc"].numpy().astype(np.float32)[None, ...]
+
+        # For now, we need to hack in the symmetry features. We'll almost certainly
+        # want to do this differently in the future.
+        action_symmetry_features = np.ones(
+            (1, points_action.shape[0], 1), dtype=np.float32
+        )
+        anchor_symmetry_features = np.ones(
+            (1, points_anchor.shape[0], 1), dtype=np.float32
+        )
+
+        # Assert shapes
+        assert len(points_action.shape) == 3
+        assert len(points_anchor.shape) == 3
+        assert len(action_symmetry_features.shape) == 3
+        assert len(anchor_symmetry_features.shape) == 3
 
         return {
-            "points_action": data["action_pc"].numpy().astype(np.float32)[None, ...],
-            "points_anchor": data["anchor_pc"].numpy().astype(np.float32)[None, ...],
-            "symmetric_cls": np.asarray([], dtype=np.float32),
+            "points_action": points_action,
+            "points_anchor": points_anchor,
+            "action_symmetry_features": action_symmetry_features,
+            "anchor_symmetry_features": anchor_symmetry_features,
         }

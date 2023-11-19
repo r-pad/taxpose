@@ -6,17 +6,17 @@ defaults:
 train_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
-    dataset_indices: null
-    n_demos: 1
+    episodes:
+      - 0
 
 val_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
-    dataset_indices: null
-    n_demos: 1
+    episodes:
+      - 1
 
 test_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
-    dataset_indices: null
-    n_demos: 1
+    episodes:
+      - 2

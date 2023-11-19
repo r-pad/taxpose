@@ -5,7 +5,7 @@ train_dset:
   demo_dset:
     dataset_root: ${benchmark.dataset_root}
     task_name: ${object_class.name}
-    n_demos: 10
+    episodes: all
     action_class: ${task.action_class}
     anchor_class: ${task.anchor_class}
     cached: true
@@ -15,7 +15,7 @@ val_dset:
   demo_dset:
     dataset_root: ${benchmark.dataset_root}
     task_name: ${object_class.name}
-    n_demos: 1
+    episodes: all
     action_class: ${task.action_class}
     anchor_class: ${task.anchor_class}
     cached: true
@@ -25,7 +25,7 @@ test_dset:
   demo_dset:
     dataset_root: ${benchmark.dataset_root}
     task_name: ${object_class.name}
-    n_demos: 1
+    episodes: all
     action_class: ${task.action_class}
     anchor_class: ${task.anchor_class}
     cached: true

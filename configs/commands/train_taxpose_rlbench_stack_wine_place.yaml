@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+  - /commands/_train_rlbench@_here_
+  - override /model: taxpose
+  - override /object_class: stack_wine
+  - override /relationship: place
+  - _self_
+
+break_symmetry: False
