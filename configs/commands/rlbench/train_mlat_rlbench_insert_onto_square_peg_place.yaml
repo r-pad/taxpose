@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+  - /commands/_train_rlbench@_here_
+  - override /model: mlat_s100_vnn
+  - override /object_class: insert_onto_square_peg
+  - override /relationship: place
+  - _self_
+
+break_symmetry: False
