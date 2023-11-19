@@ -65,8 +65,8 @@ If you write some scripts which are meant to be run stand-alone, and not importe
 
 ./launch_autobot.sh 0 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_stack_wine_place.yaml wandb.group=rlbench_taxpose
 ./launch_autobot.sh 1 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_insert_onto_square_peg_place.yaml wandb.group=rlbench_taxpose resources.num_workers=0
-./launch_autobot.sh 2 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_phone_on_base_place.yaml wandb.group=rlbench_taxpose resources.num_workers=0
-./launch_autobot.sh 3 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_put_toilet_roll_on_stand_place.yaml wandb.group=rlbench_taxpose resources.num_workers=0
+./launch_autobot.sh 2 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_phone_on_base_place.yaml wandb.group=rlbench_taxpose
+./launch_autobot.sh 3 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_put_toilet_roll_on_stand_place.yaml wandb.group=rlbench_taxpose
 ./launch_autobot.sh 4 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_stack_wine_place.yaml wandb.group=rlbench_mlat
 ./launch_autobot.sh 5 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_insert_onto_square_peg_place.yaml wandb.group=rlbench_mlat
 ./launch_autobot.sh 6 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_phone_on_base_place.yaml wandb.group=rlbench_mlat
