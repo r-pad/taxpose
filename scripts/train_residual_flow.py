@@ -107,12 +107,11 @@ def main(cfg):
         max_epochs=cfg.max_epochs,
     )
     log_txt_file = cfg.log_txt_file
-    if cfg.mode == "train":
-        write_to_file(log_txt_file, "-----------------------")
-        write_to_file(log_txt_file, "Project: {}".format(logger._project))
-        write_to_file(log_txt_file, "Experiment: {}".format(logger.experiment.name))
-        write_to_file(log_txt_file, "working_dir: {}".format(os.getcwd()))
-        write_to_file(log_txt_file, "")
+    write_to_file(log_txt_file, "-----------------------")
+    write_to_file(log_txt_file, "Project: {}".format(logger._project))
+    write_to_file(log_txt_file, "Experiment: {}".format(logger.experiment.name))
+    write_to_file(log_txt_file, "working_dir: {}".format(os.getcwd()))
+    write_to_file(log_txt_file, "")
     dm = MultiviewDataModule(
         dataset_root=hydra.utils.to_absolute_path(cfg.train_data_dir),
         test_dataset_root=hydra.utils.to_absolute_path(cfg.test_data_dir),
@@ -200,28 +199,7 @@ def main(cfg):
                     cfg.pretraining.checkpoint_file_anchor
                 )
             )
-    if cfg.mode == "train":
-        trainer.fit(model, dm)
-    elif cfg.mode == "train_val":
-        pl.seed_everything(123456)
-        model.eval()
-
-        with torch.no_grad():
-            results = trainer.validate(model, dm.train_dataloader())
-    elif cfg.mode == "validate":
-        pl.seed_everything(123456)
-        model.eval()
-
-        with torch.no_grad():
-            results = trainer.validate(model, dm)
-    elif cfg.mode == "test":
-        pl.seed_everything(123456)
-        model.eval()
-
-        with torch.no_grad():
-            results = trainer.test(model, dm)
-    else:
-        raise ValueError("Mode not recognized")
+    trainer.fit(model, dm)
 
 
 if __name__ == "__main__":

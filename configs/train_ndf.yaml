@@ -18,7 +18,6 @@ defaults:
   - pose_dist: upright # {upright, arbitrary}
   - model: release
   - task: ${object_class}_${relationship}
-  - optional mode: train # $mode \in {train, train_val, validation}
   - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
   - checkpoints/pretraining@checkpoints.pretraining
 

@@ -45,7 +45,7 @@ COPY ./taxpose $CODING_ROOT/code/taxpose
 COPY ./third_party $CODING_ROOT/code/third_party
 COPY ./setup.py $CODING_ROOT/code/setup.py
 COPY ./pyproject.toml $CODING_ROOT/code/pyproject.toml
-RUN pip install -e .
+RUN pip install -e ".[rlbench]"
 RUN pip install -e third_party/ndf_robot
 
 # Changes to the configs and scripts will not require a rebuild

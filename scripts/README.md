@@ -59,6 +59,13 @@ If you write some scripts which are meant to be run stand-alone, and not importe
 ./launch_autobot.sh 3 python scripts/train_residual_flow.py --config-name commands/ablations/se3_augmentation/train_mlat_mug_place.yaml +mode=train wandb.group=ablate_se3_mlat_s256_vnn
 
 
+## RLBench
+
+### Taxpose
+
+./launch_autobot.sh 0 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_stack_wine_place.yaml +mode=train wandb.group=rlbench_taxpose_stack_wine
+
+
 
 ## NDF evals.
 CUDA_VISIBLE_DEVICES=0 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/taxpose_mug_upright seed=10 wandb.group=taxpose
