@@ -11,4 +11,4 @@ break_symmetry: True
 
 dm:
   train_dset:
-    num_points: 100
+    num_points: 256

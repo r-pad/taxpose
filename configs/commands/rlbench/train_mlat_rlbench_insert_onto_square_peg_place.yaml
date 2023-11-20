@@ -2,7 +2,7 @@
 
 defaults:
   - /commands/_train_rlbench@_here_
-  - override /model: mlat_s100_vnn
+  - override /model: mlat_s256_vnn
   - override /object_class: insert_onto_square_peg
   - override /relationship: place
   - _self_
@@ -11,4 +11,4 @@ break_symmetry: True
 
 dm:
   train_dset:
-    num_points: 100
+    num_points: 256
