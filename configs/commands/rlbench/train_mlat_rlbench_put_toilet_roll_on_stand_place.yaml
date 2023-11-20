@@ -7,4 +7,4 @@ defaults:
   - override /relationship: place
   - _self_
 
-break_symmetry: False
+break_symmetry: True

@@ -13,7 +13,7 @@ log_dir: /opt/logs
 wandb:
   artifact_dir: /opt/artifacts
 
-break_symmetry: False
+break_symmetry: True
 
 resources:
   num_workers: 4
