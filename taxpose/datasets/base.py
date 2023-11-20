@@ -9,6 +9,8 @@ class PlacementPointCloudData(TypedDict):
     points_anchor: npt.NDArray[np.float32]  # (1, num_points, 3)
     action_symmetry_features: Optional[npt.NDArray[np.float32]]  # (1, num_points, 1)
     anchor_symmetry_features: Optional[npt.NDArray[np.float32]]  # (1, num_points, 1)
+    action_symmetry_rgb: Optional[npt.NDArray[np.uint8]]  # (1, num_points, 3)
+    anchor_symmetry_rgb: Optional[npt.NDArray[np.uint8]]  # (1, num_points, 3)
 
 
 class PlacementPointCloudDatasetConfig(Protocol):

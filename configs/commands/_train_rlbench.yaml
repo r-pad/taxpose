@@ -31,3 +31,4 @@ training:
 dm:
   train_dset:
     num_points: 256
+    synthetic_occlusion: False

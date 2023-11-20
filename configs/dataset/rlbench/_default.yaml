@@ -10,6 +10,8 @@ train_dset:
     anchor_class: ${task.anchor_class}
     cached: true
     phase: ${relationship.name}
+    teleport_initial_to_final: true
+    with_symmetry: True
 
 val_dset:
   demo_dset:
@@ -20,6 +22,8 @@ val_dset:
     anchor_class: ${task.anchor_class}
     cached: true
     phase: ${relationship.name}
+    teleport_initial_to_final: true
+    with_symmetry: True
 
 test_dset:
   demo_dset:
@@ -30,3 +34,5 @@ test_dset:
     anchor_class: ${task.anchor_class}
     cached: true
     phase: ${relationship.name}
+    teleport_initial_to_final: true
+    with_symmetry: True

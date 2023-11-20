@@ -1,5 +1,4 @@
-# task: stack_wine_place
-name: stack_wine_place
+name: put_toilet_roll_on_stand_place
 action_class: 0
 anchor_class: 1
 cloud_type: teleport

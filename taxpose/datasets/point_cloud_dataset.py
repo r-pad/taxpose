@@ -421,6 +421,8 @@ class PointCloudDataset(Dataset):
                     anchor_class,
                 )
 
+        elif self.demo_dset_cfg.dataset_type == "rlbench":
+            pass
         else:
             # We'll just compute nonsymmetric labels for now.
             (
