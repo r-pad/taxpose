@@ -321,6 +321,10 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
             skip_symmetry=self.skip_symmetry,
         )
 
+        raise NotImplementedError
+
+        # Still need to pass back downsampling and occlusion functions.
+
         return {
             "points_action": points_action,
             "points_anchor": points_anchor,

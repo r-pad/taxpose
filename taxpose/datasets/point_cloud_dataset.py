@@ -4,7 +4,6 @@ from typing import Optional, cast
 import numpy as np
 import numpy.typing as npt
 import torch
-from pytorch3d.ops import sample_farthest_points
 from torch.utils.data import Dataset
 
 from taxpose.datasets.base import (
@@ -21,7 +20,6 @@ from taxpose.datasets.symmetry_utils import (
     rotational_symmetry_labels,
     scalars_to_rgb,
 )
-from taxpose.utils.occlusion_utils import ball_occlusion, plane_occlusion
 from taxpose.utils.se3 import random_se3
 
 
@@ -273,19 +271,11 @@ class PointCloudDataset(Dataset):
         data = self.dataset[data_ix]
         points_action = torch.from_numpy(data["points_action"])
         points_anchor = torch.from_numpy(data["points_anchor"])
-        # action_sym_feats = data["action_symmetry_features"]
-        # anchor_sym_feats = data["anchor_symmetry_features"]
-        # action_sym_rgb = data["action_symmetry_rgb"]
-        # anchor_symmetry_rgb = data["anchor_symmetry_rgb"]
+        action_sym_feats = torch.from_numpy(data["action_symmetry_features"])
+        anchor_sym_feats = torch.from_numpy(data["anchor_symmetry_features"])
+        action_sym_rgb = torch.from_numpy(data["action_symmetry_rgb"])
+        anchor_sym_rgb = torch.from_numpy(data["anchor_symmetry_rgb"])
 
-        # symmetric_cls = torch.from_numpy(data["symmetric_cls"])
-
-        # if self.overfit:
-        #     transform_idx = torch.randint(
-        #         self.num_overfit_transforms, (1,)).item()
-        #     T0 = self.T0_list[transform_idx]
-        #     T1 = self.T1_list[transform_idx]
-        # else:
         T0 = random_se3(
             1,
             rot_var=self.rot_var,
@@ -299,65 +289,43 @@ class PointCloudDataset(Dataset):
             device=points_anchor.device,
         )
 
-        # if action_sym_feats is None or anchor_sym_feats is None:
-        #     (
-        #         action_sym_feats,
-        #         anchor_sym_feats,
-        #         action_sym_rgb,
-        #         anchor_symmetry_rgb,
-        #     ) = compute_symmetry_features(
-        #         points_action_trans,
-        #         points_anchor_trans,
-        #         self.dataset.object_type,
-        #         self.dataset.action,
-        #         self.action_class,
-        #         self.anchor_class,
-        #         self.dataset.normalize_dist,
-        #         skip_symmetry=False,
+        # # Occlusion happens before symmetry.
+        # def apply_occlusion(points, obj_class):
+        #     if self.synthetic_occlusion and obj_class == self.occlusion_class:
+        #         if self.ball_occlusion:
+        #             if np.random.rand() > 0.5:
+        #                 points_new, _ = ball_occlusion(
+        #                     points[0], radius=self.ball_radius
+        #                 )
+
+        #                 # Ignore the occlusion if it's going to mess us up later...
+        #                 if points_new.shape[0] > self.num_points:
+        #                     points = points_new.unsqueeze(0)
+
+        #         if self.plane_occlusion:
+        #             if np.random.rand() > 0.5:
+        #                 points_new, _ = plane_occlusion(
+        #                     points[0], stand_off=self.plane_standoff
+        #                 )
+        #                 # Ignore the occlusion if it's going to mess us up later...
+        #                 if points_new.shape[0] > self.num_points:
+        #                     points = points_new.unsqueeze(0)
+        #     return points
+
+        # # Apply occlusions.
+        # if points_action.shape[1] > self.num_points:
+        #     # Apply any occlusions.
+        #     points_action = apply_occlusion(points_action, self.action_class)
+        # else:
+        #     raise NotImplementedError(
+        #         f"Action point cloud is smaller than cloud size ({points_action.shape[1]} < {self.num_points})"
         #     )
-
-        # action_sym_feats = torch.from_numpy(action_sym_feats)
-        # anchor_sym_feats = torch.from_numpy(anchor_sym_feats)
-        # action_sym_rgb = torch.from_numpy(action_sym_rgb)
-        # anchor_symmetry_rgb = torch.from_numpy(anchor_symmetry_rgb)
-
-        # Occlusion happens before symmetry.
-        def apply_occlusion(points, obj_class):
-            if self.synthetic_occlusion and obj_class == self.occlusion_class:
-                if self.ball_occlusion:
-                    if np.random.rand() > 0.5:
-                        points_new, _ = ball_occlusion(
-                            points[0], radius=self.ball_radius
-                        )
-
-                        # Ignore the occlusion if it's going to mess us up later...
-                        if points_new.shape[0] > self.num_points:
-                            points = points_new.unsqueeze(0)
-
-                if self.plane_occlusion:
-                    if np.random.rand() > 0.5:
-                        points_new, _ = plane_occlusion(
-                            points[0], stand_off=self.plane_standoff
-                        )
-                        # Ignore the occlusion if it's going to mess us up later...
-                        if points_new.shape[0] > self.num_points:
-                            points = points_new.unsqueeze(0)
-            return points
-
-        # Apply occlusions.
-        if points_action.shape[1] > self.num_points:
-            # Apply any occlusions.
-            points_action = apply_occlusion(points_action, self.action_class)
-        else:
-            raise NotImplementedError(
-                f"Action point cloud is smaller than cloud size ({points_action.shape[1]} < {self.num_points})"
-            )
-        if points_anchor.shape[1] > self.num_points:
-            points_anchor = apply_occlusion(points_anchor, self.anchor_class)
-        else:
-            raise NotImplementedError(
-                f"Anchor point cloud is smaller than cloud size ({points_anchor.shape[1]} < {self.num_points})"
-            )
+        # if points_anchor.shape[1] > self.num_points:
+        #     points_anchor = apply_occlusion(points_anchor, self.anchor_class)
+        # else:
+        #     raise NotImplementedError(
+        #         f"Anchor point cloud is smaller than cloud size ({points_anchor.shape[1]} < {self.num_points})"
+        #     )
 
         # print(f"Action symmetry features: {action_sym_feats.shape}")
         # print(f"Anchor symmetry features: {anchor_sym_feats.shape}")
@@ -365,32 +333,33 @@ class PointCloudDataset(Dataset):
         # print(f"Anchor symmetry rgb: {anchor_sym_rgb.shape}")
 
         # Downsample after symmetry features.
-        def apply_sampling(points):
-            points, ids = sample_farthest_points(
-                points, K=self.num_points, random_start_point=True
-            )
+        # def apply_sampling(points):
+        #     points, ids = sample_farthest_points(
+        #         points, K=self.num_points, random_start_point=True
+        #     )
 
-            return points
+        #     return points
 
-        if points_action.shape[1] > self.num_points:
-            points_action = apply_sampling(points_action)
-        else:
-            raise NotImplementedError(
-                f"Action point cloud is smaller than cloud size ({points_action.shape[1]} < {self.num_points})"
-            )
+        # if points_action.shape[1] > self.num_points:
+        #     points_action = apply_sampling(points_action)
+        # else:
+        #     raise NotImplementedError(
+        #         f"Action point cloud is smaller than cloud size ({points_action.shape[1]} < {self.num_points})"
+        #     )
 
-        if points_anchor.shape[1] > self.num_points:
-            points_anchor = apply_sampling(points_anchor)
-        else:
-            raise NotImplementedError(
-                f"Anchor point cloud is smaller than cloud size ({points_anchor.shape[1]} < {self.num_points})"
-            )
+        # if points_anchor.shape[1] > self.num_points:
+        #     points_anchor = apply_sampling(points_anchor)
+        # else:
+        #     raise NotImplementedError(
+        #         f"Anchor point cloud is smaller than cloud size ({points_anchor.shape[1]} < {self.num_points})"
+        #     )
 
         # Create symmetry features. This happens after downsampling!!! (it could happen before, but it's not efficient)
         # The core idea here is that we want those symmetry features to be semantically meaningful during
         # demonstrations, so we need to compute them before transforming everything.
         # At test time, there should be a DIFFERENT PROCEDURE!!!
         if self.demo_dset_cfg.dataset_type == "ndf":
+            raise NotImplementedError("Need to implement this for NDF.")
             ot = self.dataset.object_type
             action_class = OBJECT_LABELS_TO_CLASS[(ot, self.action_class)]
             anchor_class = OBJECT_LABELS_TO_CLASS[(ot, self.anchor_class)]
@@ -424,6 +393,7 @@ class PointCloudDataset(Dataset):
         elif self.demo_dset_cfg.dataset_type == "rlbench":
             pass
         else:
+            raise NotImplementedError("bad")
             # We'll just compute nonsymmetric labels for now.
             (
                 action_sym_feats,
@@ -436,11 +406,6 @@ class PointCloudDataset(Dataset):
                 action_class=None,
                 anchor_class=None,
             )
-
-        action_sym_feats = torch.from_numpy(action_sym_feats).float()
-        anchor_sym_feats = torch.from_numpy(anchor_sym_feats).float()
-        action_sym_rgb = torch.from_numpy(action_sym_rgb)
-        anchor_sym_rgb = torch.from_numpy(anchor_sym_rgb)
 
         # Transform the points!
         points_action_trans = T0.transform_points(points_action)

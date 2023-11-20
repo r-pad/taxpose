@@ -12,6 +12,8 @@ train_dset:
     phase: ${relationship.name}
     teleport_initial_to_final: true
     with_symmetry: True
+    occlusion_cfg: null
+    num_points: 256
 
 val_dset:
   demo_dset:
@@ -24,6 +26,8 @@ val_dset:
     phase: ${relationship.name}
     teleport_initial_to_final: true
     with_symmetry: True
+    occlusion_cfg: null
+    num_points: 256
 
 test_dset:
   demo_dset:
@@ -36,3 +40,5 @@ test_dset:
     phase: ${relationship.name}
     teleport_initial_to_final: true
     with_symmetry: True
+    occlusion_cfg: null
+    num_points: 256

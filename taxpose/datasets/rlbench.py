@@ -1,18 +1,22 @@
 import functools
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar, List, Literal, Union
+from typing import ClassVar, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
 import open3d as o3d
+import torch
 from rpad.rlbench_utils.placement_dataset import RLBenchPlacementDataset, StackWinePhase
 from torch.utils.data import Dataset
 
+from taxpose.datasets.augmentations import OcclusionConfig, maybe_downsample
 from taxpose.datasets.base import PlacementPointCloudData
 
 
-def rotational_symmetry_labels(points, symmetry_axis, second_axis):
+def rotational_symmetry_labels(
+    points, symmetry_axis, second_axis
+) -> npt.NDArray[np.float32]:
     """Get some 1-D symmetry labels for rotational symmetry.
 
     Args:
@@ -32,7 +36,7 @@ def rotational_symmetry_labels(points, symmetry_axis, second_axis):
     # Normalize by the largest inner product.
     inner_products /= np.max(np.abs(inner_products))
 
-    return inner_products
+    return inner_products.astype(np.float32)
 
 
 DEMO_SYMMETRY_LABELS = {
@@ -138,12 +142,12 @@ def colorize_symmetry_labels(labels) -> npt.NDArray[np.uint8]:
     return color_cts
 
 
-def remove_outliers(original_points):
-    """Remove outliers using open3d."""
+def remove_outliers_o3d(original_points):
+    """Remove outliers which are far from other points using pure numpy"""
 
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(original_points[0])
-    pcd.remove_radius_outlier(nb_points=30, radius=0.1)
+    pcd.remove_radius_outlier(nb_points=30, radius=0.03)
     pcd.remove_statistical_outlier(nb_neighbors=30, std_ratio=1.0)
 
     # Next, cluster the points.
@@ -159,7 +163,35 @@ def remove_outliers(original_points):
     # print(
     #     f"Removed {original_points.shape[1] - np.asarray(points).shape[0]} outliers from {original_points.shape[1]} points."
     # )
-    return np.asarray(points)[None, ...]
+    return np.asarray(points, dtype=np.float32)[None, ...]
+
+
+def remove_outliers(original_points):
+    """Remove outliers which are far from other points using pure numpy"""
+    # Compute the distance between each point and every other point.
+    dists = np.linalg.norm(
+        original_points[0, None, ...] - original_points[0, :, None, ...], axis=-1
+    )
+
+    # The outliers are the points which are far from other points. Remove points that
+    # are greater than threshold away from all other points, and ignore the diagonal.
+    threshold = 0.1
+
+    # This is really for wine stacking
+
+    # Set diagonal to inf
+    np.fill_diagonal(dists, np.inf)
+
+    outliers = np.all(dists > threshold, axis=0)
+
+    # Remove the outliers.
+    points = np.delete(original_points, outliers, axis=1)
+
+    # Print how many were removed.
+    # print(
+    #     f"Removed {original_points.shape[1] - points.shape[1]} outliers from {original_points.shape[1]} points."
+    # )
+    return points
 
 
 @dataclass
@@ -170,6 +202,12 @@ class RLBenchPointCloudDatasetConfig:
     episodes: Union[List[int], Literal["all"]] = "all"
     cached: bool = True
     phase: StackWinePhase = "grasp"
+
+    # Occlusion config.
+    occlusion_cfg: Optional[OcclusionConfig] = None
+
+    # Downsample the point clouds.
+    num_points: Optional[int] = None
 
     # This allows us to use additonal ground-truth pose information to teleport
     # the initial, onoccluded observation to the final, occluded position.
@@ -199,9 +237,10 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
         return len(self.episode_ixs)
 
     @functools.lru_cache(maxsize=100)
-    def __getitem__(self, index: int) -> PlacementPointCloudData:
+    def _load_data(
+        self, index: int
+    ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, torch.Tensor]]:
         data = self.dataset[self.episode_ixs[index]]
-
         # This dataset should really be about the keyframes, but there are some
         # occlusions at keyframes. We may want to switch to using an "imagined"
         # version of point clouds.
@@ -231,6 +270,18 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
         # Quickly remove outliers...
         points_action = remove_outliers(points_action)
         points_anchor = remove_outliers(points_anchor)
+
+        return points_action, points_anchor, data
+
+    def __getitem__(self, index: int) -> PlacementPointCloudData:
+        # Load the data.
+        points_action, points_anchor, data = self._load_data(index)
+        # Occlude if necessary.
+        # TODO: implement occlusions here.
+
+        # Downsample if necessary.
+        points_action = maybe_downsample(points_action, self.cfg.num_points)
+        points_anchor = maybe_downsample(points_anchor, self.cfg.num_points)
 
         if self.cfg.with_symmetry:
             T_action_key_world = data["T_action_key_world"].numpy().astype(np.float32)
