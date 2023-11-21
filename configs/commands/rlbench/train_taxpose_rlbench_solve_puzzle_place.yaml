@@ -1,0 +1,17 @@
+# @package _global_
+
+defaults:
+  - /commands/_train_rlbench@_here_
+  - override /model: taxpose
+  - override /object_class: solve_puzzle
+  - override /relationship: place
+  - _self_
+
+break_symmetry: False
+
+model:
+  break_symmetry: False
+
+dm:
+  train_dset:
+    num_points: 256

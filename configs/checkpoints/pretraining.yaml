@@ -28,6 +28,8 @@ dgcnn:
     phone_base: null
     toilet_roll: null
     toilet_roll_stand: null
+    puzzle_piece: null
+    puzzle: null
 vn_dgcnn:
   nce_loss:
     # 0
@@ -58,3 +60,5 @@ vn_dgcnn:
     phone_base: null
     toilet_roll: null
     toilet_roll_stand: null
+    puzzle_piece: null
+    puzzle: null

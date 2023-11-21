@@ -54,6 +54,7 @@ DEMO_SYMMETRY_LABELS = {
         },
         "anchor": {
             "symmetry_axis": "anchor_z",
+            # TODO: figure out if we should switch this to y.
             "second_axis": "anchor_x",
         },
     },
@@ -65,6 +66,7 @@ DEMO_SYMMETRY_LABELS = {
         },
         "anchor": None,
     },
+    "solve_puzzle": None,
 }
 
 
