@@ -66,6 +66,7 @@ DEMO_SYMMETRY_LABELS = {
         },
         "anchor": None,
     },
+    "place_hanger_on_rack": None,
     "solve_puzzle": None,
 }
 

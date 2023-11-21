@@ -2,8 +2,8 @@
 
 defaults:
   - /commands/_train_rlbench@_here_
-  - override /model: mlat_s256_vnn
-  - override /object_class: solve_puzzle
+  - override /model: taxpose
+  - override /object_class: place_hanger_on_rack
   - override /relationship: place
   - _self_
 
