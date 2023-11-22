@@ -79,6 +79,20 @@ If you write some scripts which are meant to be run stand-alone, and not importe
 ./launch_autobot.sh 4 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_solve_puzzle_place.yaml wandb.group=rlbench_mlat resources.num_workers=0
 ./launch_autobot.sh 5 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_place_hanger_on_rack_place.yaml wandb.group=rlbench_mlat resources.num_workers=0
 
+
+### Ablations
+
+#### Taxpose
+python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_taxpose_stack_wine_place_1 wandb.group=rlbench_ablations_taxpose
+python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_taxpose_stack_wine_place_5 wandb.group=rlbench_ablations_taxpose
+python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_taxpose_stack_wine_place_10 wandb.group=rlbench_ablations_taxpose
+
+#### Mlat
+python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_mlat_stack_wine_place_1 wandb.group=rlbench_ablations_mlat
+python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_mlat_stack_wine_place_5 wandb.group=rlbench_ablations_mlat
+python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_mlat_stack_wine_place_10 wandb.group=rlbench_ablations_mlat
+
+
 ## RLBench Evals
 
 ### Taxpose
