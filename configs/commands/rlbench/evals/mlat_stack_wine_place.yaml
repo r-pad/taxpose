@@ -1,0 +1,14 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/evals/_base@_here_
+  - override /model: mlat_s256_vnn
+  - override /object_class: stack_wine
+  - override /relationship: place
+  - _self_
+
+break_symmetry: True
+
+dm:
+  train_dset:
+    num_points: 256

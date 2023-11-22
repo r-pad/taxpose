@@ -275,6 +275,8 @@ def main(cfg):
             ],
         )
 
+        wandb.log({f"{name}_metrics": metrics_table})
+
 
 if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")

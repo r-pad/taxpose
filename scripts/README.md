@@ -68,12 +68,32 @@ If you write some scripts which are meant to be run stand-alone, and not importe
 ./launch_autobot.sh 2 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_phone_on_base_place.yaml wandb.group=rlbench_taxpose
 ./launch_autobot.sh 3 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_put_toilet_roll_on_stand_place.yaml wandb.group=rlbench_taxpose
 ./launch_autobot.sh 4 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_solve_puzzle_place.yaml wandb.group=rlbench_taxpose
+./launch_autobot.sh 5 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_place_hanger_on_rack_place.yaml wandb.group=rlbench_taxpose
+
+### Mlat
 
 ./launch_autobot.sh 0 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_stack_wine_place.yaml wandb.group=rlbench_mlat
 ./launch_autobot.sh 1 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_insert_onto_square_peg_place.yaml wandb.group=rlbench_mlat
 ./launch_autobot.sh 2 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_phone_on_base_place.yaml wandb.group=rlbench_mlat
 ./launch_autobot.sh 3 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_put_toilet_roll_on_stand_place.yaml wandb.group=rlbench_mlat
 ./launch_autobot.sh 4 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_solve_puzzle_place.yaml wandb.group=rlbench_mlat resources.num_workers=0
+./launch_autobot.sh 5 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_place_hanger_on_rack_place.yaml wandb.group=rlbench_mlat resources.num_workers=0
+
+## RLBench Evals
+
+### Taxpose
+python scripts/eval_metrics.py --config-name=commands/rlbench/evals/taxpose_stack_wine_place wandb.group=rlbench_taxpose
+python scripts/eval_metrics.py --config-name=commands/rlbench/evals/taxpose_put_toilet_roll_on_stand_place wandb.group=rlbench_taxpose
+python scripts/eval_metrics.py --config-name=commands/rlbench/evals/taxpose_place_hanger_on_rack_place wandb.group=rlbench_taxpose
+python scripts/eval_metrics.py --config-name=commands/rlbench/evals/taxpose_phone_on_base_place wandb.group=rlbench_taxpose
+python scripts/eval_metrics.py --config-name=commands/rlbench/evals/taxpose_insert_onto_square_peg_place wandb.group=rlbench_taxpose
+
+### Mlat
+python scripts/eval_metrics.py --config-name=commands/rlbench/evals/mlat_stack_wine_place wandb.group=rlbench_mlat
+python scripts/eval_metrics.py --config-name=commands/rlbench/evals/mlat_put_toilet_roll_on_stand_place wandb.group=rlbench_mlat
+python scripts/eval_metrics.py --config-name=commands/rlbench/evals/mlat_place_hanger_on_rack_place wandb.group=rlbench_mlat
+python scripts/eval_metrics.py --config-name=commands/rlbench/evals/mlat_phone_on_base_place wandb.group=rlbench_mlat
+python scripts/eval_metrics.py --config-name=commands/rlbench/evals/mlat_insert_onto_square_peg_place wandb.group=rlbench_mlat
 
 
 ## NDF evals.

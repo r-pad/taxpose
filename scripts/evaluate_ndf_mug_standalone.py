@@ -552,19 +552,19 @@ def load_data(
     )
 
     # Visualize the symmetry features
-    fig = pointcloud_fig(
-        points_action_np,
-        downsample=1,
-        colors=action_symmetry_rgb,
-    )
-    fig.show()
+    # fig = pointcloud_fig(
+    #     points_action_np,
+    #     downsample=1,
+    #     colors=action_symmetry_rgb,
+    # )
+    # fig.show()
 
-    fig = pointcloud_fig(
-        points_anchor_np,
-        downsample=1,
-        colors=anchor_symmetry_rgb,
-    )
-    fig.show()
+    # fig = pointcloud_fig(
+    #     points_anchor_np,
+    #     downsample=1,
+    #     colors=anchor_symmetry_rgb,
+    # )
+    # fig.show()
 
     action_symmetry_features = (
         torch.from_numpy(action_symmetry_features).float().unsqueeze(0)
