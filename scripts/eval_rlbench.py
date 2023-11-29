@@ -20,6 +20,7 @@ from rpad.rlbench_utils.placement_dataset import (
 )
 from scipy.spatial.transform import Rotation as R
 
+from taxpose.datasets.rlbench import rotational_symmetry_labels
 from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
@@ -48,13 +49,37 @@ def create_coordinate_frame(T, size=0.1):
     return frame
 
 
+def bottle_symmetry_features(points):
+    # TODO - hack: right now assume the bottle is vertical.
+    assert len(points.shape) == 2
+
+    action_symmetry_axis = np.array([0, 0, 1], dtype=np.float32)
+    action_second_axis = np.array([1, 0, 0], dtype=np.float32)
+
+    action_symmetry_features = rotational_symmetry_labels(
+        points, action_symmetry_axis, action_second_axis
+    )[..., None]
+
+    return action_symmetry_features
+
+
+def rack_symmetry_features(points):
+    return np.ones((points.shape[0], 1), dtype=np.float32)
+
+
 class TAXPosePickPlacePredictor:
-    def __init__(self, model_cfg, task_cfg, wandb_cfg, checkpoints_cfg):
+    def __init__(self, policy_spec, task_cfg, wandb_cfg, checkpoints_cfg):
         self.grasp_model = self.load_model(
-            checkpoints_cfg.grasp, model_cfg, wandb_cfg, task_cfg.grasp_task
+            checkpoints_cfg.grasp,
+            policy_spec.grasp_model,
+            wandb_cfg,
+            task_cfg.grasp_task,
         )
         self.place_model = self.load_model(
-            checkpoints_cfg.place, model_cfg, wandb_cfg, task_cfg.place_task
+            checkpoints_cfg.place,
+            policy_spec.place_model,
+            wandb_cfg,
+            task_cfg.place_task,
         )
 
     @staticmethod
@@ -155,13 +180,27 @@ class TAXPosePickPlacePredictor:
     def place(self, init_obs, post_grasp_obs) -> np.ndarray:
         inputs = obs_to_input(init_obs, "stack_wine", "place")
 
-        action_pc = inputs["action_pc"].unsqueeze(0).to(self.place_model.device)
-        anchor_pc = inputs["anchor_pc"].unsqueeze(0).to(self.place_model.device)
+        device = self.place_model.device
+
+        action_pc = inputs["action_pc"].unsqueeze(0).to(device)
+        anchor_pc = inputs["anchor_pc"].unsqueeze(0).to(device)
 
         action_pc, _ = sample_farthest_points(action_pc, K=256, random_start_point=True)
         anchor_pc, _ = sample_farthest_points(anchor_pc, K=256, random_start_point=True)
 
-        preds = self.place_model(action_pc, anchor_pc, None, None)
+        action_symmetry_features = bottle_symmetry_features(action_pc.cpu().numpy()[0])
+        anchor_symmetry_features = rack_symmetry_features(anchor_pc.cpu().numpy()[0])
+
+        # Torchify and GPU
+        action_symmetry_features = torch.from_numpy(action_symmetry_features).to(device)
+        anchor_symmetry_features = torch.from_numpy(anchor_symmetry_features).to(device)
+
+        preds = self.place_model(
+            action_pc,
+            anchor_pc,
+            action_symmetry_features[None],
+            anchor_symmetry_features[None],
+        )
 
         # Get the current pose of the gripper.
         T_gripper_world = np.eye(4)
@@ -314,8 +353,6 @@ def run_trial(policy_spec, task_spec, env_spec):
     # Make predictions for grasp and place.
     T_grippergrasp_world = policy.grasp(obs)
 
-    breakpoint()
-
     # Execute the grasp. The transform needs to be converted from a 4x4 matrix to xyz+quat.
     # And the gripper action is a single dimensional action.
     p_grippergrasp_world = T_grippergrasp_world[:3, 3]
@@ -338,16 +375,14 @@ def run_trial(policy_spec, task_spec, env_spec):
     post_grasp_obs, reward, terminate = task.step(grasp_action)
 
     # Lift the object off the table. Add .1 to the z-coordinate.
-    p_gripperlift_world = post_grasp_obs.gripper_pose[:3]
+    p_gripperlift_world = np.copy(post_grasp_obs.gripper_pose[:3])
     p_gripperlift_world[2] += 0.1
     q_gripperlift_world = post_grasp_obs.gripper_pose[3:]
     grasp_action = np.concatenate(
         [p_gripperlift_world, q_gripperlift_world, gripper_close]
     )
 
-    obs, reward, terminate = task.step(grasp_action)
-
-    breakpoint()
+    _, reward, terminate = task.step(grasp_action)
 
     # env._action_mode.arm_action_mode = EndEffectorPoseViaPlanning(
     #     collision_checking=False
@@ -355,7 +390,7 @@ def run_trial(policy_spec, task_spec, env_spec):
 
     T_bottle_world = policy.place(obs, post_grasp_obs)
 
-    breakpoint()
+    # breakpoint()
 
     # Execute the place.
     p_bottle_world = T_bottle_world[:3, 3]
@@ -371,13 +406,16 @@ def run_trial(policy_spec, task_spec, env_spec):
 
     obs, reward, terminate = task.step(place_action)
 
+    # breakpoint()
+
     # Close the environment.
+    env.shutdown()
 
 
 @hydra.main(config_path="../configs", config_name="eval_rlbench")
 def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
-    run_trial(cfg.model, cfg, None)
+    run_trial(cfg.policy_spec, cfg, None)
 
 
 if __name__ == "__main__":
