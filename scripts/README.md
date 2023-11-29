@@ -88,10 +88,19 @@ python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/s
 python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_taxpose_stack_wine_place_10 wandb.group=rlbench_ablations_taxpose
 
 #### Mlat
-python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_mlat_stack_wine_place_1 wandb.group=rlbench_ablations_mlat
-python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_mlat_stack_wine_place_5 wandb.group=rlbench_ablations_mlat
-python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_mlat_stack_wine_place_10 wandb.group=rlbench_ablations_mlat
+./launch_autobot.sh 0 python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_mlat_stack_wine_place_1 wandb.group=rlbench_ablations_mlat resources.num_workers=0
+./launch_autobot.sh 1 python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_mlat_stack_wine_place_5 wandb.group=rlbench_ablations_mlat
+./launch_autobot.sh 2 python scripts/train_residual_flow.py --config-name commands/rlbench/ablations/sample_efficiency/train_mlat_stack_wine_place_10 wandb.group=rlbench_ablations_mlat
 
+##### Evals
+
+python scripts/eval_metrics.py --config-name=commands/rlbench/ablations/sample_efficiency/evals/taxpose_stack_wine_place_1 wandb.group=rlbench_ablations_taxpose
+python scripts/eval_metrics.py --config-name=commands/rlbench/ablations/sample_efficiency/evals/taxpose_stack_wine_place_5 wandb.group=rlbench_ablations_taxpose
+python scripts/eval_metrics.py --config-name=commands/rlbench/ablations/sample_efficiency/evals/taxpose_stack_wine_place_10 wandb.group=rlbench_ablations_taxpose
+
+python scripts/eval_metrics.py --config-name=commands/rlbench/ablations/sample_efficiency/evals/mlat_stack_wine_place_1 wandb.group=rlbench_ablations_mlat
+python scripts/eval_metrics.py --config-name=commands/rlbench/ablations/sample_efficiency/evals/mlat_stack_wine_place_5 wandb.group=rlbench_ablations_mlat
+python scripts/eval_metrics.py --config-name=commands/rlbench/ablations/sample_efficiency/evals/mlat_stack_wine_place_10 wandb.group=rlbench_ablations_mlat
 
 ## RLBench Evals
 
