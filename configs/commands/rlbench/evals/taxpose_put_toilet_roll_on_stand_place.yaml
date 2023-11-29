@@ -1,0 +1,14 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/evals/_base@_here_
+  - override /model: taxpose
+  - override /object_class: put_toilet_roll_on_stand
+  - override /relationship: place
+  - _self_
+
+break_symmetry: True
+
+dm:
+  train_dset:
+    num_points: 256

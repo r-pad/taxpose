@@ -1,0 +1,44 @@
+
+# This is the general structure of the datamodule for NDF tasks.
+
+train_dset:
+  demo_dset:
+    dataset_root: ${benchmark.dataset_root}
+    task_name: ${object_class.name}
+    episodes: all
+    action_class: ${task.action_class}
+    anchor_class: ${task.anchor_class}
+    cached: true
+    phase: ${relationship.name}
+    teleport_initial_to_final: true
+    with_symmetry: True
+    occlusion_cfg: null
+    num_points: 256
+
+val_dset:
+  demo_dset:
+    dataset_root: ${benchmark.dataset_root}
+    task_name: ${object_class.name}
+    episodes: all
+    action_class: ${task.action_class}
+    anchor_class: ${task.anchor_class}
+    cached: true
+    phase: ${relationship.name}
+    teleport_initial_to_final: true
+    with_symmetry: True
+    occlusion_cfg: null
+    num_points: 256
+
+test_dset:
+  demo_dset:
+    dataset_root: ${benchmark.dataset_root}
+    task_name: ${object_class.name}
+    episodes: all
+    action_class: ${task.action_class}
+    anchor_class: ${task.anchor_class}
+    cached: true
+    phase: ${relationship.name}
+    teleport_initial_to_final: true
+    with_symmetry: True
+    occlusion_cfg: null
+    num_points: 256

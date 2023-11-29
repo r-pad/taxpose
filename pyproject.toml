@@ -4,13 +4,13 @@ version = "0.1.0"
 description = "TAX-Pose: Task-Specific Cross-Pose Estimation for Robot Manipulation"
 readme = "README.md"
 requires-python = ">=3.6, <3.10" # ndf_robot requires < 3.10 :(
-license = {file = "LICENSE.txt"}
+license = { file = "LICENSE.txt" }
 authors = [
-  {email = "chuerp@andrew.cmu.edu", name = "Chuer Pan"},
-  {email = "bokorn@andrew.cmu.edu", name = "Brian Okorn"},
-  {email = "haolunz@andrew.cmu.edu", name = "Harry Zhang"},
-  {email = "baeisner@andrew.cmu.edu", name = "Ben Eisner"},
-  {email = "dheld@andrew.cmu.edu", name = "David Held"},
+  { email = "chuerp@andrew.cmu.edu", name = "Chuer Pan" },
+  { email = "bokorn@andrew.cmu.edu", name = "Brian Okorn" },
+  { email = "haolunz@andrew.cmu.edu", name = "Harry Zhang" },
+  { email = "baeisner@andrew.cmu.edu", name = "Ben Eisner" },
+  { email = "dheld@andrew.cmu.edu", name = "David Held" },
 ]
 dependencies = [
   # "chamferdist",
@@ -20,6 +20,7 @@ dependencies = [
   "hydra-core",
   "imageio",
   "jupyterlab",
+  "open3d",
   "opencv-python",
   "pybullet",
   "pyg_lib ~= 0.1; sys_platform == 'linux'",
@@ -38,11 +39,7 @@ dependencies = [
 ]
 
 [build-system]
-requires = [
-  "setuptools >= 62.3.2",
-  "setuptools-scm",
-  "wheel",
-]
+requires = ["setuptools >= 62.3.2", "setuptools-scm", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
@@ -56,10 +53,10 @@ develop = [
   "pytest",
   "types-tqdm",
 ]
-build_docs = [
-  "mkdocs-material",
-  "mkdocstrings[python]",
+rlbench = [
+  "rpad-rlbench-utils @ git+https://github.com/r-pad/rlbench_utils.git",
 ]
+build_docs = ["mkdocs-material", "mkdocstrings[python]"]
 
 
 # This is required to allow us to have notebooks/ at the top level.

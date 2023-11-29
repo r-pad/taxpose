@@ -1,0 +1,9 @@
+defaults:
+  - _mlat
+
+name: mlat_n256_ns
+
+num_points: 256
+multilaterate: True
+mlat_sample: False
+mlat_nkps: null

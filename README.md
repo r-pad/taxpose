@@ -648,3 +648,35 @@ These are real-world experiments we ran, and so can't be reproduced purely from 
 ## Supplement Tables 11-14: Expanded results
 
 These are granular results of the experiments in Table 1.
+
+
+## Docker
+
+### Build a Docker container.
+
+```
+docker build -t beisner/taxpose .
+```
+
+### Run training.
+
+```
+WANDB_API_KEY=<API_KEY>
+USERNAME=<USERNAME>
+# Optional: mount current directory to run / test new code.
+# Mount data directory to access data.
+docker run \
+    --shm-size=256m\
+    -v /data/ndf:/opt/baeisner/data \
+    -v $(pwd)/trained_models:/opt/baeisner/code/trained_models \
+    -v $(pwd)/logs:/opt/baeisner/logs \
+    --gpus all \
+    -e WANDB_API_KEY=$WANDB_API_KEY \
+    -e WANDB_DOCKER_IMAGE=beisner/taxpose \
+    beisner/taxpose python scripts/train_residual_flow.py \
+        task=mug_grasp \
+        model=taxpose \
+        +mode=train \
+        benchmark.dataset_root=/opt/baeisner/data \
+        log_dir=/opt/baeisner/logs
+```

@@ -1,0 +1,23 @@
+# @package _global_
+
+defaults:
+  - /commands/_train_rlbench@_here_
+  - override /model: taxpose
+  - override /object_class: stack_wine
+  - override /relationship: place
+  - _self_
+
+break_symmetry: True
+
+# Dataset Settings
+dm:
+  train_dset:
+    demo_dset:
+      dataset_type: ${benchmark.name}
+      episodes:
+        - 0
+
+  val_dset:
+    demo_dset:
+      episodes:
+        - 10

@@ -1,6 +1,7 @@
-
+job_type: eval_${object_class.name}_${pose_dist.name}_${seed}
 
 defaults:
+  - _logging
   - _self_
 
   - object_class: mug #{mug, bottle, bowl}
@@ -51,7 +52,7 @@ single_instance: False
 start_iteration: 0
 
 # Logging Settings
-log_dir: logs/ndf_evals
+# log_dir: logs/ndf_evals
 eval_name: ${object_class.name}_${pose_dist.name}_${model.name}
 eval_save_dir: ./  # Dump directly inside the eval directory.
 results_file_name: results.txt
@@ -60,9 +61,9 @@ pybullet_viz: True
 image_logging_period: 100
 debug: False
 
-hydra:
-  run:
-    dir: ${log_dir}/${eval_name}/${now:%Y-%m-%d_%H%M%S}/${seed}
-  sweep:
-    dir: ${log_dir}/${eval_name}/sweep/${now:%Y-%m-%d_%H%M%S}
-    subdir: ${hydra.job.num}
+# hydra:
+#   run:
+#     dir: ${log_dir}/${eval_name}/${now:%Y-%m-%d_%H%M%S}/${seed}
+#   sweep:
+#     dir: ${log_dir}/${eval_name}/sweep/${now:%Y-%m-%d_%H%M%S}
+#     subdir: ${hydra.job.num}

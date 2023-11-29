@@ -1,0 +1,10 @@
+defaults:
+  - _mlat
+
+name: mlat_s256_vnn
+
+emb_nn: "vn_dgcnn"
+
+multilaterate: True
+mlat_sample: True
+mlat_nkps: 256

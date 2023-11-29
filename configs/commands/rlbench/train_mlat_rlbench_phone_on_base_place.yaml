@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+  - /commands/_train_rlbench@_here_
+  - override /model: mlat_s256_vnn
+  - override /object_class: phone_on_base
+  - override /relationship: place
+  - _self_
+
+break_symmetry: False

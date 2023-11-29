@@ -1,0 +1,19 @@
+defaults:
+  - ndf/_default@_here_
+  - _self_
+
+# Dataset Settings
+train_dset:
+  demo_dset:
+    dataset_indices: null
+    num_demo: 10
+
+val_dset:
+  demo_dset:
+    dataset_indices: null
+    num_demo: null
+
+test_dset:
+  demo_dset:
+    dataset_indices: null
+    num_demo: null

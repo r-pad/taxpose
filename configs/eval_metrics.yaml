@@ -1,0 +1,31 @@
+
+
+job_type: eval_metrics_${task.name}
+
+defaults:
+  - _self_
+  - _logging
+  - datamodule  # This loops in the dataset.
+  - benchmark: ndf # {ndf, rlbench}
+  - object_class: mug # {mug, bottle, bowl}
+  - relationship: place # {place, grasp}
+  - pose_dist: upright # {upright, arbitrary}
+  - model: release
+  - task: ${object_class}_${relationship}
+  - checkpoints/rlbench@checkpoints: ${object_class}/${model}
+
+checkpoint: ${checkpoints.place}
+# checkpoint: null
+
+seed: 0
+break_symmetry: True
+inference:
+  batch_size: 8
+  sigmoid_on: True
+split: "train"
+
+resources:
+  num_workers: 8
+
+wandb:
+  group: Null

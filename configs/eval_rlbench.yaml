@@ -1,0 +1,18 @@
+job_type: eval_rlbench_${object_class.name}
+
+defaults:
+  - _logging
+  - _self_
+
+  - object_class: stack_wine #{mug, bottle, bowl}
+
+  # Machinery to load the correct model architecture.
+  # The model config can be found in configs/model.
+  - model: ???
+
+  # Task-specific settings.
+  - task@grasp_task: ${object_class}_grasp
+  - task@place_task: ${object_class}_place
+
+  # Load the checkpoints appropriately.
+  - checkpoints/rlbench@checkpoints: ${object_class}/${model}

@@ -1,0 +1,11 @@
+# @package _global_
+
+defaults:
+  - /commands/ndf_evals/_base@_here_
+  - override /model: taxpose
+  - override /object_class: mug
+  - override /pose_dist: arbitrary
+  - _self_
+
+checkpoint_file_grasp: r-pad/taxpose/model-dzbusuf8:v0
+checkpoint_file_place: r-pad/taxpose/model-yby5mhh5:v0
