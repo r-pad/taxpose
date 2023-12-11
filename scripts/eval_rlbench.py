@@ -1,11 +1,19 @@
+import logging
+import pickle
 from abc import abstractmethod
 from dataclasses import dataclass
+from enum import Enum, auto
+from pathlib import Path
 from typing import Protocol
 
 import hydra
+import joblib
 import numpy as np
 import open3d as o3d
+import pandas as pd
 import torch
+import tqdm
+import wandb
 from omegaconf import OmegaConf
 from pytorch3d.ops import sample_farthest_points
 from rlbench.action_modes.action_mode import MoveArmThenGripper
@@ -68,19 +76,31 @@ def rack_symmetry_features(points):
 
 
 class TAXPosePickPlacePredictor:
-    def __init__(self, policy_spec, task_cfg, wandb_cfg, checkpoints_cfg):
+    def __init__(
+        self,
+        policy_spec,
+        task_cfg,
+        wandb_cfg,
+        checkpoints_cfg,
+        run=None,
+        debug_viz=False,
+    ):
         self.grasp_model = self.load_model(
             checkpoints_cfg.grasp,
             policy_spec.grasp_model,
             wandb_cfg,
             task_cfg.grasp_task,
+            run=run,
         )
         self.place_model = self.load_model(
             checkpoints_cfg.place,
             policy_spec.place_model,
             wandb_cfg,
             task_cfg.place_task,
+            run=run,
         )
+
+        self.debug_viz = debug_viz
 
     @staticmethod
     def render(obs, inputs, preds, T_action_world, T_actionfinal_world):
@@ -126,8 +146,8 @@ class TAXPosePickPlacePredictor:
         o3d.visualization.draw_geometries(geometries)
 
     @staticmethod
-    def load_model(model_path, model_cfg, wandb_cfg, task_cfg):
-        ckpt_file = get_weights_path(model_path, wandb_cfg)
+    def load_model(model_path, model_cfg, wandb_cfg, task_cfg, run=None):
+        ckpt_file = get_weights_path(model_path, wandb_cfg, run=run)
         network = ResidualFlow_DiffEmbTransformer(
             pred_weight=model_cfg.pred_weight,
             emb_nn=model_cfg.emb_nn,
@@ -173,7 +193,8 @@ class TAXPosePickPlacePredictor:
         T_gripperfinal_gripper = preds["pred_T_action"].get_matrix()[0].T.cpu().numpy()
         T_gripperfinal_world = T_gripperfinal_gripper @ T_gripper_world
 
-        self.render(obs, inputs, preds, T_gripper_world, T_gripperfinal_world)
+        if self.debug_viz:
+            self.render(obs, inputs, preds, T_gripper_world, T_gripperfinal_world)
 
         return T_gripperfinal_world
 
@@ -212,7 +233,8 @@ class TAXPosePickPlacePredictor:
         T_gripperfinal_gripper = preds["pred_T_action"].get_matrix()[0].T.cpu().numpy()
         T_gripperfinal_world = T_gripperfinal_gripper @ T_gripper_world
 
-        self.render(init_obs, inputs, preds, T_gripper_world, T_gripperfinal_world)
+        if self.debug_viz:
+            self.render(init_obs, inputs, preds, T_gripper_world, T_gripperfinal_world)
 
         return T_gripperfinal_world
 
@@ -268,26 +290,6 @@ class RandomPickPlacePredictor(PickPlacePredictor):
         )
 
 
-# TASK_DICT = {
-#     "stack_wine": {
-#         "phase": {
-#             "grasp": {
-#                 "action_obj_handles": {
-#                     "Panda_leftfinger_visual",
-#                     "Panda_rightfinger_visual",
-#                     "Panda_gripper_visual",
-#                 },
-#                 "anchor_obj_handles": {"wine_bottle_visual"},
-#             },
-#             "place": {
-#                 "action_obj_handles": {"wine_bottle_visual"},
-#                 "anchor_obj_handles": {"rack_bottom_visual", "rack_top_visual"},
-#             },
-#         }
-#     }
-# }
-
-
 # TODO: put this in the original rlbench library.
 def obs_to_input(obs, task_name, phase):
     rgb, point_cloud, mask = obs_to_rgb_point_cloud(obs)
@@ -315,107 +317,235 @@ def obs_to_input(obs, task_name, phase):
     }
 
 
+# We may need to add more failure reasons.
+class FailureReason(Enum):
+    NO_FAILURE = auto()
+    GRASP_FAILURE = auto()
+    GRASP_MOTION_PLANNING_FAILURE = auto()
+    PLACE_FAILURE = auto()
+    PLACE_MOTION_PLANNING_FAILURE = auto()
+    PREDICTION_FAILURE = auto()
+    UNKNOWN_FAILURE = auto()
+
+
+@dataclass
+class TrialResult:
+    success: bool
+    failure_reason: FailureReason
+
+
 @torch.no_grad()
-def run_trial(policy_spec, task_spec, env_spec):
+def run_trial(policy_spec, task_spec, env_spec, headless=True, run=None) -> TrialResult:
+    # Seed the random number generator.
+
+    # TODO: beisner need to seeeeeed.
+
+    # Create the policy.
     policy = TAXPosePickPlacePredictor(
-        policy_spec, task_spec, task_spec.wandb, task_spec.checkpoints
+        policy_spec,
+        task_spec,
+        task_spec.wandb,
+        task_spec.checkpoints,
+        run=run,
+        debug_viz=not headless,
     )
+
     # Create the environment.
     env = Environment(
         action_mode=MoveArmThenGripper(
             arm_action_mode=EndEffectorPoseViaPlanning(collision_checking=True),
             gripper_action_mode=Discrete(),
         ),
-        headless=False,
+        headless=headless,
     )
 
-    task = env.get_task(StackWine)
-    task.sample_variation()
+    try:
+        task = env.get_task(StackWine)
+        task.sample_variation()
 
-    # Reset the environment.
-    descriptions, obs = task.reset()
+        # Reset the environment.
+        descriptions, obs = task.reset()
 
-    # First, move the arm down a bit so that the cameras can see it!
-    # This is a hack to get around the fact that the cameras are not
-    # in the same position as the robot's arm.
-    down_action = np.array([*obs.gripper_pose, 1.0])
-    down_action[2] -= 0.4
-    obs, reward, terminate = task.step(down_action)
+        # First, move the arm down a bit so that the cameras can see it!
+        # This is a hack to get around the fact that the cameras are not
+        # in the same position as the robot's arm.
+        down_action = np.array([*obs.gripper_pose, 1.0])
+        down_action[2] -= 0.4
+        obs, reward, terminate = task.step(down_action)
 
-    # policy = RandomPickPlacePredictor(
-    #     None,
-    #     xrange=(env._scene._workspace_minx, env._scene._workspace_maxx),
-    #     yrange=(env._scene._workspace_miny, env._scene._workspace_maxy),
-    #     zrange=(env._scene._workspace_minz, env._scene._workspace_maxz),
-    #     grip_rot=obs.gripper_pose[3:],
-    # )
+        # Make predictions for grasp and place.
+        try:
+            T_grippergrasp_world = policy.grasp(obs)
+        except Exception as e:
+            print(e)
+            return TrialResult(False, FailureReason.PREDICTION_FAILURE)
 
-    # Make predictions for grasp and place.
-    T_grippergrasp_world = policy.grasp(obs)
+        # Execute the grasp. The transform needs to be converted from a 4x4 matrix to xyz+quat.
+        # And the gripper action is a single dimensional action.
+        p_grippergrasp_world = T_grippergrasp_world[:3, 3]
+        q_grippergrasp_world = R.from_matrix(T_grippergrasp_world[:3, :3]).as_quat()
+        gripper_close = np.array([0.0])
+        grasp_action = np.concatenate(
+            [p_grippergrasp_world, q_grippergrasp_world, gripper_close]
+        )
 
-    # Execute the grasp. The transform needs to be converted from a 4x4 matrix to xyz+quat.
-    # And the gripper action is a single dimensional action.
-    p_grippergrasp_world = T_grippergrasp_world[:3, 3]
-    q_grippergrasp_world = R.from_matrix(T_grippergrasp_world[:3, :3]).as_quat()
-    gripper_close = np.array([0.0])
-    grasp_action = np.concatenate(
-        # [p_grippergrasp_world, q_grippergrasp_world, gripper_close]
-        [
-            p_grippergrasp_world,
-            q_grippergrasp_world,
-            gripper_close,
-        ]
-    )
+        try:
+            post_grasp_obs, reward, terminate = task.step(grasp_action)
+        except Exception as e:
+            print(e)
+            return TrialResult(False, FailureReason.GRASP_MOTION_PLANNING_FAILURE)
 
-    # TODO remove this because it's in the wrong order.
-    # T_bottle_world = policy.place(obs, obs)
+        # Lift the object off the table. Add .1 to the z-coordinate. This should not fail!
+        p_gripperlift_world = np.copy(post_grasp_obs.gripper_pose[:3])
+        p_gripperlift_world[2] += 0.1
+        q_gripperlift_world = post_grasp_obs.gripper_pose[3:]
+        grasp_action = np.concatenate(
+            [p_gripperlift_world, q_gripperlift_world, gripper_close]
+        )
+        _, reward, terminate = task.step(grasp_action)
 
-    # breakpoint()
+        # Make predictions for place.
+        try:
+            T_bottle_world = policy.place(obs, post_grasp_obs)
+        except Exception as e:
+            print(e)
+            return TrialResult(False, FailureReason.PREDICTION_FAILURE)
 
-    post_grasp_obs, reward, terminate = task.step(grasp_action)
+        # Execute the place.
+        p_bottle_world = T_bottle_world[:3, 3]
+        q_bottle_world = R.from_matrix(T_bottle_world[:3, :3]).as_quat()
+        gripper_open = np.array([1.0])
 
-    # Lift the object off the table. Add .1 to the z-coordinate.
-    p_gripperlift_world = np.copy(post_grasp_obs.gripper_pose[:3])
-    p_gripperlift_world[2] += 0.1
-    q_gripperlift_world = post_grasp_obs.gripper_pose[3:]
-    grasp_action = np.concatenate(
-        [p_gripperlift_world, q_gripperlift_world, gripper_close]
-    )
+        # Add 0.03 to the z-coordinate.
+        # TODO: beisner, this is a hack. It should be dead on, but the motion planner doesn't like this.
+        # The "right" fix would be to do some sort of motion planning improvement to get like, a min-collision
+        # trajectory...
+        p_bottle_world[2] += task_spec.z_offset
+        place_action = np.concatenate([p_bottle_world, q_bottle_world, gripper_open])
 
-    _, reward, terminate = task.step(grasp_action)
+        try:
+            obs, reward, terminate = task.step(place_action)
+        except Exception as e:
+            print(e)
+            return TrialResult(False, FailureReason.PLACE_MOTION_PLANNING_FAILURE)
 
-    # env._action_mode.arm_action_mode = EndEffectorPoseViaPlanning(
-    #     collision_checking=False
-    # )
+        return TrialResult(True, FailureReason.NO_FAILURE)
+    except Exception as e:
+        print(e)
+        return TrialResult(False, FailureReason.UNKNOWN_FAILURE)
 
-    T_bottle_world = policy.place(obs, post_grasp_obs)
+    finally:
+        # Close the environment.
+        env.shutdown()
 
-    # breakpoint()
 
-    # Execute the place.
-    p_bottle_world = T_bottle_world[:3, 3]
-    q_bottle_world = R.from_matrix(T_bottle_world[:3, :3]).as_quat()
-    gripper_open = np.array([1.0])
+def run_trials(
+    policy_spec,
+    task_spec,
+    env_spec,
+    num_trials,
+    headless=True,
+    run=None,
+    parallelize=True,
+):
+    # TODO: Parallelize this. Should all be picklable.
 
-    # Add 0.03 to the z-coordinate.
-    # TODO: beisner, this is a hack. It should be dead on, but the motion planner doesn't like this.
-    # The "right" fix would be to do some sort of motion planning improvement to get like, a min-collision
-    # trajectory...
-    p_bottle_world[2] += 0.08
-    place_action = np.concatenate([p_bottle_world, q_bottle_world, gripper_open])
+    if not parallelize:
+        results = []
+        for i in range(num_trials):
+            result = run_trial(
+                policy_spec, task_spec, env_spec, headless=headless, run=run
+            )
+            logging.info(f"Trial {i}: {result}")
+            results.append(result)
+    else:
+        # Try with joblib. Let's see if this works.
+        job_results = joblib.Parallel(n_jobs=10, return_as="generator")(
+            joblib.delayed(run_trial)(
+                policy_spec,
+                task_spec,
+                env_spec,
+                headless=headless,
+                run=None,  # run is unpickleable...
+            )
+            for _ in range(num_trials)
+        )
+        results = [r for r in tqdm.tqdm(job_results, total=num_trials)]
 
-    obs, reward, terminate = task.step(place_action)
-
-    # breakpoint()
-
-    # Close the environment.
-    env.shutdown()
+    return results
 
 
 @hydra.main(config_path="../configs", config_name="eval_rlbench")
 def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
-    run_trial(cfg.policy_spec, cfg, None)
+
+    # Force the hydra config cfg to be resolved
+    cfg = OmegaConf.create(OmegaConf.to_yaml(cfg, resolve=True))
+
+    # Initialize wandb.
+    run = wandb.init(
+        job_type=cfg.job_type,
+        project=cfg.wandb.project,
+        entity=cfg.wandb.entity,
+        group=cfg.wandb.group,
+        config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True),
+    )
+
+    results = run_trials(
+        cfg.policy_spec,
+        cfg,
+        None,
+        cfg.num_trials,
+        headless=cfg.headless,
+        run=run,
+    )
+
+    # Compute some metrics.
+    num_successes = sum([1 for r in results if r.success])
+    num_failures = sum([1 for r in results if not r.success])
+    print(f"Successes: {num_successes}")
+    print(f"Failures: {num_failures}")
+
+    # Count failure reasons
+    failure_reasons = [r.failure_reason for r in results if not r.success]
+    failure_reason_counts = {r.name: failure_reasons.count(r) for r in FailureReason}
+    print(failure_reason_counts)
+
+    results_dir = Path(cfg.output_dir)
+
+    # Create a pandas dataframe for the results statistics.
+    # The df should have a column for successes, failures, success rate, and a column with
+    # counts for each failure reason.
+    df = pd.DataFrame(
+        {
+            "successes": [num_successes],
+            "failures": [num_failures],
+            "success_rate": [num_successes / cfg.num_trials],
+            **failure_reason_counts,
+        }
+    )
+
+    # Save the results to wandb as a table.
+    run.log(
+        {
+            "results_table": wandb.Table(dataframe=df),
+        }
+    )
+
+    # Pickle the results and stats.
+    with open(results_dir / "results.pkl", "wb") as f:
+        pickle.dump(results, f)
+
+    with open(results_dir / "stats.pkl", "wb") as f:
+        pickle.dump(
+            {
+                "num_successes": num_successes,
+                "num_failures": num_failures,
+                "success_rate": num_successes / cfg.num_trials,
+                "failure_reason_counts": failure_reason_counts,
+            },
+            f,
+        )
 
 
 if __name__ == "__main__":

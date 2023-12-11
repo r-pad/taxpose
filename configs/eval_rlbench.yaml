@@ -26,3 +26,9 @@ policy_spec:
 checkpoints:
   grasp: ${grasp_checkpoints.grasp}
   place: ${place_checkpoints.place}
+
+num_trials: 100
+headless: True
+
+# For prediction.
+z_offset: 0.03
