@@ -1,8 +1,8 @@
 # @package _global_
 
 defaults:
-  - /commands/_train_ndf@_here_
+  - /commands/ndf/_eval@_here_
   - override /model: taxpose
   - override /object_class: bottle
-  - override /relationship: place
+  - override /pose_dist: upright
   - _self_

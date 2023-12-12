@@ -1,12 +1,10 @@
 # @package _global_
 
 defaults:
-  - /commands/ndf_evals/_base@_here_
+  - /commands/ndf/_train@_here_
   - override /model: taxpose
   - override /object_class: mug
-  - override /pose_dist: upright
+  - override /relationship: place
   - _self_
 
 break_symmetry: False
-model:
-  break_symmetry: False
