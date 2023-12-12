@@ -51,6 +51,7 @@ develop = [
   "pre-commit",
   "pylint",
   "pytest",
+  "pytest-xdist",
   "types-tqdm",
 ]
 rlbench = [
@@ -103,7 +104,8 @@ module = [
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-addopts = "--ignore=third_party/"
+addopts = "--ignore=third_party/ -n auto"
+testpaths = "tests"
 
 [tool.pylint]
 disable = [
