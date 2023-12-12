@@ -1,16 +1,13 @@
 # @package _global_
 
 defaults:
-  - /commands/rlbench/evals/_base@_here_
+  - /commands/rlbench/_eval_base@_here_
   - override /model: taxpose
-  - override /object_class: insert_onto_square_peg
+  - override /object_class: stack_wine
   - override /relationship: place
   - _self_
 
 break_symmetry: True
-
-model:
-  break_symmetry: True
 
 dm:
   train_dset:

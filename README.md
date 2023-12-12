@@ -58,7 +58,8 @@ For our experiments, we installed torch 1.11 with cuda 11.3:
 ```
 # pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
 # pip install torch==1.13.0+cu116 torchvision==0.14.0+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
-# Install latest torch, 2.1.1+cu121
+pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
+
 ```
 
 ### `pytorch-geometric`

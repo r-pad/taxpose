@@ -1,8 +1,8 @@
 # @package _global_
 
 defaults:
-  - /commands/rlbench/evals/_base@_here_
-  - override /model: mlat_s256_vnn
+  - /commands/rlbench/_eval_base@_here_
+  - override /model: taxpose
   - override /object_class: insert_onto_square_peg
   - override /relationship: place
   - _self_
