@@ -1,0 +1,31 @@
+defaults:
+  - rlbench/_default@_here_
+  - _self_
+
+# Dataset Settings
+train_dset:
+  demo_dset:
+    dataset_type: ${benchmark.name}
+    episodes:
+    # Only include center peg.
+      - 0
+      - 1
+      # - 2
+      - 3 # This episode is broken under occlusion, too few points on the peg.
+      # - 4
+      # - 5 # This episode is broken under occlusion, too few points on the peg.
+      # - 6  # This episode is broken under occlusion, too few points on the peg.
+      # - 7
+
+val_dset:
+  demo_dset:
+    dataset_type: ${benchmark.name}
+    episodes:
+      - 8
+      # - 9
+
+test_dset:
+  demo_dset:
+    dataset_type: ${benchmark.name}
+    episodes:
+      - 0

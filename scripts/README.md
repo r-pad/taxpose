@@ -70,6 +70,12 @@ If you write some scripts which are meant to be run stand-alone, and not importe
 ./launch_autobot.sh 4 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_solve_puzzle_place.yaml wandb.group=rlbench_taxpose
 ./launch_autobot.sh 5 python scripts/train_residual_flow.py --config-name commands/rlbench/train_taxpose_rlbench_place_hanger_on_rack_place.yaml wandb.group=rlbench_taxpose
 
+./launch.sh ${RPAD_PLATFORM} 0 python scripts/train_residual_flow.py --config-name commands/rlbench/put_toilet_roll_on_stand/train_taxpose_grasp.yaml wandb.group=rlbench_taxpose
+./launch.sh ${RPAD_PLATFORM} 1 python scripts/train_residual_flow.py --config-name commands/rlbench/phone_on_base/train_taxpose_grasp.yaml wandb.group=rlbench_taxpose
+./launch.sh ${RPAD_PLATFORM} 2 python scripts/train_residual_flow.py --config-name commands/rlbench/place_hanger_on_rack/train_taxpose_grasp.yaml wandb.group=rlbench_taxpose
+./launch.sh ${RPAD_PLATFORM} 3 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxpose_grasp.yaml wandb.group=rlbench_taxpose
+./launch.sh ${RPAD_PLATFORM} 0 python scripts/train_residual_flow.py --config-name commands/rlbench/insert_onto_square_peg/train_taxpose_grasp.yaml wandb.group=rlbench_taxpose
+
 ### Mlat
 
 ./launch_autobot.sh 0 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_stack_wine_place.yaml wandb.group=rlbench_mlat
