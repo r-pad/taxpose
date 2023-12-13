@@ -3,8 +3,8 @@
 defaults:
   - /commands/rlbench/_train@_here_
   - override /model: taxpose
-  - override /object_class: place_hanger_on_rack
-  - override /relationship: place
+  - override /task: place_hanger_on_rack
+  - override /phase: place
   - _self_
 
 break_symmetry: False

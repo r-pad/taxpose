@@ -3,8 +3,8 @@
 defaults:
   - /commands/rlbench/_train@_here_
   - override /model: mlat_s256_vnn
-  - override /object_class: put_toilet_roll_on_stand
-  - override /relationship: place
+  - override /task: put_toilet_roll_on_stand
+  - override /phase: place
   - _self_
 
 break_symmetry: True

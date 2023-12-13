@@ -3,8 +3,8 @@
 defaults:
   - /commands/rlbench/_train@_here_
   - override /model: mlat_s256_vnn
-  - override /object_class: solve_puzzle
-  - override /relationship: place
+  - override /task: solve_puzzle
+  - override /phase: place
   - _self_
 
 break_symmetry: False

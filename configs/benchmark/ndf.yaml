@@ -1,2 +1,2 @@
 name: ndf
-dataset_root: ${hydra:runtime.cwd}/data
+dataset_root: ${..data_root}/ndf

@@ -1,4 +1,6 @@
-job_type: pretraining_${object_class.name}
+job_type: pretraining_${benchmark.name}_${object_class.name}
+
+data_root: ${oc.env:HOME}/datasets
 
 defaults:
   - benchmark: ndf # {ndf, rlbench}

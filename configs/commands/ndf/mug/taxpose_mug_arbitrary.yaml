@@ -3,7 +3,7 @@
 defaults:
   - /commands/ndf/_eval@_here_
   - override /model: taxpose
-  - override /object_class: mug
+  - override /task: mug
   - override /pose_dist: arbitrary
   - _self_
 

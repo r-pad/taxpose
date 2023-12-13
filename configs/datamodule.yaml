@@ -1,7 +1,7 @@
 defaults:
   # hydra default which removes ndf from the tree
   - _self_
-  - dataset@dm: ${benchmark}/${object_class}_${relationship}
+  - dataset@dm: ${benchmark}/${task}_${phase}
 
 
 # plane_occlusion: True

@@ -1,4 +1,4 @@
-job_type: eval_rlbench_${object_class.name}
+job_type: eval_rlbench_${task.name}
 
 defaults:
   - _logging

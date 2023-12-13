@@ -1,22 +1,27 @@
-job_type: eval_${object_class.name}_${pose_dist.name}_${seed}
+job_type: eval_${task.name}_${pose_dist.name}_${seed}
+
+data_root: ${oc.env:HOME}/datasets
 
 defaults:
   - _logging
   - _self_
 
-  - object_class: mug #{mug, bottle, bowl}
-  - pose_dist: upright # {upright, arbitrary}
-
-  # Machinery to load the correct model architecture.
+    # Machinery to load the correct model architecture.
   # The model config can be found in configs/model.
   - model: ???
 
+  - optional task: mug #{mug, bottle, bowl}
+  - pose_dist: upright # {upright, arbitrary}
+  - optional benchmark: ndf # {ndf}
+
+
   # Task-specific settings.
-  - task@grasp_task: ${object_class}_grasp
-  - task@place_task: ${object_class}_place
+  - task/ndf/${task}/task@task
+  - task/ndf@grasp_task: ${task}/phase/grasp
+  - task/ndf@place_task: ${task}/phase/place
 
   # Load the checkpoints appropriately.
-  - checkpoints/ndf@checkpoints: ${object_class}/${model}
+  - checkpoints/ndf@checkpoints: ${task}/${model}
 
 
 checkpoint_file_grasp: ${checkpoints.${pose_dist.name}.grasp}
@@ -53,7 +58,7 @@ start_iteration: 0
 
 # Logging Settings
 # log_dir: logs/ndf_evals
-eval_name: ${object_class.name}_${pose_dist.name}_${model.name}
+eval_name: ${task.name}_${pose_dist.name}_${model.name}
 eval_save_dir: ./  # Dump directly inside the eval directory.
 results_file_name: results.txt
 

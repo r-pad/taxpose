@@ -74,8 +74,8 @@ def main(cfg):
 
     model = EquivarianceTrainingModule(
         model=network,
-        weight_normalize=cfg.task.weight_normalize,
-        softmax_temperature=cfg.task.softmax_temperature,
+        weight_normalize=cfg.task.phase.weight_normalize,
+        softmax_temperature=cfg.task.phase.softmax_temperature,
         sigmoid_on=cfg.inference.sigmoid_on,
     )
 

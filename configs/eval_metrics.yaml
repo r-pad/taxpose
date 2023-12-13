@@ -2,17 +2,23 @@
 
 job_type: eval_metrics_${task.name}
 
+data_root: ${oc.env:HOME}/datasets
+
 defaults:
   - _self_
   - _logging
+
+  - model: release
+
   - datamodule  # This loops in the dataset.
   - benchmark: ndf # {ndf, rlbench}
-  - object_class: mug # {mug, bottle, bowl}
-  - relationship: place # {place, grasp}
   - pose_dist: upright # {upright, arbitrary}
-  - model: release
-  - task: ${object_class}_${relationship}
-  - checkpoints/rlbench@checkpoints: ${object_class}/${model}
+
+  - optional task: stack_wine
+  - optional phase: place
+  - task/${benchmark}/${task}/task@task
+  - task/${benchmark}/${task}/phase/${phase}@task.phase
+  - checkpoints/rlbench@checkpoints: ${task}/${model}
 
 checkpoint: ${checkpoints.place}
 # checkpoint: null

@@ -1,0 +1,12 @@
+# @package task
+
+name: grasp
+action_class: 2
+anchor_class: 0
+cloud_type: pre_grasp
+softmax_temperature: 0.1
+weight_normalize: softmax
+action_name: gripper
+anchor_name: puzzle_piece
+checkpoint_file_action: null
+checkpoint_file_anchor: null

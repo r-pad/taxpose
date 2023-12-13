@@ -5,14 +5,6 @@ defaults:
   - override /benchmark: rlbench
   - _self_
 
-benchmark:
-  dataset_root: /data/rlbench
-
-log_dir: /opt/logs
-
-wandb:
-  artifact_dir: /opt/artifacts
-
 break_symmetry: True
 
 resources:

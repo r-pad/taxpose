@@ -1,8 +1,9 @@
 # Logging Settings
-job_type: pretraining_${object_class.name}
+job_type: pretraining_${benchmark.name}_${object_class.name}
 image_logging_period: 1000
 
 defaults:
+  - benchmark: ndf
   - object_class: mug
   - _logging
   - _self_

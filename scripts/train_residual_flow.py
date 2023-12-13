@@ -53,10 +53,9 @@ def maybe_load_from_wandb(checkpoint_reference, wandb_cfg, run):
         ckpt_file = checkpoint_reference
 
 
-@hydra.main(config_path="../configs", config_name="train_ndf")
+@hydra.main(version_base="1.1", config_path="../configs", config_name="train_ndf")
 def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
-    # breakpoint()
 
     # torch.set_float32_matmul_precision("medium")
     pl.seed_everything(cfg.seed)
@@ -133,9 +132,9 @@ def main(cfg):
         displace_loss_weight=cfg.training.displace_loss_weight,
         consistency_loss_weight=cfg.training.consistency_loss_weight,
         direct_correspondence_loss_weight=cfg.training.direct_correspondence_loss_weight,
-        weight_normalize=cfg.task.weight_normalize,
+        weight_normalize=cfg.task.phase.weight_normalize,
         sigmoid_on=cfg.training.sigmoid_on,
-        softmax_temperature=cfg.task.softmax_temperature,
+        softmax_temperature=cfg.task.phase.softmax_temperature,
         flow_supervision=cfg.training.flow_supervision,
     )
 
@@ -151,38 +150,42 @@ def main(cfg):
         )
 
     else:
-        if cfg.pretraining.checkpoint_file_action is not None:
-            # # Check to see if it's a wandb checkpoint.
-            # TODO: need to retrain a few things... checkpoint didn't stick...
-            emb_nn_action_state_dict = load_emb_weights(
-                cfg.pretraining.checkpoint_file_action, cfg.wandb, logger.experiment
-            )
-            # checkpoint_file_fn = maybe_load_from_wandb(
-            #     cfg.pretraining.checkpoint_file_action, cfg.wandb, logger.experiment.run
-            # )
+        # Might be empty and not have those keys defined.
+        # TODO: move this pretraining into the model itself.
+        # TODO: figure out if we can get rid of the dictionary and make it null.
+        if cfg.model.pretraining:
+            if cfg.model.pretraining.checkpoint_file_action is not None:
+                # # Check to see if it's a wandb checkpoint.
+                # TODO: need to retrain a few things... checkpoint didn't stick...
+                emb_nn_action_state_dict = load_emb_weights(
+                    cfg.pretraining.checkpoint_file_action, cfg.wandb, logger.experiment
+                )
+                # checkpoint_file_fn = maybe_load_from_wandb(
+                #     cfg.pretraining.checkpoint_file_action, cfg.wandb, logger.experiment.run
+                # )
 
-            model.model.emb_nn_action.load_state_dict(emb_nn_action_state_dict)
-            print(
-                "-----------------------Pretrained EmbNN Action Model Loaded!-----------------------"
-            )
-            print(
-                "Loaded Pretrained EmbNN Action: {}".format(
-                    cfg.pretraining.checkpoint_file_action
+                model.model.emb_nn_action.load_state_dict(emb_nn_action_state_dict)
+                print(
+                    "-----------------------Pretrained EmbNN Action Model Loaded!-----------------------"
                 )
-            )
-        if cfg.pretraining.checkpoint_file_anchor is not None:
-            emb_nn_anchor_state_dict = load_emb_weights(
-                cfg.pretraining.checkpoint_file_anchor, cfg.wandb, logger.experiment
-            )
-            model.model.emb_nn_anchor.load_state_dict(emb_nn_anchor_state_dict)
-            print(
-                "-----------------------Pretrained EmbNN Anchor Model Loaded!-----------------------"
-            )
-            print(
-                "Loaded Pretrained EmbNN Anchor: {}".format(
-                    cfg.pretraining.checkpoint_file_anchor
+                print(
+                    "Loaded Pretrained EmbNN Action: {}".format(
+                        cfg.pretraining.checkpoint_file_action
+                    )
                 )
-            )
+            if cfg.pretraining.checkpoint_file_anchor is not None:
+                emb_nn_anchor_state_dict = load_emb_weights(
+                    cfg.pretraining.checkpoint_file_anchor, cfg.wandb, logger.experiment
+                )
+                model.model.emb_nn_anchor.load_state_dict(emb_nn_anchor_state_dict)
+                print(
+                    "-----------------------Pretrained EmbNN Anchor Model Loaded!-----------------------"
+                )
+                print(
+                    "Loaded Pretrained EmbNN Anchor: {}".format(
+                        cfg.pretraining.checkpoint_file_anchor
+                    )
+                )
     trainer.fit(model, dm)
 
 

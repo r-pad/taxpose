@@ -3,6 +3,6 @@
 defaults:
   - /commands/ndf/_train@_here_
   - override /model: mlat_s256_vnn
-  - override /object_class: bottle
-  - override /relationship: grasp
+  - override /task: bottle
+  - override /phase: grasp
   - _self_

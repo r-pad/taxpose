@@ -11,3 +11,10 @@ mlat_sample: null
 mlat_nkps: null
 num_points: 1024
 break_symmetry: True
+
+defaults:
+  - optional pretraining_mode: nce_loss
+  - encoder: dgcnn
+  - _self_
+
+pretraining: null

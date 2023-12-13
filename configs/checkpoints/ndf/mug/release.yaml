@@ -2,8 +2,8 @@ defaults:
   - taxpose_base
 
 arbitrary:
-  grasp: ${hydra:runtime.cwd}/trained_models/ndf/${object_class.name}/arbitrary/grasp.ckpt
-  place: ${hydra:runtime.cwd}/trained_models/ndf/${object_class.name}/arbitrary/place.ckpt
+  grasp: ${hydra:runtime.cwd}/trained_models/ndf/${task.name}/arbitrary/grasp.ckpt
+  place: ${hydra:runtime.cwd}/trained_models/ndf/${task.name}/arbitrary/place.ckpt
 upright:
-  grasp: ${hydra:runtime.cwd}/trained_models/ndf/${object_class.name}/upright/grasp.ckpt
-  place: ${hydra:runtime.cwd}/trained_models/ndf/${object_class.name}/upright/place.ckpt
+  grasp: ${hydra:runtime.cwd}/trained_models/ndf/${task.name}/upright/grasp.ckpt
+  place: ${hydra:runtime.cwd}/trained_models/ndf/${task.name}/upright/place.ckpt

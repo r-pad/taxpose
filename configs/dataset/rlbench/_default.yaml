@@ -4,12 +4,12 @@
 train_dset:
   demo_dset:
     dataset_root: ${benchmark.dataset_root}
-    task_name: ${object_class.name}
+    task_name: ${task.name}
     episodes: all
-    action_class: ${task.action_class}
-    anchor_class: ${task.anchor_class}
+    action_class: ${task.phase.action_class}
+    anchor_class: ${task.phase.anchor_class}
     cached: true
-    phase: ${relationship.name}
+    phase: ${task.phase.name}
     teleport_initial_to_final: true
     with_symmetry: True
     occlusion_cfg: null
@@ -18,12 +18,12 @@ train_dset:
 val_dset:
   demo_dset:
     dataset_root: ${benchmark.dataset_root}
-    task_name: ${object_class.name}
+    task_name: ${task.name}
     episodes: all
-    action_class: ${task.action_class}
-    anchor_class: ${task.anchor_class}
+    action_class: ${task.phase.action_class}
+    anchor_class: ${task.phase.anchor_class}
     cached: true
-    phase: ${relationship.name}
+    phase: ${task.phase.name}
     teleport_initial_to_final: true
     with_symmetry: True
     occlusion_cfg: null
@@ -32,12 +32,12 @@ val_dset:
 test_dset:
   demo_dset:
     dataset_root: ${benchmark.dataset_root}
-    task_name: ${object_class.name}
+    task_name: ${task.name}
     episodes: all
-    action_class: ${task.action_class}
-    anchor_class: ${task.anchor_class}
+    action_class: ${task.phase.action_class}
+    anchor_class: ${task.phase.anchor_class}
     cached: true
-    phase: ${relationship.name}
+    phase: ${task.phase.name}
     teleport_initial_to_final: true
     with_symmetry: True
     occlusion_cfg: null

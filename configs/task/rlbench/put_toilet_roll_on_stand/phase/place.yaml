@@ -1,4 +1,6 @@
-name: put_toilet_roll_on_stand_place
+# @package task
+
+name: place
 action_class: 0
 anchor_class: 1
 cloud_type: teleport
@@ -6,5 +8,3 @@ softmax_temperature: 1
 weight_normalize: l1
 action_name: toilet_roll
 anchor_name: toilet_roll_stand
-checkpoint_file_action: null
-checkpoint_file_anchor: null

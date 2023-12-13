@@ -3,8 +3,8 @@
 defaults:
   - /commands/rlbench/_train@_here_
   - override /model: taxpose
-  - override /object_class: phone_on_base
-  - override /relationship: place
+  - override /task: phone_on_base
+  - override /phase: place
   - _self_
 
 break_symmetry: False

@@ -3,8 +3,8 @@
 defaults:
   - /commands/ndf/_train@_here_
   - override /model: taxpose
-  - override /object_class: mug
-  - override /relationship: grasp
+  - override /task: mug
+  - override /phase: grasp
   - _self_
 
 break_symmetry: False

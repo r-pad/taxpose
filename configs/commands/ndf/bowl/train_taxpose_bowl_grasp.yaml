@@ -3,6 +3,6 @@
 defaults:
   - /commands/ndf/_train@_here_
   - override /model: taxpose
-  - override /object_class: bowl
-  - override /relationship: grasp
+  - override /task: bowl
+  - override /phase: grasp
   - _self_

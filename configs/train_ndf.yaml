@@ -1,22 +1,46 @@
 
 
-job_type: train_${task.name}
+job_type: train_${task.name}_${task.phase.name}
+
+# This has to happen before the benchmark stuff.
+# This sets the data root for all data in the config.
+# Something like autobot will override it.
+data_root: ${oc.env:HOME}/datasets
+
+
+# TODO: Fix all the training scripts.
 
 defaults:
   - _self_
-  - _logging
-  - datamodule  # This loops in the dataset.
-  - benchmark: ndf # {ndf, rlbench}
-  - object_class: mug # {mug, bottle, bowl}
-  - relationship: place # {place, grasp}
-  - pose_dist: upright # {upright, arbitrary}
-  - model: release
-  - task: ${object_class}_${relationship}
-  - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
-  - checkpoints/pretraining@checkpoints.pretraining
 
-resources:
-  num_workers: 8
+  # Normal logging stuff.
+  - _logging
+
+  # Set up the model and checkpointing. Happens before dataset because order
+  # matters for interpolation.
+  - model: taxpose  # {taxpose, mlat_s256_vnn}
+
+  # Task information for setting up the datamodule.
+  - datamodule  # This datamodule will be used in evaluation, so factor it out.
+  - benchmark: rlbench  # {ndf, rlbench}
+  - optional task: stack_wine
+  - optional phase: place
+  - task/${benchmark}/${task}/task@task
+  - task/${benchmark}/${task}/phase/${phase}@task.phase
+
+  # Set the pretraining checkpoint.
+  - /checkpoints/${benchmark}/${task}/pretraining/${phase}@model.pretraining
+
+  # - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
+
+
+model:
+
+benchmark:
+
+task:
+
+dm:
 
 training:
   batch_size: 8
@@ -42,13 +66,11 @@ training:
   log_every_n_steps: 100
   check_val_every_n_epoch: 5
 
-wandb:
-  group: Null
-
-pretraining:
-  mode: nce_loss
-  checkpoint_file_action: ${checkpoints.pretraining.${model.emb_nn}.${pretraining.mode}.${task.action_name}}
-  checkpoint_file_anchor: ${checkpoints.pretraining.${model.emb_nn}.${pretraining.mode}.${task.anchor_name}}
-
 seed: 0
 break_symmetry: False
+
+resources:
+  num_workers: 8
+
+wandb:
+  group: Null

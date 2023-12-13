@@ -3,6 +3,6 @@
 defaults:
   - /commands/ablations/se3_augmentation/_base@_here_
   - override /model: mlat_s256_vnn
-  - override /object_class: mug
-  - override /relationship: place
+  - override /task: mug
+  - override /phase: place
   - _self_

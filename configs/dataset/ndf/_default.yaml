@@ -11,14 +11,14 @@ train_dset:
     dataset_indices: ???
     num_demo: ???
     min_num_points: 1024
-    cloud_type: ${task.cloud_type}
-    action_class: ${task.action_class}
-    anchor_class: ${task.anchor_class}
+    cloud_type: ${task.phase.cloud_type}
+    action_class: ${task.phase.action_class}
+    anchor_class: ${task.phase.anchor_class}
     min_num_cameras: 4
     max_num_cameras: 4
     normalize_dist: True
-    object_type: ${object_class.name}
-    action: ${relationship.name}
+    object_type: ${task.name}
+    action: ${task.phase.name}
     symmetry_after_transform: True
 
 val_dset:
@@ -34,8 +34,8 @@ val_dset:
     min_num_cameras: ${...train_dset.demo_dset.min_num_cameras}
     max_num_cameras: ${...train_dset.demo_dset.max_num_cameras}
     normalize_dist: ${...train_dset.demo_dset.normalize_dist}
-    object_type: ${object_class.name}
-    action: ${relationship.name}
+    object_type: ${task.name}
+    action: ${task.phase.name}
     symmetry_after_transform: ${...train_dset.demo_dset.symmetry_after_transform}
 
 test_dset:
@@ -51,6 +51,6 @@ test_dset:
     min_num_cameras: ${...train_dset.demo_dset.min_num_cameras}
     max_num_cameras: ${...train_dset.demo_dset.max_num_cameras}
     normalize_dist: ${...train_dset.demo_dset.normalize_dist}
-    object_type: ${object_class.name}
-    action: ${relationship.name}
+    object_type: ${task.name}
+    action: ${task.phase.name}
     symmetry_after_transform: ${...train_dset.demo_dset.symmetry_after_transform}

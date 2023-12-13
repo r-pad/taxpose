@@ -3,8 +3,8 @@
 defaults:
   - /commands/rlbench/_eval@_here_
   - override /model: taxpose
-  - override /object_class: stack_wine
-  - override /relationship: place
+  - override /task: stack_wine
+  - override /phase: place
   - _self_
 
 break_symmetry: True

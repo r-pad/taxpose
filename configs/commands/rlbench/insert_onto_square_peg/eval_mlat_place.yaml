@@ -3,8 +3,8 @@
 defaults:
   - /commands/rlbench/_eval@_here_
   - override /model: mlat_s256_vnn
-  - override /object_class: insert_onto_square_peg
-  - override /relationship: place
+  - override /task: insert_onto_square_peg
+  - override /phase: place
   - _self_
 
 break_symmetry: True

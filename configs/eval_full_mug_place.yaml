@@ -25,7 +25,7 @@ checkpoint_file_place: ${checkpoints.place.ckpt_file}
 log_txt_file: ${hydra:runtime.cwd}/test_results.txt # abs path of file to log results
 
 # log saving dir
-log_dir: ./results/ndf/${object_class.name}/${pose_dist.name}
+log_dir: ./results/ndf/${task.name}/${pose_dist.name}
 num_iterations: 100 # number of trails
 data_dir: ./predictions # directory name for data saved
 log_every_trial: False # True - log success rate at every trial; False - log only at the end of the # of trials

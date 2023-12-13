@@ -2,15 +2,8 @@
 
 defaults:
   - /train_ndf
+  - override /benchmark: ndf
   - _self_
-
-benchmark:
-  dataset_root: /data/ndf
-
-log_dir: /opt/logs
-
-wandb:
-  artifact_dir: /opt/artifacts
 
 break_symmetry: True
 
