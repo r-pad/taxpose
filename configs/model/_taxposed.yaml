@@ -1,0 +1,23 @@
+name: ???
+
+conditioning: pos_delta_l2norm
+
+emb_dims: 512
+emb_nn: dgcnn
+return_flow_component: True
+center_feature: True
+inital_sampling_ratio: 1
+pred_weight: True
+multilaterate: False
+mlat_sample: null
+mlat_nkps: null
+break_symmetry: False
+latent_z_linear_size: 40
+
+gumbel_temp: 1
+division_smooth_factor: 1
+add_smooth_factor: 0.05
+taxpose_centering: z
+
+pzcondx_encoder_type: 2_dgcnn
+shuffle_for_pzX: False

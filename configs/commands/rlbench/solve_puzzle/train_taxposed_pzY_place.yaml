@@ -1,0 +1,14 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_train_taxposed@_here_
+  - override /model: taxposed
+  - override /task:  solve_puzzle
+  - override /phase: place
+  - _self_
+
+break_symmetry: False
+
+dm:
+  train_dset:
+    num_points: 256

@@ -1,0 +1,96 @@
+
+
+job_type: train_${task.name}_${task.phase.name}
+
+# This has to happen before the benchmark stuff.
+# This sets the data root for all data in the config.
+# Something like autobot will override it.
+data_root: ${oc.env:HOME}/datasets
+
+
+# TODO: Fix all the training scripts.
+
+defaults:
+  - _self_
+
+  # Normal logging stuff.
+  - _logging
+
+  # Set up the model and checkpointing. Happens before dataset because order
+  # matters for interpolation.
+  - model: taxposed  # {taxpose, taxposed, mlat_s256_vnn}
+
+  # Task information for setting up the datamodule.
+  - datamodule  # This datamodule will be used in evaluation, so factor it out.
+  - benchmark: rlbench  # {ndf, rlbench}
+  - optional task: stack_wine
+  - optional phase: place
+  - task/${benchmark}/${task}/task@task
+  - task/${benchmark}/${task}/phase/${phase}@task.phase
+
+  # Set the pretraining checkpoint.
+  # - /checkpoints/${benchmark}/${task}/pretraining/${phase}@model.pretraining
+
+  # - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
+
+
+model:
+
+benchmark:
+
+task:
+
+dm:
+
+training:
+  batch_size: 8
+  max_epochs: 20
+  max_steps: -1
+
+  sigmoid_on: True
+
+  # TPD Training Settings
+  load_cond_x: False
+  init_cond_x: False
+  freeze_embnn: False
+  freeze_residual_flow: False
+  freeze_z_embnn: False
+  joint_train_prior: False
+  joint_train_prior_freeze_embnn: False
+
+  # Optimizer Settings
+  lr: 1e-4
+  gradient_clipping: 0.001
+
+  # Loss Settings
+  flow_supervision: action2anchor # {both, action2anchor, anchor2action}
+  point_loss_type: 0
+  min_err_across_racks_debug: True
+  error_mode_2rack: demo_rack
+  rotation_weight: 0
+  consistency_weight: 1
+  smoothness_weight: 0.1
+  action_weight: 1
+  vae_reg_loss_weight: 0 #1
+  goal_emb_cond_x_loss_weight: 1 #0.01
+  # displace_loss_weight: 1
+  # direct_correspondence_loss_weight: 1
+  # consistency_loss_weight: 0.1
+
+  # Checkpoint Settings
+  load_from_checkpoint: False
+  checkpoint_file: null
+
+  # Visualization Settings
+  image_logging_period: 1001
+  log_every_n_steps: 100
+  check_val_every_n_epoch: 5
+
+seed: 0
+break_symmetry: False
+
+resources:
+  num_workers: 8
+
+wandb:
+  group: Null

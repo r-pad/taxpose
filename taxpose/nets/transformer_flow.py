@@ -207,7 +207,7 @@ class ResidualMLPHead(nn.Module):
     v_i = f(\phi_i) + \tilde{y}_i - x_i
     """
 
-    def __init__(self, emb_dims=512, pred_weight=True, residual_on=True):
+    def __init__(self, emb_dims=512, output_dims=3, pred_weight=True, residual_on=True):
         super(ResidualMLPHead, self).__init__()
 
         self.emb_dims = emb_dims
@@ -220,7 +220,7 @@ class ResidualMLPHead(nn.Module):
         else:
             self.proj_flow = nn.Sequential(
                 PointNet([emb_dims, emb_dims // 2, emb_dims // 4, emb_dims // 8]),
-                nn.Conv1d(emb_dims // 8, 3, kernel_size=1, bias=False),
+                nn.Conv1d(emb_dims // 8, output_dims, kernel_size=1, bias=False),
             )
         self.pred_weight = pred_weight
         if self.pred_weight:
@@ -466,6 +466,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
     def __init__(
         self,
         emb_dims=512,
+        input_dims=3,
         cycle=True,
         emb_nn="dgcnn",
         return_flow_component=False,
@@ -478,18 +479,21 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         sample: bool = False,
         mlat_nkps: int = 100,
         break_symmetry=False,
+        conditioning_size=0,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.emb_dims = emb_dims
+        self.input_dims = input_dims
         self.cycle = cycle
         self.break_symmetry = break_symmetry
+        self.conditioning_size = conditioning_size
         if emb_nn == "dgcnn":
-            self.emb_nn_action = DGCNN(emb_dims=self.emb_dims)
-            self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims)
+            self.emb_nn_action = DGCNN(emb_dims=self.emb_dims, input_dims=self.input_dims, conditioning_size=self.conditioning_size)
+            self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims, input_dims=self.input_dims, conditioning_size=self.conditioning_size)
         elif emb_nn == "vn_dgcnn":
             args = VNArgs()
-            self.emb_nn_action = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
-            self.emb_nn_anchor = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
+            self.emb_nn_action = VN_DGCNN(args, num_part=self.emb_dims, gc=False) # TODO: add input_dims and conditioning_size
+            self.emb_nn_anchor = VN_DGCNN(args, num_part=self.emb_dims, gc=False) # TODO: add input_dims and conditioning_size
         else:
             raise Exception("Not implemented")
         self.center_feature = center_feature
@@ -504,7 +508,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.transformer_anchor = CustomTransformer(
             emb_dims=emb_dims, return_attn=self.return_attn, bidirectional=False
         )
-        if multilaterate:
+        if multilaterate: # TODO: add input_dims 
             self.head_action = MultilaterationHead(
                 emb_dims=emb_dims,
                 pred_weight=self.pred_weight,
@@ -520,11 +524,13 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         else:
             self.head_action = ResidualMLPHead(
                 emb_dims=emb_dims,
+                output_dims=input_dims,
                 pred_weight=self.pred_weight,
                 residual_on=self.residual_on,
             )
             self.head_anchor = ResidualMLPHead(
                 emb_dims=emb_dims,
+                output_dims=input_dims,
                 pred_weight=self.pred_weight,
                 residual_on=self.residual_on,
             )
@@ -541,12 +547,31 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 nn.Conv1d(emb_dims_sym * 4, self.emb_dims, kernel_size=1, bias=False),
             )
 
-    def forward(self, *input):
-        action_points = input[0].permute(0, 2, 1)[:, :3]  # B,3,num_points
-        anchor_points = input[1].permute(0, 2, 1)[:, :3]
+    def forward(self, *input, conditioning_action=None, conditioning_anchor=None, action_center=None, anchor_center=None):
+        action_points = input[0].permute(0, 2, 1)[:, :self.input_dims]  # B,3,num_points
+        anchor_points = input[1].permute(0, 2, 1)[:, :self.input_dims]
 
-        action_points_dmean = action_points - action_points.mean(dim=2, keepdim=True)
-        anchor_points_dmean = anchor_points - anchor_points.mean(dim=2, keepdim=True)
+        if action_center is None:
+            action_center = action_points[:, :3].mean(dim=2, keepdim=True)
+        if anchor_center is None:
+            anchor_center = anchor_points[:, :3].mean(dim=2, keepdim=True)
+
+        action_points_dmean = torch.cat(
+            [
+                action_points[:,:3,:] - \
+                    action_center,
+                action_points[:,3:,:],
+            ],
+            dim=1
+        )
+        anchor_points_dmean = torch.cat(
+            [
+                anchor_points[:,:3,:] - \
+                    anchor_center,
+                anchor_points[:,3:,:],
+            ],
+            dim=1
+        )
 
         # mean center point cloud before DGCNN
         if not self.center_feature:
