@@ -55,7 +55,6 @@ class Multimodal_EquivarianceTrainingModule(PointCloudTrainingModule):
         self.weight_normalize = weight_normalize
         # 0 for mse loss, 1 for chamfer distance, 2 for mse loss + chamfer distance
         self.point_loss_type = point_loss_type
-        self.return_flow_component = return_flow_component
         self.sigmoid_on = sigmoid_on
         self.softmax_temperature = softmax_temperature
         self.min_err_across_racks_debug = min_err_across_racks_debug
@@ -69,55 +68,103 @@ class Multimodal_EquivarianceTrainingModule(PointCloudTrainingModule):
         @param points_anchor, (1,num_points,3)
         """
         points_action_mean = points_action.clone().mean(axis=1)
-        points_action_mean_centered = points_action-points_action_mean
+        points_action_mean_centered = points_action - points_action_mean
         points_anchor_mean_centered = points_anchor - points_action_mean
 
         return points_action_mean_centered, points_anchor_mean_centered, points_action_mean
 
-    def get_transform(self, points_trans_action, points_trans_anchor, points_onetrans_action=None, points_onetrans_anchor=None, mode="forward"):
-        if(self.model.return_flow_component):
-            res = self.model(
-               points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor, mode=mode)
-            x_action = res['flow_action']
-            x_anchor = res['flow_anchor']
-        else:
-            if self.model.conditioning not in ["latent_z", "latent_z_1pred", "latent_z_1pred_10d",]:
-                x_action, x_anchor, goal_emb = self.model(
-                    points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor, mode=mode)
-                heads = None
+    def extract_flow_and_weight(self, x):
+        # x: Batch, num_points, 4
+        pred_flow = x[:, :, :3]
+        if(x.shape[2] > 3):
+            if self.sigmoid_on:
+                pred_w = torch.sigmoid(x[:, :, 3])
             else:
-                x_action, x_anchor, goal_emb, heads = self.model_with_cond_x(
-                    mode, points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor, mode=mode)
+                pred_w = x[:, :, 3]
+        else:
+            pred_w = None
+        return pred_flow, pred_w
 
-        points_trans_action = points_trans_action[:, :, :3]
-        points_trans_anchor = points_trans_anchor[:, :, :3]
-        ans_dict = self.predict(x_action=x_action, x_anchor=x_anchor,
-                                points_trans_action=points_trans_action, points_trans_anchor=points_trans_anchor)
-        if(self.model.return_flow_component):
-            ans_dict['flow_components'] = res
-        return ans_dict
+    def predict(self, model_output, points_trans_action, points_trans_anchor):
+        x_action = model_output['flow_action']
+        x_anchor = model_output['flow_anchor']
+        
+        # If we've applied some sampling, we need to extract the predictions too...
+        if "sampled_ixs_action" in model_output:
+            ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+            sampled_points_trans_action = torch.take_along_dim(
+                points_trans_action, ixs_action, dim=1
+            )
+        else:
+            sampled_points_trans_action = points_trans_action
 
-    def predict(self, x_action, x_anchor, points_trans_action, points_trans_anchor):
-        pred_flow_action, pred_w_action = self.extract_flow_and_weight(
-            x_action)
-        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(
-            x_anchor)
+        if "sampled_ixs_anchor" in model_output:
+            ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+            sampled_points_trans_anchor = torch.take_along_dim(
+                points_trans_anchor, ixs_anchor, dim=1
+            )
+        else:
+            sampled_points_trans_anchor
+        
+        pred_flow_action, pred_w_action = self.extract_flow_and_weight(x_action)
+        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(x_anchor)
 
-        pred_T_action = dualflow2pose(xyz_src=points_trans_action, xyz_tgt=points_trans_anchor,
-                                      flow_src=pred_flow_action, flow_tgt=pred_flow_anchor,
-                                      weights_src=pred_w_action, weights_tgt=pred_w_anchor,
-                                      return_transform3d=True, normalization_scehme=self.weight_normalize, temperature=self.softmax_temperature)
-        pred_points_action = pred_T_action.transform_points(
-            points_trans_action)
+        pred_T_action = dualflow2pose(xyz_src=sampled_points_trans_action, 
+                                      xyz_tgt=sampled_points_trans_anchor,
+                                      flow_src=pred_flow_action, 
+                                      flow_tgt=pred_flow_anchor,
+                                      weights_src=pred_w_action, 
+                                      weights_tgt=pred_w_anchor,
+                                      return_transform3d=True, 
+                                      normalization_scehme=self.weight_normalize, 
+                                      temperature=self.softmax_temperature)
+        
+        pred_points_action = pred_T_action.transform_points(points_trans_action)
 
         return {"pred_T_action": pred_T_action,
                 "pred_points_action": pred_points_action}
 
-    def compute_loss(self, x_action, x_anchor, goal_emb, batch, log_values={}, loss_prefix='', heads=None):
+    def get_transform(self, points_trans_action, points_trans_anchor, points_onetrans_action=None, points_onetrans_anchor=None, mode="forward"):
+        model_output = self.model(points_trans_action, 
+                                  points_trans_anchor, 
+                                  points_onetrans_action, 
+                                  points_onetrans_anchor, 
+                                  mode=mode)
+
+        points_trans_action = points_trans_action[:, :, :3]
+        points_trans_anchor = points_trans_anchor[:, :, :3]
+        
+        ans_dict = self.predict(model_output,
+                                points_trans_action=points_trans_action, 
+                                points_trans_anchor=points_trans_anchor)
+        
+        ans_dict['flow_components'] = model_output
+        return ans_dict
+
+    def compute_loss(self, model_output, batch, log_values={}, loss_prefix='', heads=None):
+        x_action = model_output['flow_action']
+        x_anchor = model_output['flow_anchor']
+        goal_emb = model_output['goal_emb']
+        
         points_action = batch['points_action'][:, :, :3]
         points_anchor = batch['points_anchor'][:, :, :3]
         points_trans_action = batch['points_action_trans'][:, :, :3]
         points_trans_anchor = batch['points_anchor_trans'][:, :, :3]
+
+        # If we've applied some sampling, we need to extract the predictions too...
+        if "sampled_ixs_action" in model_output:
+            ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+            points_action = torch.take_along_dim(points_action, ixs_action, dim=1)
+            points_trans_action = torch.take_along_dim(
+                points_trans_action, ixs_action, dim=1
+            )
+
+        if "sampled_ixs_anchor" in model_output:
+            ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+            points_anchor = torch.take_along_dim(points_anchor, ixs_anchor, dim=1)
+            points_trans_anchor = torch.take_along_dim(
+                points_trans_anchor, ixs_anchor, dim=1
+            )
 
         T0 = Transform3d(matrix=batch['T0'])
         T1 = Transform3d(matrix=batch['T1'])
@@ -127,15 +174,17 @@ class Multimodal_EquivarianceTrainingModule(PointCloudTrainingModule):
         t0_max, t0_min, t0_mean = get_translation(T0)
         t1_max, t1_min, t1_mean = get_translation(T1)
 
-        pred_flow_action, pred_w_action = self.extract_flow_and_weight(
-            x_action)
-        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(
-            x_anchor)
+        pred_flow_action, pred_w_action = self.extract_flow_and_weight(x_action)
+        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(x_anchor)
 
-        pred_T_action = dualflow2pose(xyz_src=points_trans_action, xyz_tgt=points_trans_anchor,
-                                      flow_src=pred_flow_action, flow_tgt=pred_flow_anchor,
-                                      weights_src=pred_w_action, weights_tgt=pred_w_anchor,
-                                      return_transform3d=True, normalization_scehme=self.weight_normalize,
+        pred_T_action = dualflow2pose(xyz_src=points_trans_action, 
+                                      xyz_tgt=points_trans_anchor,
+                                      flow_src=pred_flow_action, 
+                                      flow_tgt=pred_flow_anchor,
+                                      weights_src=pred_w_action, 
+                                      weights_tgt=pred_w_anchor,
+                                      return_transform3d=True, 
+                                      normalization_scehme=self.weight_normalize,
                                       temperature=self.softmax_temperature)
 
         induced_flow_action = (pred_T_action.transform_points(
@@ -147,20 +196,11 @@ class Multimodal_EquivarianceTrainingModule(PointCloudTrainingModule):
         gt_T_action = T0.inverse().compose(T1)
         points_action_target = T1.transform_points(points_action)
 
-        if not self.min_err_across_racks_debug:
-            # don't print rotation/translation error metrics to the logs
-            pass
-            # error_R_max, error_R_min, error_R_mean = get_degree_angle(T0.inverse().compose(
-            #     T1).compose(pred_T_action.inverse()))
-
-            # error_t_max, error_t_min, error_t_mean = get_translation(T0.inverse().compose(
-            #     T1).compose(pred_T_action.inverse()))
-        else:
+        if self.min_err_across_racks_debug:
             error_R_mean, error_t_mean = get_2rack_errors(pred_T_action, T0, T1, mode=self.error_mode_2rack)
             log_values[loss_prefix+'error_R_mean'] = error_R_mean
             log_values[loss_prefix+'error_t_mean'] = error_t_mean
-            log_values[loss_prefix +
-                   'rotation_loss'] = self.rotation_weight * error_R_mean
+            log_values[loss_prefix+'rotation_loss'] = self.rotation_weight * error_R_mean
 
         # Loss associated with ground truth transform
         point_loss_action = mse_criterion(
@@ -237,18 +277,6 @@ class Multimodal_EquivarianceTrainingModule(PointCloudTrainingModule):
 
         return loss, log_values
 
-    def extract_flow_and_weight(self, x):
-        # x: Batch, num_points, 4
-        pred_flow = x[:, :, :3]
-        if(x.shape[2] > 3):
-            if self.sigmoid_on:
-                pred_w = torch.sigmoid(x[:, :, 3])
-            else:
-                pred_w = x[:, :, 3]
-        else:
-            pred_w = None
-        return pred_flow, pred_w
-
     def module_step(self, batch, batch_idx, log_prefix=''):
         points_trans_action = batch['points_action_trans']
         points_trans_anchor = batch['points_anchor_trans']
@@ -257,34 +285,20 @@ class Multimodal_EquivarianceTrainingModule(PointCloudTrainingModule):
         # points_action = batch['points_action']
         # points_anchor = batch['points_anchor']
 
-        if self.return_flow_component:
-            # TODO only pass in points_anchor and points_action if the model is training
-            model_output = self.model(points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor)
-            x_action = model_output['flow_action']
-            x_anchor = model_output['flow_anchor']
-            goal_emb = model_output['goal_emb']
-            
-            if self.model.conditioning not in ["latent_z", "latent_z_1pred", "latent_z_1pred_10d", "latent_z_linear", "latent_z_linear_internalcond"]:
-                heads = None
-            else:
-                heads = {'goal_emb_mu': model_output['goal_emb_mu'], 'goal_emb_logvar': model_output['goal_emb_logvar']}
-
-            # residual_flow_action = model_output['residual_flow_action']
-            # residual_flow_anchor = model_output['residual_flow_anchor']
-            # corr_flow_action = model_output['corr_flow_action']
-            # corr_flow_anchor = model_output['corr_flow_anchor']
+        # TODO only pass in points_anchor and points_action if the model is training
+        model_output = self.model(points_trans_action, 
+                                  points_trans_anchor, 
+                                  points_onetrans_action, 
+                                  points_onetrans_anchor)
+        
+        if self.model.conditioning not in ["latent_z", "latent_z_1pred", "latent_z_1pred_10d", "latent_z_linear", "latent_z_linear_internalcond"]:
+            heads = None
         else:
-            if self.model.conditioning not in ["latent_z", "latent_z_1pred", "latent_z_1pred_10d", "latent_z_linear", "latent_z_linear_internalcond"]:
-                x_action, x_anchor, goal_emb = self.model(
-                    points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor)
-                heads = None
-            else:
-                x_action, x_anchor, goal_emb, heads = self.model(
-                    points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor)
+            heads = {'goal_emb_mu': model_output['goal_emb_mu'], 'goal_emb_logvar': model_output['goal_emb_logvar']}
 
         log_values = {}
         loss, log_values = self.compute_loss(
-            x_action, x_anchor, goal_emb, batch, log_values=log_values, loss_prefix=log_prefix, heads=heads)
+            model_output, batch, log_values=log_values, loss_prefix=log_prefix, heads=heads)
         
         torch.cuda.empty_cache()
         
@@ -293,49 +307,58 @@ class Multimodal_EquivarianceTrainingModule(PointCloudTrainingModule):
                 T0 = Transform3d(matrix=batch['T0'])
                 T1 = Transform3d(matrix=batch['T1'])
 
-                if self.return_flow_component:
-                    if self.model.conditioning not in ["uniform_prior_pos_delta_l2norm", "latent_z", "latent_z_1pred", "latent_z_1pred_10d", "latent_z_linear", "latent_z_linear_internalcond"]:
-                        model_output = self.model(points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor, mode="forward")
-                    else:
-                        model_output = self.model(points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor, mode="inference")
-                        
-                    x_action = model_output['flow_action']
-                    x_anchor = model_output['flow_anchor']
-                    goal_emb = model_output['goal_emb']
+                if self.model.conditioning not in ["uniform_prior_pos_delta_l2norm", "latent_z", "latent_z_1pred", "latent_z_1pred_10d", "latent_z_linear", "latent_z_linear_internalcond"]:
+                    inference_mode='forward'
                 else:
-                    if self.model.conditioning not in ["uniform_prior_pos_delta_l2norm", "latent_z", "latent_z_1pred", "latent_z_1pred_10d", "latent_z_linear", "latent_z_linear_internalcond"]:
-                        # not inference mode here because these models don't have a separate inference mode
-                        x_action, x_anchor, goal_emb = self.model(
-                            points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor, mode="forward")
-                    else:
-                        x_action, x_anchor, goal_emb = self.model(
-                            points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor, mode="inference")
-                        
-                pred_flow_action, pred_w_action = self.extract_flow_and_weight(
-                    x_action)
-                pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(
-                    x_anchor)
+                    inference_mode='inference'
+                    
+                model_output = self.model(points_trans_action, 
+                                          points_trans_anchor, 
+                                          points_onetrans_action, 
+                                          points_onetrans_anchor, 
+                                          mode=inference_mode)
+                    
+                x_action = model_output['flow_action']
+                x_anchor = model_output['flow_anchor']
+                goal_emb = model_output['goal_emb']
+                
+                # If we've applied some sampling, we need to extract the predictions too...
+                if "sampled_ixs_action" in model_output:
+                    ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+                    sampled_points_trans_action = torch.take_along_dim(
+                        points_trans_action, ixs_action, dim=1
+                    )
+                else:
+                    sampled_points_trans_action = points_trans_action
+
+                if "sampled_ixs_anchor" in model_output:
+                    ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+                    sampled_points_trans_anchor = torch.take_along_dim(
+                        points_trans_anchor, ixs_anchor, dim=1
+                    )
+                else:
+                    sampled_points_trans_anchor = points_trans_anchor
+                
+                pred_flow_action, pred_w_action = self.extract_flow_and_weight(x_action)
+                pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(x_anchor)
                 
                 del x_action, x_anchor, goal_emb
 
-                pred_T_action = dualflow2pose(xyz_src=points_trans_action, xyz_tgt=points_trans_anchor,
-                                            flow_src=pred_flow_action, flow_tgt=pred_flow_anchor,
-                                            weights_src=pred_w_action, weights_tgt=pred_w_anchor,
-                                            return_transform3d=True, normalization_scehme=self.weight_normalize,
-                                            temperature=self.softmax_temperature)
+                pred_T_action = dualflow2pose(xyz_src=sampled_points_trans_action, 
+                                              xyz_tgt=sampled_points_trans_anchor,
+                                              flow_src=pred_flow_action, 
+                                              flow_tgt=pred_flow_anchor,
+                                              weights_src=pred_w_action, 
+                                              weights_tgt=pred_w_anchor,
+                                              return_transform3d=True, 
+                                              normalization_scehme=self.weight_normalize,
+                                              temperature=self.softmax_temperature)
 
-                if not self.min_err_across_racks_debug:
-                    # don't print rotation/translation error metrics to the logs
-                    pass
-                    # error_R_max, error_R_min, error_R_mean = get_degree_angle(T0.inverse().compose(
-                    #     T1).compose(pred_T_action.inverse()))
-
-                    # error_t_max, error_t_min, error_t_mean = get_translation(T0.inverse().compose(
-                    #     T1).compose(pred_T_action.inverse()))
-                else:
+                if self.min_err_across_racks_debug:
                     error_R_mean, error_t_mean = get_2rack_errors(pred_T_action, T0, T1, mode=self.error_mode_2rack)
                     log_values[loss_prefix+'sample_error_R_mean'] = error_R_mean
                     log_values[loss_prefix+'sample_error_t_mean'] = error_t_mean
+            
             get_inference_error(log_values, batch, loss_prefix=log_prefix)
         torch.cuda.empty_cache()
 
@@ -356,51 +379,54 @@ class Multimodal_EquivarianceTrainingModule(PointCloudTrainingModule):
         T0 = Transform3d(matrix=batch['T0'])
         T1 = Transform3d(matrix=batch['T1'])
 
-        if self.return_flow_component:
-            model_output = self.model(points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor)
-            x_action = model_output['flow_action']
-            x_anchor = model_output['flow_anchor']
-            goal_emb = model_output['goal_emb']
-            residual_flow_action = model_output['residual_flow_action']
-            residual_flow_anchor = model_output['residual_flow_anchor']
-            corr_flow_action = model_output['corr_flow_action']
-            corr_flow_anchor = model_output['corr_flow_anchor']
-        else:
-            if self.model.conditioning not in ["latent_z", "latent_z_1pred", "latent_z_1pred_10d", "latent_z_linear", "latent_z_linear_internalcond"]:
-                x_action, x_anchor, goal_emb = self.model(
-                    points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor)
-                heads = None
-            else:
-                x_action, x_anchor, goal_emb, heads = self.model(
-                    points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor)
+        model_output = self.model(points_trans_action, 
+                                  points_trans_anchor, 
+                                  points_onetrans_action, 
+                                  points_onetrans_anchor)
+        
+        x_action = model_output['flow_action']
+        x_anchor = model_output['flow_anchor']
+        goal_emb = model_output['goal_emb']
+        residual_flow_action = model_output['residual_flow_action']
+        residual_flow_anchor = model_output['residual_flow_anchor']
+        corr_flow_action = model_output['corr_flow_action']
+        corr_flow_anchor = model_output['corr_flow_anchor']
 
         points_action = points_action[:, :, :3]
         points_anchor = points_anchor[:, :, :3]
         points_trans_action = points_trans_action[:, :, :3]
         points_trans_anchor = points_trans_anchor[:, :, :3]
-
-        pred_flow_action = x_action[:, :, :3]
-        if(x_action .shape[2] > 3):
-            if self.sigmoid_on:
-                pred_w_action = torch.sigmoid(x_action[:, :, 3])
-            else:
-                pred_w_action = x_action[:, :, 3]
+                
+        # If we've applied some sampling, we need to extract the predictions too...
+        if "sampled_ixs_action" in model_output:
+            ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+            sampled_points_action = torch.take_along_dim(points_action, ixs_action, dim=1)
+            sampled_points_trans_action = torch.take_along_dim(
+                points_trans_action, ixs_action, dim=1
+            )
         else:
-            pred_w_action = None
+            sampled_points_trans_action = points_trans_action
 
-        pred_flow_anchor = x_anchor[:, :, :3]
-        if(x_anchor .shape[2] > 3):
-            if self.sigmoid_on:
-                pred_w_anchor = torch.sigmoid(x_anchor[:, :, 3])
-            else:
-                pred_w_anchor = x_anchor[:, :, 3]
+        if "sampled_ixs_anchor" in model_output:
+            ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+            sampled_points_anchor = torch.take_along_dim(points_anchor, ixs_anchor, dim=1)
+            sampled_points_trans_anchor = torch.take_along_dim(
+                points_trans_anchor, ixs_anchor, dim=1
+            )
         else:
-            pred_w_anchor = None
+            sampled_points_trans_anchor = points_trans_anchor
 
-        pred_T_action = dualflow2pose(xyz_src=points_trans_action, xyz_tgt=points_trans_anchor,
-                                      flow_src=pred_flow_action, flow_tgt=pred_flow_anchor,
-                                      weights_src=pred_w_action, weights_tgt=pred_w_anchor,
-                                      return_transform3d=True, normalization_scehme=self.weight_normalize,
+        pred_flow_action, pred_w_action = self.extract_flow_and_weight(x_action)
+        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(x_anchor)
+
+        pred_T_action = dualflow2pose(xyz_src=sampled_points_trans_action, 
+                                      xyz_tgt=sampled_points_trans_anchor,
+                                      flow_src=pred_flow_action, 
+                                      flow_tgt=pred_flow_anchor,
+                                      weights_src=pred_w_action, 
+                                      weights_tgt=pred_w_anchor,
+                                      return_transform3d=True, 
+                                      normalization_scehme=self.weight_normalize,
                                       temperature=self.softmax_temperature)
 
         pred_points_action = pred_T_action.transform_points(
@@ -456,7 +482,7 @@ class Multimodal_EquivarianceTrainingModule(PointCloudTrainingModule):
 
         colors_pred_w_action = color_gradient(pred_w_action[0])
         colors_pred_w_anchor = color_gradient(pred_w_anchor[0])
-        pred_w_points = torch.cat([points_action[0].detach(), points_anchor[0].detach()], dim=0).cpu().numpy()
+        pred_w_points = torch.cat([sampled_points_action[0].detach(), sampled_points_anchor[0].detach()], dim=0).cpu().numpy()
         pred_w_on_objects = np.concatenate([
             pred_w_points,
             np.concatenate([colors_pred_w_action, colors_pred_w_anchor], axis=0)],
@@ -478,7 +504,6 @@ class Multimodal_EquivarianceTrainingModule(PointCloudTrainingModule):
                 goal_emb_on_objects)
 
         return res_images
-
 
 
 class Multimodal_EquivarianceTrainingModule_WithPZCondX(PointCloudTrainingModule):
@@ -517,65 +542,83 @@ class Multimodal_EquivarianceTrainingModule_WithPZCondX(PointCloudTrainingModule
         @param points_anchor, (1,num_points,3)
         """
         points_action_mean = points_action.clone().mean(axis=1)
-        points_action_mean_centered = points_action-points_action_mean
+        points_action_mean_centered = points_action - points_action_mean
         points_anchor_mean_centered = points_anchor - points_action_mean
 
         return points_action_mean_centered, points_anchor_mean_centered, points_action_mean
 
-    def get_transform(self, points_trans_action, points_trans_anchor, points_action=None, points_anchor=None, mode="forward"):
-        # mode is unused
+    def extract_flow_and_weight(self, *args, **kwargs):
+        return self.training_module_no_cond_x.extract_flow_and_weight(*args, **kwargs)
 
-        if(self.model.return_flow_component):
-            res = self.model_with_cond_x(
-                points_trans_action, points_trans_anchor, points_action, points_anchor)
-            x_action = res['flow_action']
-            x_anchor = res['flow_anchor']
+    def predict(self, model_output, points_trans_action, points_trans_anchor):
+        x_action = model_output['flow_action']
+        x_anchor = model_output['flow_anchor']
+        
+        # If we've applied some sampling, we need to extract the predictions too...
+        if "sampled_ixs_action" in model_output:
+            ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+            sampled_points_trans_action = torch.take_along_dim(
+                points_trans_action, ixs_action, dim=1
+            )
         else:
-            res = self.model_with_cond_x(
-                    points_trans_action, points_trans_anchor, points_action, points_anchor)
-            if self.model_with_cond_x.conditioning not in ["latent_z", "latent_z_1pred", "latent_z_1pred_10d", "latent_z_linear", "latent_z_linear_internalcond"]:
-                if self.model_with_cond_x.return_debug:
-                    x_action, x_anchor, goal_emb, goal_emb_cond_x, for_debug = res
-                    heads = None
-                else:
-                    x_action, x_anchor, goal_emb, goal_emb_cond_x = res
-                    heads = None
-            else:
-                if self.model_with_cond_x.return_debug:
-                    x_action, x_anchor, goal_emb, goal_emb_cond_x, heads, for_debug = res
-                else:
-                    x_action, x_anchor, goal_emb, goal_emb_cond_x, heads = res
+            sampled_points_trans_action = points_trans_action
 
-        points_trans_action = points_trans_action[:, :, :3]
-        points_trans_anchor = points_trans_anchor[:, :, :3]
-        ans_dict = self.predict(x_action=x_action, x_anchor=x_anchor,
-                                points_trans_action=points_trans_action, points_trans_anchor=points_trans_anchor)
-        if(self.model.return_flow_component):
-            ans_dict['flow_components'] = res
-        if self.model_with_cond_x.return_debug:
-            for_debug['goal_emb'] = goal_emb
-            for_debug['goal_emb_cond_x'] = goal_emb_cond_x
-            ans_dict['for_debug'] = for_debug
-        return ans_dict
+        if "sampled_ixs_anchor" in model_output:
+            ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+            sampled_points_trans_anchor = torch.take_along_dim(
+                points_trans_anchor, ixs_anchor, dim=1
+            )
+        else:
+            sampled_points_trans_anchor
+        
+        pred_flow_action, pred_w_action = self.extract_flow_and_weight(x_action)
+        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(x_anchor)
 
-    def predict(self, x_action, x_anchor, points_trans_action, points_trans_anchor):
-        pred_flow_action, pred_w_action = self.extract_flow_and_weight(
-            x_action)
-        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(
-            x_anchor)
-
-        pred_T_action = dualflow2pose(xyz_src=points_trans_action, xyz_tgt=points_trans_anchor,
-                                      flow_src=pred_flow_action, flow_tgt=pred_flow_anchor,
-                                      weights_src=pred_w_action, weights_tgt=pred_w_anchor,
-                                      return_transform3d=True, normalization_scehme=self.training_module_no_cond_x.weight_normalize, temperature=self.training_module_no_cond_x.softmax_temperature)
-        pred_points_action = pred_T_action.transform_points(
-            points_trans_action)
+        pred_T_action = dualflow2pose(xyz_src=sampled_points_trans_action, 
+                                      xyz_tgt=sampled_points_trans_anchor,
+                                      flow_src=pred_flow_action, 
+                                      flow_tgt=pred_flow_anchor,
+                                      weights_src=pred_w_action, 
+                                      weights_tgt=pred_w_anchor,
+                                      return_transform3d=True, 
+                                      normalization_scehme=self.training_module_no_cond_x.weight_normalize, 
+                                      temperature=self.training_module_no_cond_x.softmax_temperature)
+        
+        pred_points_action = pred_T_action.transform_points(points_trans_action)
 
         return {"pred_T_action": pred_T_action,
                 "pred_points_action": pred_points_action}
 
-    def compute_loss(self, x_action, x_anchor, goal_emb, goal_emb_cond_x, batch, log_values={}, loss_prefix=''):
-        loss, log_values = self.training_module_no_cond_x.compute_loss(x_action, x_anchor, goal_emb, batch, log_values, loss_prefix)
+    def get_transform(self, points_trans_action, points_trans_anchor, points_action=None, points_anchor=None, mode="forward"):
+        # mode is unused
+
+        model_output = self.model_with_cond_x(points_trans_action, 
+                                              points_trans_anchor, 
+                                              points_action, 
+                                              points_anchor)
+
+        points_trans_action = points_trans_action[:, :, :3]
+        points_trans_anchor = points_trans_anchor[:, :, :3]
+        
+        ans_dict = self.predict(model_output,
+                                points_trans_action=points_trans_action, 
+                                points_trans_anchor=points_trans_anchor)
+        
+        ans_dict['flow_components'] = model_output
+        return ans_dict
+
+    def compute_loss(self, model_output, batch, log_values={}, loss_prefix=''):
+        x_action = model_output['flow_action']
+        x_anchor = model_output['flow_anchor']
+        goal_emb = model_output['goal_emb']
+        goal_emb_cond_x = model_output['goal_emb_cond_x']
+        
+        # Compute pzY losses using the pzX predictions (except goal_emb which is from pzY)
+        loss, log_values = self.training_module_no_cond_x.compute_loss(model_output, 
+                                                                       batch, 
+                                                                       log_values, 
+                                                                       loss_prefix)
+
         # aka "if it is training time and not val time"
         if goal_emb is not None:
             B, K, D = goal_emb.shape
@@ -608,12 +651,9 @@ class Multimodal_EquivarianceTrainingModule_WithPZCondX(PointCloudTrainingModule
 
             log_values[loss_prefix+'goal_emb_cond_x_loss'] = self.goal_emb_cond_x_loss_weight * goal_emb_loss
             log_values[loss_prefix+'action_kl'] = action_kl
-            log_values[loss_prefix + 'anchor_kl'] = anchor_kl
+            log_values[loss_prefix+'anchor_kl'] = anchor_kl
 
         return loss, log_values
-
-    def extract_flow_and_weight(self, *args, **kwargs):
-        return self.training_module_no_cond_x.extract_flow_and_weight(*args, **kwargs)
 
     def module_step(self, batch, batch_idx):
         points_trans_action = batch['points_action_trans']
@@ -640,32 +680,17 @@ class Multimodal_EquivarianceTrainingModule_WithPZCondX(PointCloudTrainingModule
             self.training_module_no_cond_x.model.freeze_embnn = self.cfg_freeze_embnn
             self.training_module_no_cond_x.model.tax_pose.freeze_embnn = self.cfg_freeze_embnn
             
-        if self.model.return_flow_component:
-            model_output = self.model_with_cond_x(points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor)
-            x_action = model_output['flow_action']
-            x_anchor = model_output['flow_anchor']
-            goal_emb = model_output['goal_emb']
-            goal_emb_cond_x = model_output['goal_emb_cond_x']
-        else:
-            res = self.model_with_cond_x(
-                    points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor)
-            if self.model_with_cond_x.conditioning not in ["latent_z", "latent_z_1pred", "latent_z_1pred_10d", "latent_z_linear", "latent_z_linear_internalcond"]:
-                if self.model_with_cond_x.return_debug:
-                    x_action, x_anchor, goal_emb, goal_emb_cond_x, for_debug = res
-                    heads = None
-                else:
-                    x_action, x_anchor, goal_emb, goal_emb_cond_x = res
-                    heads = None
-            else:
-                if self.model_with_cond_x.return_debug:
-                    x_action, x_anchor, goal_emb, goal_emb_cond_x, heads, for_debug = res
-                else:
-                    x_action, x_anchor, goal_emb, goal_emb_cond_x, heads = res
+        model_output = self.model_with_cond_x(points_trans_action, 
+                                              points_trans_anchor, 
+                                              points_onetrans_action, 
+                                              points_onetrans_anchor)
 
         log_values = {}
         log_prefix = 'pzX_' if self.joint_train_prior else ''
-        loss, log_values = self.compute_loss(
-            x_action, x_anchor, goal_emb, goal_emb_cond_x, batch, log_values=log_values, loss_prefix=log_prefix)        
+        loss, log_values = self.compute_loss(model_output, 
+                                             batch, 
+                                             log_values=log_values, 
+                                             loss_prefix=log_prefix)        
         
         if self.joint_train_prior:
             loss = pzY_loss + loss
@@ -686,41 +711,53 @@ class Multimodal_EquivarianceTrainingModule_WithPZCondX(PointCloudTrainingModule
         T0 = Transform3d(matrix=batch['T0'])
         T1 = Transform3d(matrix=batch['T1'])
 
-        if self.model.return_flow_component:
-            model_output = self.model_with_cond_x(points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor)
-            x_action = model_output['flow_action']
-            x_anchor = model_output['flow_anchor']
-            goal_emb = model_output['goal_emb']
-            goal_emb_cond_x = model_output['goal_emb_cond_x']
-        else:
-            res = self.model_with_cond_x(
-                    points_trans_action, points_trans_anchor, points_onetrans_action, points_onetrans_anchor)
-            if self.model_with_cond_x.conditioning not in ["latent_z", "latent_z_1pred", "latent_z_1pred_10d", "latent_z_linear", "latent_z_linear_internalcond"]:
-                if self.model_with_cond_x.return_debug:
-                    x_action, x_anchor, goal_emb, goal_emb_cond_x, for_debug = res
-                    heads = None
-                else:
-                    x_action, x_anchor, goal_emb, goal_emb_cond_x = res
-                    heads = None
-            else:
-                if self.model_with_cond_x.return_debug:
-                    x_action, x_anchor, goal_emb, goal_emb_cond_x, heads, for_debug = res
-                else:
-                    x_action, x_anchor, goal_emb, goal_emb_cond_x, heads = res
-
+        model_output = self.model_with_cond_x(points_trans_action, 
+                                              points_trans_anchor, 
+                                              points_onetrans_action, 
+                                              points_onetrans_anchor)
+        
+        x_action = model_output['flow_action']
+        x_anchor = model_output['flow_anchor']
+        goal_emb = model_output['goal_emb']
+        goal_emb_cond_x = model_output['goal_emb_cond_x']
 
         points_action = points_action[:, :, :3]
         points_anchor = points_anchor[:, :, :3]
         points_trans_action = points_trans_action[:, :, :3]
         points_trans_anchor = points_trans_anchor[:, :, :3]
+        
+        # If we've applied some sampling, we need to extract the predictions too...
+        if "sampled_ixs_action" in model_output:
+            ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+            sampled_points_action = torch.take_along_dim(points_action, ixs_action, dim=1)
+            sampled_points_trans_action = torch.take_along_dim(
+                points_trans_action, ixs_action, dim=1
+            )
+        else:
+            sampled_points_trans_action = points_trans_action
+
+        if "sampled_ixs_anchor" in model_output:
+            ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+            sampled_points_anchor = torch.take_along_dim(points_anchor, ixs_anchor, dim=1)
+            sampled_points_trans_anchor = torch.take_along_dim(
+                points_trans_anchor, ixs_anchor, dim=1
+            )
+        else:
+            sampled_points_trans_anchor = points_trans_anchor
 
         pred_flow_action, pred_w_action = self.extract_flow_and_weight(x_action)
         pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(x_anchor)
 
-        pred_T_action = dualflow2pose(xyz_src=points_trans_action, xyz_tgt=points_trans_anchor,
-                                      flow_src=pred_flow_action, flow_tgt=pred_flow_anchor,
-                                      weights_src=pred_w_action, weights_tgt=pred_w_anchor,
-                                      return_transform3d=True, normalization_scehme=self.training_module_no_cond_x.weight_normalize, temperature=self.training_module_no_cond_x.softmax_temperature)
+        pred_T_action = dualflow2pose(xyz_src=sampled_points_trans_action, 
+                                      xyz_tgt=sampled_points_trans_anchor,
+                                      flow_src=pred_flow_action, 
+                                      flow_tgt=pred_flow_anchor,
+                                      weights_src=pred_w_action, 
+                                      weights_tgt=pred_w_anchor,
+                                      return_transform3d=True, 
+                                      normalization_scehme=self.training_module_no_cond_x.weight_normalize, 
+                                      temperature=self.training_module_no_cond_x.softmax_temperature)
+        
         pred_points_action = pred_T_action.transform_points(points_trans_action)
         points_action_target = T1.transform_points(points_action)
         
@@ -771,7 +808,7 @@ class Multimodal_EquivarianceTrainingModule_WithPZCondX(PointCloudTrainingModule
 
         colors_pred_w_action = color_gradient(pred_w_action[0])
         colors_pred_w_anchor = color_gradient(pred_w_anchor[0])
-        pred_w_points = torch.cat([points_action[0].detach(), points_anchor[0].detach()], dim=0).cpu().numpy()
+        pred_w_points = torch.cat([sampled_points_action[0].detach(), sampled_points_anchor[0].detach()], dim=0).cpu().numpy()
         pred_w_on_objects = np.concatenate([
             pred_w_points,
             np.concatenate([colors_pred_w_action, colors_pred_w_anchor], axis=0)],

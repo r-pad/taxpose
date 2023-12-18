@@ -66,7 +66,6 @@ class Multimodal_ResidualFlow_DiffEmbTransformer(nn.Module):
         #     assert not freeze_residual_flow and not freeze_z_embnn, "Prob didn't want to freeze residual flow or z embnn when using latent_z_linear"
 
         self.tax_pose = residualflow_diffembtransformer
-        self.return_flow_component = True
 
         self.emb_dims = self.EMB_DIMS_BY_CONDITIONING[self.conditioning]
         self.num_emb_heads = self.NUM_HEADS_BY_CONDITIONING[self.conditioning]
@@ -265,32 +264,15 @@ class Multimodal_ResidualFlow_DiffEmbTransformer(nn.Module):
         if self.conditioning in ["latent_z_linear", "latent_z_linear_internalcond"]:
             goal_emb = goal_emb[0]
 
-        if self.return_flow_component:
-            if self.freeze_residual_flow:
-                flow_action['flow_action'] = flow_action['flow_action'].detach()
-                flow_action['flow_anchor'] = flow_action['flow_anchor'].detach()
-            flow_action = {
-                **flow_action, 
-                'goal_emb': goal_emb,
-                **for_debug,
-            }
-        else:
-            if self.freeze_residual_flow:
-                flow_action = (flow_action[0].detach(), flow_action[1].detach(), *flow_action[2:])
-
-            if self.conditioning in ["latent_z_linear", "latent_z_linear_internalcond"] and mode == "forward":
-                # These are for the loss
-                heads = {
-                    k: for_debug[k] for k in ['goal_emb_mu', 'goal_emb_logvar']
-                }
-                flow_action = (
-                    *flow_action, 
-                    goal_emb,
-                    heads
-                )
-            else:
-                flow_action = (*flow_action, goal_emb)
-
+        if self.freeze_residual_flow:
+            flow_action['flow_action'] = flow_action['flow_action'].detach()
+            flow_action['flow_anchor'] = flow_action['flow_anchor'].detach()
+        
+        flow_action = {
+            **flow_action, 
+            'goal_emb': goal_emb,
+            **for_debug,
+        }
         return flow_action
     
     def sample(self, action_points, anchor_points):
@@ -459,45 +441,19 @@ class Multimodal_ResidualFlow_DiffEmbTransformer_WithPZCondX(nn.Module):
                                                     action_center=action_center,
                                                     anchor_center=anchor_center)
 
-        if self.residflow_embnn.return_flow_component:
-            # If the demo is available, run p(z|Y)
-            if input[2] is not None:
-                # Inputs 2 and 3 are the objects in demo positions
-                # If we have access to these, we can run the pzY network
-                pzY_results = self.residflow_embnn(*input)
-                goal_emb = pzY_results['goal_emb']
-            else:
-                goal_emb = None
-
-            flow_action = {
-                **flow_action,
-                'goal_emb': goal_emb,
-                'goal_emb_cond_x': goal_emb_cond_x,
-                **for_debug,
-            }
+        # If the demo is available, run p(z|Y)
+        if input[2] is not None:
+            # Inputs 2 and 3 are the objects in demo positions
+            # If we have access to these, we can run the pzY network
+            pzY_results = self.residflow_embnn(*input)
+            goal_emb = pzY_results['goal_emb']
         else:
-            # If the demo is available, run p(z|Y)
-            if input[2] is not None:
-                # Inputs 2 and 3 are the objects in demo positions
-                # If we have access to these, we can run the pzY network
-                pzY_results = self.residflow_embnn(*input)
-                goal_emb = pzY_results[2]
-            else:
-                goal_emb = None
+            goal_emb = None
 
-            flow_action = (*flow_action, goal_emb, goal_emb_cond_x)
-            # TODO put everything into a dictionary later. Getting outputs from a tuple with a changing length is annoying
-            if self.conditioning in ["latent_z_linear", "latent_z_linear_internalcond"]:
-                flow_action = (
-                    *flow_action, 
-
-                    # These are for the loss
-                    {
-                        k: for_debug[k] for k in ['goal_emb_mu', 'goal_emb_logvar']
-                    }
-                )
-            if self.return_debug:
-                flow_action = (*flow_action, for_debug)
-
-
+        flow_action = {
+            **flow_action,
+            'goal_emb': goal_emb,
+            'goal_emb_cond_x': goal_emb_cond_x,
+            **for_debug,
+        }
         return flow_action

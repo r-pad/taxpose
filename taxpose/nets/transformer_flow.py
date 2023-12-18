@@ -207,7 +207,7 @@ class ResidualMLPHead(nn.Module):
     v_i = f(\phi_i) + \tilde{y}_i - x_i
     """
 
-    def __init__(self, emb_dims=512, output_dims=3, pred_weight=True, residual_on=True):
+    def __init__(self, emb_dims=512, pred_weight=True, residual_on=True):
         super(ResidualMLPHead, self).__init__()
 
         self.emb_dims = emb_dims
@@ -220,7 +220,7 @@ class ResidualMLPHead(nn.Module):
         else:
             self.proj_flow = nn.Sequential(
                 PointNet([emb_dims, emb_dims // 2, emb_dims // 4, emb_dims // 8]),
-                nn.Conv1d(emb_dims // 8, output_dims, kernel_size=1, bias=False),
+                nn.Conv1d(emb_dims // 8, 3, kernel_size=1, bias=False),
             )
         self.pred_weight = pred_weight
         if self.pred_weight:
@@ -524,13 +524,11 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         else:
             self.head_action = ResidualMLPHead(
                 emb_dims=emb_dims,
-                output_dims=input_dims,
                 pred_weight=self.pred_weight,
                 residual_on=self.residual_on,
             )
             self.head_anchor = ResidualMLPHead(
                 emb_dims=emb_dims,
-                output_dims=input_dims,
                 pred_weight=self.pred_weight,
                 residual_on=self.residual_on,
             )
@@ -631,8 +629,8 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         head_action_output = self.head_action(
             action_embedding_tf,
             anchor_embedding_tf,
-            action_points,
-            anchor_points,
+            action_points[:, :3, :],
+            anchor_points[:, :3, :],
             scores=action_attn,
         )
         flow_action = head_action_output["full_flow"].permute(0, 2, 1)
@@ -657,8 +655,8 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             head_anchor_output = self.head_anchor(
                 anchor_embedding_tf,
                 action_embedding_tf,
-                anchor_points,
-                action_points,
+                anchor_points[:, :3, :],
+                action_points[:, :3, :],
                 scores=anchor_attn,
             )
             flow_anchor = head_anchor_output["full_flow"].permute(0, 2, 1)

@@ -128,7 +128,7 @@ def main(cfg):
 
     dm.setup()
 
-    if cfg.model.name in ["taxposed"]:
+    if cfg.model.name in ["taxposed", "taxposed_mlat_s100", "taxposed_mlat_s256"]:
         TP_input_dims = Multimodal_ResidualFlow_DiffEmbTransformer.TP_INPUT_DIMS[cfg.model.conditioning]
         
         taxpose_decoder_network = ResidualFlow_DiffEmbTransformer(
