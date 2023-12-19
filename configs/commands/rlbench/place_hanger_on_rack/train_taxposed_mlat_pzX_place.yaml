@@ -1,0 +1,23 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_train_taxposed@_here_
+  - override /model: taxposed_mlat_s100
+  - override /task:  place_hanger_on_rack
+  - override /phase: place
+  - _self_
+
+break_symmetry: False
+
+training:
+  init_cond_x: True
+  freeze_embnn: True
+  freeze_residual_flow: True
+  freeze_z_embnn: True
+
+  load_from_checkpoint: True
+  checkpoint_file: null
+
+dm:
+  train_dset:
+    num_points: 256

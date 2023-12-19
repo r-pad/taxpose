@@ -45,11 +45,13 @@ dm:
 training:
   batch_size: 8
   max_epochs: 500
+  max_steps: -1
 
   sigmoid_on: True
 
   # Optimizer Settings
   lr: 1e-4
+  gradient_clipping: null
 
   # Loss Settings
   flow_supervision: both

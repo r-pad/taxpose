@@ -85,6 +85,63 @@ If you write some scripts which are meant to be run stand-alone, and not importe
 ./launch_autobot.sh 4 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_solve_puzzle_place.yaml wandb.group=rlbench_mlat resources.num_workers=0
 ./launch_autobot.sh 5 python scripts/train_residual_flow.py --config-name commands/rlbench/train_mlat_rlbench_place_hanger_on_rack_place.yaml wandb.group=rlbench_mlat resources.num_workers=0
 
+### TAXPoseD 
+#### TAXPoseD p(z|Y)
+
+./launch.sh ${RPAD_PLATFORM} 0 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxposed_pzY_place.yaml wandb.group=rlbench_taxposed
+
+./launch.sh ${RPAD_PLATFORM} 1 python scripts/train_residual_flow.py --config-name commands/rlbench/insert_onto_square_peg/train_taxposed_pzY_place.yaml wandb.group=rlbench_taxposed
+
+./launch.sh ${RPAD_PLATFORM} 2 python scripts/train_residual_flow.py --config-name commands/rlbench/phone_on_base/train_taxposed_pzY_place.yaml wandb.group=rlbench_taxposed
+
+./launch.sh ${RPAD_PLATFORM} 3 python scripts/train_residual_flow.py --config-name commands/rlbench/put_toilet_roll_on_stand/train_taxposed_pzY_place.yaml wandb.group=rlbench_taxposed
+
+./launch.sh ${RPAD_PLATFORM} 4 python scripts/train_residual_flow.py --config-name commands/rlbench/place_hanger_on_rack/train_taxposed_pzY_place.yaml wandb.group=rlbench_taxposed
+
+./launch.sh ${RPAD_PLATFORM} 5 python scripts/train_residual_flow.py --config-name commands/rlbench/solve_puzzle/train_taxposed_pzY_place.yaml wandb.group=rlbench_taxposed
+
+#### TAXPoseD p(z|X)
+
+./launch.sh ${RPAD_PLATFORM} 0 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxposed_pzX_place.yaml wandb.group=rlbench_taxposed training.checkpoint_file=<stack_wine p(z|Y) checkpoint>
+
+./launch.sh ${RPAD_PLATFORM} 1 python scripts/train_residual_flow.py --config-name commands/rlbench/insert_onto_square_peg/train_taxposed_pzX_place.yaml wandb.group=rlbench_taxposed training.checkpoint_file=<insert_onto_square_peg p(z|Y) checkpoint>
+
+./launch.sh ${RPAD_PLATFORM} 2 python scripts/train_residual_flow.py --config-name commands/rlbench/phone_on_base/train_taxposed_pzX_place.yaml wandb.group=rlbench_taxposed training.checkpoint_file=<phone_on_base p(z|Y) checkpoint>
+
+./launch.sh ${RPAD_PLATFORM} 3 python scripts/train_residual_flow.py --config-name commands/rlbench/put_toilet_roll_on_stand/train_taxposed_pzX_place.yaml wandb.group=rlbench_taxposed training.checkpoint_file=<put_toilet_roll_on_stand p(z|Y) checkpoint>
+
+./launch.sh ${RPAD_PLATFORM} 4 python scripts/train_residual_flow.py --config-name commands/rlbench/place_hanger_on_rack/train_taxposed_pzX_place.yaml wandb.group=rlbench_taxposed training.checkpoint_file=<place_hanger_on_rack p(z|Y) checkpoint>
+
+./launch.sh ${RPAD_PLATFORM} 5 python scripts/train_residual_flow.py --config-name commands/rlbench/solve_puzzle/train_taxposed_pzX_place.yaml wandb.group=rlbench_taxposed training.checkpoint_file=<solve_puzzle p(z|Y) checkpoint>
+
+#### TAXPoseD Mlat p(z|Y)
+
+./launch.sh ${RPAD_PLATFORM} 0 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxposed_mlat_pzY_place.yaml wandb.group=rlbench_taxposed_mlat
+
+./launch.sh ${RPAD_PLATFORM} 1 python scripts/train_residual_flow.py --config-name commands/rlbench/insert_onto_square_peg/train_taxposed_mlat_pzY_place.yaml wandb.group=rlbench_taxposed_mlat
+
+./launch.sh ${RPAD_PLATFORM} 2 python scripts/train_residual_flow.py --config-name commands/rlbench/phone_on_base/train_taxposed_mlat_pzY_place.yaml wandb.group=rlbench_taxposed_mlat
+
+./launch.sh ${RPAD_PLATFORM} 3 python scripts/train_residual_flow.py --config-name commands/rlbench/put_toilet_roll_on_stand/train_taxposed_mlat_pzY_place.yaml wandb.group=rlbench_taxposed_mlat
+
+./launch.sh ${RPAD_PLATFORM} 4 python scripts/train_residual_flow.py --config-name commands/rlbench/place_hanger_on_rack/train_taxposed_mlat_pzY_place.yaml wandb.group=rlbench_taxposed_mlat
+
+./launch.sh ${RPAD_PLATFORM} 5 python scripts/train_residual_flow.py --config-name commands/rlbench/solve_puzzle/train_taxposed_mlat_pzY_place.yaml wandb.group=rlbench_taxposed_mlat
+
+#### TAXPoseD Mlat p(z|X)
+
+./launch.sh ${RPAD_PLATFORM} 0 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxposed_mlat_pzX_place.yaml wandb.group=rlbench_taxposed_mlat training.checkpoint_file=<stack_wine p(z|Y) checkpoint>
+
+./launch.sh ${RPAD_PLATFORM} 1 python scripts/train_residual_flow.py --config-name commands/rlbench/insert_onto_square_peg/train_taxposed_mlat_pzX_place.yaml wandb.group=rlbench_taxposed_mlat training.checkpoint_file=<insert_onto_square_peg p(z|Y) checkpoint>
+
+./launch.sh ${RPAD_PLATFORM} 2 python scripts/train_residual_flow.py --config-name commands/rlbench/phone_on_base/train_taxposed_mlat_pzX_place.yaml wandb.group=rlbench_taxposed_mlat training.checkpoint_file=<phone_on_base p(z|Y) checkpoint>
+
+./launch.sh ${RPAD_PLATFORM} 3 python scripts/train_residual_flow.py --config-name commands/rlbench/put_toilet_roll_on_stand/train_taxposed_mlat_pzX_place.yaml wandb.group=rlbench_taxposed_mlat training.checkpoint_file=<put_toilet_roll_on_stand p(z|Y) checkpoint>
+
+./launch.sh ${RPAD_PLATFORM} 4 python scripts/train_residual_flow.py --config-name commands/rlbench/place_hanger_on_rack/train_taxposed_mlat_pzX_place.yaml wandb.group=rlbench_taxposed_mlat training.checkpoint_file=<place_hanger_on_rack p(z|Y) checkpoint>
+
+./launch.sh ${RPAD_PLATFORM} 5 python scripts/train_residual_flow.py --config-name commands/rlbench/solve_puzzle/train_taxposed_mlat_pzX_place.yaml wandb.group=rlbench_taxposed_mlat training.checkpoint_file=<solve_puzzle p(z|Y) checkpoint>
+
 
 ### Ablations
 

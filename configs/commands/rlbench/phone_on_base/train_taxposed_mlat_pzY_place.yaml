@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_train_taxposed@_here_
+  - override /model: taxposed_mlat_s100
+  - override /task:  phone_on_base
+  - override /phase: place
+  - _self_
+
+break_symmetry: False

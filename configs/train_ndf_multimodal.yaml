@@ -44,7 +44,7 @@ dm:
 
 training:
   batch_size: 8
-  max_epochs: 20
+  max_epochs: 500
   max_steps: -1
 
   sigmoid_on: True
@@ -82,7 +82,7 @@ training:
   checkpoint_file: null
 
   # Visualization Settings
-  image_logging_period: 1001
+  image_logging_period: 100
   log_every_n_steps: 100
   check_val_every_n_epoch: 5
 

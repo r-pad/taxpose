@@ -3,7 +3,7 @@ name: ???
 conditioning: pos_delta_l2norm
 
 emb_dims: 512
-emb_nn: dgcnn
+emb_nn: cond_dgcnn
 return_flow_component: True
 center_feature: True
 inital_sampling_ratio: 1
@@ -13,6 +13,7 @@ mlat_sample: null
 mlat_nkps: null
 break_symmetry: False
 latent_z_linear_size: 40
+num_points: 1024
 
 gumbel_temp: 1
 division_smooth_factor: 1

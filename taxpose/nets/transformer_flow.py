@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from taxpose.nets.pointnet import PointNet
+from taxpose.nets.taxposed_dgcnn import DGCNN as CondDGCNN
 from taxpose.nets.transformer_flow_pm import CustomTransformer
 from taxpose.nets.tv_mlp import MLP as TVMLP
 from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
@@ -487,13 +488,26 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.cycle = cycle
         self.break_symmetry = break_symmetry
         self.conditioning_size = conditioning_size
+        self.emb_nn = emb_nn
         if emb_nn == "dgcnn":
-            self.emb_nn_action = DGCNN(emb_dims=self.emb_dims, input_dims=self.input_dims, conditioning_size=self.conditioning_size)
-            self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims, input_dims=self.input_dims, conditioning_size=self.conditioning_size)
+            self.emb_nn_action = DGCNN(emb_dims=self.emb_dims)
+            self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims)
+        elif emb_nn == "cond_dgcnn":
+            self.emb_nn_action = CondDGCNN(
+                emb_dims=self.emb_dims,
+                input_dims=self.input_dims,
+                conditioning_size=self.conditioning_size,
+            )
+            self.emb_nn_anchor = CondDGCNN(
+                emb_dims=self.emb_dims,
+                input_dims=self.input_dims,
+                conditioning_size=self.conditioning_size,
+            )
         elif emb_nn == "vn_dgcnn":
             args = VNArgs()
-            self.emb_nn_action = VN_DGCNN(args, num_part=self.emb_dims, gc=False) # TODO: add input_dims and conditioning_size
-            self.emb_nn_anchor = VN_DGCNN(args, num_part=self.emb_dims, gc=False) # TODO: add input_dims and conditioning_size
+            # TODO: add variable input and conditioning
+            self.emb_nn_action = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
+            self.emb_nn_anchor = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
         else:
             raise Exception("Not implemented")
         self.center_feature = center_feature
@@ -508,7 +522,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.transformer_anchor = CustomTransformer(
             emb_dims=emb_dims, return_attn=self.return_attn, bidirectional=False
         )
-        if multilaterate: # TODO: add input_dims 
+        if multilaterate:
             self.head_action = MultilaterationHead(
                 emb_dims=emb_dims,
                 pred_weight=self.pred_weight,
@@ -545,9 +559,17 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 nn.Conv1d(emb_dims_sym * 4, self.emb_dims, kernel_size=1, bias=False),
             )
 
-    def forward(self, *input, conditioning_action=None, conditioning_anchor=None, action_center=None, anchor_center=None):
-        action_points = input[0].permute(0, 2, 1)[:, :self.input_dims]  # B,3,num_points
-        anchor_points = input[1].permute(0, 2, 1)[:, :self.input_dims]
+    def forward(
+        self,
+        *input,
+        conditioning_action=None,
+        conditioning_anchor=None,
+        action_center=None,
+        anchor_center=None,
+    ):
+        # B,input_dims,num_points
+        action_points = input[0].permute(0, 2, 1)[:, : self.input_dims]
+        anchor_points = input[1].permute(0, 2, 1)[:, : self.input_dims]
 
         if action_center is None:
             action_center = action_points[:, :3].mean(dim=2, keepdim=True)
@@ -556,19 +578,17 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
 
         action_points_dmean = torch.cat(
             [
-                action_points[:,:3,:] - \
-                    action_center,
-                action_points[:,3:,:],
+                action_points[:, :3, :] - action_center,
+                action_points[:, 3:, :],
             ],
-            dim=1
+            dim=1,
         )
         anchor_points_dmean = torch.cat(
             [
-                anchor_points[:,:3,:] - \
-                    anchor_center,
-                anchor_points[:,3:,:],
+                anchor_points[:, :3, :] - anchor_center,
+                anchor_points[:, 3:, :],
             ],
-            dim=1
+            dim=1,
         )
 
         # mean center point cloud before DGCNN
@@ -576,8 +596,16 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             action_points_dmean = action_points
             anchor_points_dmean = anchor_points
 
-        action_embedding = self.emb_nn_action(action_points_dmean)
-        anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
+        if self.emb_nn == "cond_dgcnn":
+            action_embedding = self.emb_nn_action(
+                action_points_dmean, conditioning=conditioning_action
+            )
+            anchor_embedding = self.emb_nn_anchor(
+                anchor_points_dmean, conditioning=conditioning_anchor
+            )
+        else:
+            action_embedding = self.emb_nn_action(action_points_dmean)
+            anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
 
         if self.freeze_embnn:
             action_embedding = action_embedding.detach()
