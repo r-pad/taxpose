@@ -47,9 +47,9 @@ def occlusion_fn(
         return lambda x, y, z: x
 
     def occlusion(points: npt.NDArray[np.float32], obj_class: int, min_num_points: int):
-        if obj_class == cfg.occlusion_class:
+        if obj_class == cfg.occlusion_class or cfg.occlusion_class == "all":
             if cfg.ball_occlusion:
-                if np.random.rand() > cfg.occlusion_prob:
+                if np.random.rand() < cfg.occlusion_prob:
                     points_new, _ = ball_occlusion(points[0], radius=cfg.ball_radius)
 
                     # Ignore the occlusion if it's going to mess us up later...
@@ -57,13 +57,13 @@ def occlusion_fn(
                         points = points_new.unsqueeze(0)
 
             if cfg.plane_occlusion:
-                if np.random.rand() > cfg.occlusion_prob:
+                if np.random.rand() < cfg.occlusion_prob:
                     points_new, _ = plane_occlusion(
                         points[0], stand_off=cfg.plane_standoff
                     )
                     # Ignore the occlusion if it's going to mess us up later...
                     if points_new.shape[0] > min_num_points:
                         points = points_new.unsqueeze(0)
-        return points
+        return points if isinstance(points, np.ndarray) else points.numpy()
 
     return occlusion

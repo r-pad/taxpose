@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 import numpy as np
 import numpy.typing as npt
 
-from taxpose.datasets.ndf import ObjectClass
+from taxpose.datasets.enums import ObjectClass
 
 
 def scalars_to_rgb(symmetry_labels: npt.NDArray[np.float32]) -> npt.NDArray[np.uint8]:
@@ -162,3 +162,105 @@ def nonsymmetric_labels(obj_pcd) -> Tuple[np.float32, np.float32]:
     l_obj = np.ones((obj_pcd.shape[0], 1), dtype=np.float32)
 
     return l_obj, centroid
+
+
+def compute_demo_symmetry_features(
+    points_action: npt.NDArray[np.float32],
+    points_anchor: npt.NDArray[np.float32],
+    action_class: ObjectClass,
+    anchor_class: ObjectClass,
+):
+    assert len(points_action.shape) == 2
+    assert len(points_anchor.shape) == 2
+    assert points_action.shape[1] == 3
+    assert points_anchor.shape[1] == 3
+
+    if anchor_class == ObjectClass.GRIPPER:
+        raise ValueError("Anchor class cannot be the gripper.")
+
+    action_centroid = points_action.mean(axis=0)
+    anchor_centroid = points_anchor.mean(axis=0)
+
+    if action_class == ObjectClass.GRIPPER:
+        action_sym_feats, _, _ = gripper_symmetry_labels(points_action)
+    elif action_class in {ObjectClass.BOTTLE, ObjectClass.BOWL}:
+        action_sym_feats, _, _, _ = rotational_symmetry_labels(
+            points_action, action_class, anchor_centroid
+        )
+    else:
+        action_sym_feats, _ = nonsymmetric_labels(points_action)
+
+    if anchor_class in {ObjectClass.BOTTLE, ObjectClass.BOWL}:
+        anchor_sym_feats, _, _, _ = rotational_symmetry_labels(
+            points_anchor, anchor_class, action_centroid
+        )
+    else:
+        anchor_sym_feats, _ = nonsymmetric_labels(points_anchor)
+
+    anchor_sym_rgb = scalars_to_rgb(anchor_sym_feats[..., 0])
+    action_sym_rgb = scalars_to_rgb(action_sym_feats[..., 0])
+
+    return (
+        action_sym_feats,
+        anchor_sym_feats,
+        action_sym_rgb,
+        anchor_sym_rgb,
+    )
+
+
+def compute_inference_symmetry_features(
+    points_action: npt.NDArray[np.float32],
+    points_anchor: npt.NDArray[np.float32],
+    action_class: ObjectClass,
+    anchor_class: ObjectClass,
+):
+    """The only difference between this and compute_demo_symmetry_features is that
+    this function RANDOMLY breaks symmetries. This allows the computation
+    of the two objects to be independent."""
+    assert len(points_action.shape) == 2
+    assert len(points_anchor.shape) == 2
+    assert points_action.shape[1] == 3
+    assert points_anchor.shape[1] == 3
+
+    if anchor_class == ObjectClass.GRIPPER:
+        raise ValueError("Anchor class cannot be the gripper.")
+
+    if anchor_class == ObjectClass.MUG or action_class == ObjectClass.MUG:
+        # No symmetry.
+        action_sym_feats, _ = nonsymmetric_labels(points_action)
+        anchor_sym_feats, _ = nonsymmetric_labels(points_anchor)
+        anchor_sym_rgb = scalars_to_rgb(anchor_sym_feats[..., 0])
+        action_sym_rgb = scalars_to_rgb(action_sym_feats[..., 0])
+        return (
+            action_sym_feats,
+            anchor_sym_feats,
+            action_sym_rgb,
+            anchor_sym_rgb,
+        )
+
+    if action_class == ObjectClass.GRIPPER:
+        action_sym_feats, _, _ = gripper_symmetry_labels(points_action)
+    elif action_class in {ObjectClass.BOTTLE, ObjectClass.BOWL}:
+        # Change here! Notice no input.
+        action_sym_feats, _, _, _ = rotational_symmetry_labels(
+            points_action, action_class, look_at=None
+        )
+    else:
+        action_sym_feats, _ = nonsymmetric_labels(points_action)
+
+    if anchor_class in {ObjectClass.BOTTLE, ObjectClass.BOWL}:
+        anchor_sym_feats, _, _, _ = rotational_symmetry_labels(
+            points_anchor, anchor_class, look_at=None
+        )
+    else:
+        anchor_sym_feats, _ = nonsymmetric_labels(points_anchor)
+
+    anchor_sym_rgb = scalars_to_rgb(anchor_sym_feats[..., 0])
+    action_sym_rgb = scalars_to_rgb(action_sym_feats[..., 0])
+
+    return (
+        action_sym_feats,
+        anchor_sym_feats,
+        action_sym_rgb,
+        anchor_sym_rgb,
+    )

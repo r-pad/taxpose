@@ -55,7 +55,8 @@ from torch import nn
 from torch.nn import functional as F
 from torchvision.transforms import ToTensor
 
-from taxpose.datasets.ndf import OBJECT_LABELS_TO_CLASS, ObjectClass
+from taxpose.datasets.enums import ObjectClass
+from taxpose.datasets.ndf import OBJECT_LABELS_TO_CLASS
 from taxpose.datasets.symmetry_utils import (
     gripper_symmetry_labels,
     nonsymmetric_labels,

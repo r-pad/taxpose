@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from pytorch3d.ops import ball_query
 from torch.nn import functional as F
@@ -7,6 +8,9 @@ def ball_occlusion(points, radius=0.05):
     """
     points: (num_points, 3)
     """
+    if isinstance(points, np.ndarray):
+        points = torch.from_numpy(points)
+
     idx = torch.randint(points.shape[0], [1])
     center = points[idx]
 
@@ -18,6 +22,9 @@ def ball_occlusion(points, radius=0.05):
 
 
 def plane_occlusion(points, stand_off=0.02):
+    if isinstance(points, np.ndarray):
+        points = torch.from_numpy(points)
+
     idx = torch.randint(points.shape[0], [1])
     pt = points[idx]
     center = points.mean(dim=0, keepdim=True)

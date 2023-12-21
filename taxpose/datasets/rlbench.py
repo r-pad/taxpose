@@ -208,6 +208,7 @@ class RLBenchPointCloudDatasetConfig:
 
     # Occlusion config.
     occlusion_cfg: Optional[OcclusionConfig] = None
+    synthetic_occlusion: bool = False
 
     # Downsample the point clouds.
     num_points: Optional[int] = None
