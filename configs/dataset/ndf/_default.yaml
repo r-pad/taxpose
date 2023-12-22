@@ -25,7 +25,6 @@ train_dset:
     action: ${task.phase.name}
     symmetry_after_transform: False
     occlusion_cfg: ???
-    synthetic_occlusion: False
     distractor_anchor_aug: False
     distractor_rot_sample_method: "axis_angle_uniform_z"
     multimodal_transform_base: False
@@ -47,7 +46,6 @@ val_dset:
     action: ${task.phase.name}
     symmetry_after_transform: ${...train_dset.demo_dset.symmetry_after_transform}
     occlusion_cfg: ???
-    synthetic_occlusion: False
     distractor_anchor_aug: ${...train_dset.demo_dset.distractor_anchor_aug}
     distractor_rot_sample_method: ${...train_dset.demo_dset.distractor_rot_sample_method}
     multimodal_transform_base: ${...train_dset.demo_dset.multimodal_transform_base}
@@ -69,7 +67,6 @@ test_dset:
     action: ${task.phase.name}
     symmetry_after_transform: ${...train_dset.demo_dset.symmetry_after_transform}
     occlusion_cfg: ???
-    synthetic_occlusion: False
     distractor_anchor_aug: ${...train_dset.demo_dset.distractor_anchor_aug}
     distractor_rot_sample_method: ${...train_dset.demo_dset.distractor_rot_sample_method}
     multimodal_transform_base: ${...train_dset.demo_dset.multimodal_transform_base}

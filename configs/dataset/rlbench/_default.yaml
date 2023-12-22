@@ -18,7 +18,6 @@ train_dset:
     with_symmetry: True
     occlusion_cfg: ???
     num_points: 256
-    synthetic_occlusion: False
 
 val_dset:
   demo_dset:
@@ -33,7 +32,6 @@ val_dset:
     with_symmetry: True
     occlusion_cfg: ???
     num_points: 256
-    synthetic_occlusion: False
 
 test_dset:
   demo_dset:
@@ -48,4 +46,3 @@ test_dset:
     with_symmetry: True
     occlusion_cfg: ???
     num_points: 256
-    synthetic_occlusion: False

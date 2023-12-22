@@ -76,7 +76,6 @@ class NDFPointCloudDatasetConfig:
 
     # Augmentation parameters.
     occlusion_cfg: Optional[OcclusionConfig] = None
-    synthetic_occlusion: bool = False
     distractor_anchor_aug: bool = False
     distractor_rot_sample_method: str = "axis_angle"
     multimodal_transform_base: bool = False
@@ -184,7 +183,6 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
         self.object_type = cfg.object_type
         self.action = cfg.action
         self.skip_symmetry = cfg.symmetry_after_transform
-        self.synthetic_occlusion = cfg.synthetic_occlusion
         self.distractor_anchor_aug = cfg.distractor_anchor_aug
         self.distractor_rot_sample_method = cfg.distractor_rot_sample_method
         self.multimodal_transform_base = cfg.multimodal_transform_base
@@ -204,6 +202,7 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
         if self.num_demo is not None:
             self.filenames = self.filenames[: self.num_demo]
 
+        self.occlusion_cfg = cfg.occlusion_cfg
         self.occlusion_fn = occlusion_fn(cfg.occlusion_cfg)
 
     def get_existing_data_indices(self):
@@ -309,7 +308,7 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
             points_anchor = torch.cat([points_anchor1, points_anchor2], axis=1).numpy()
 
         # Apply occlusions
-        if self.synthetic_occlusion:
+        if self.occlusion_cfg is not None:
             points_action = self.occlusion_fn(
                 points_action, self.action_class, self.min_num_points
             )
