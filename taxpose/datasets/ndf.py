@@ -10,25 +10,21 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from taxpose.datasets.augmentations import (
+    maybe_downsample,
+    OcclusionConfig,
+    occlusion_fn,
+)
 from taxpose.datasets.base import PlacementPointCloudData
+from taxpose.datasets.enums import ObjectClass, Phase
+from taxpose.datasets.env_mod_utils import get_random_distractor_demo
+from taxpose.datasets.symmetry_utils import (
+    compute_demo_symmetry_features as new_compute_demo_symmetry_features,
+)
 from taxpose.utils.symmetry_utils import (
     get_sym_label_pca_grasp,
     get_sym_label_pca_place,
 )
-
-
-class ObjectClass(str, Enum):
-    MUG = "mug"
-    RACK = "rack"
-    GRIPPER = "gripper"
-    BOTTLE = "bottle"
-    BOWL = "bowl"
-    SLAB = "slab"
-
-
-class Phase(str, Enum):
-    GRASP = "grasp"
-    PLACE = "place"
 
 
 #  0 for mug, 1 for rack, 2 for gripper
@@ -77,6 +73,12 @@ class NDFPointCloudDatasetConfig:
     object_type: ObjectClass = ObjectClass.MUG
     action: Phase = Phase.GRASP
     symmetry_after_transform: bool = False
+
+    # Augmentation parameters.
+    occlusion_cfg: Optional[OcclusionConfig] = None
+    distractor_anchor_aug: bool = False
+    distractor_rot_sample_method: str = "axis_angle"
+    multimodal_transform_base: bool = False
 
 
 def compute_demo_symmetry_features(
@@ -181,6 +183,9 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
         self.object_type = cfg.object_type
         self.action = cfg.action
         self.skip_symmetry = cfg.symmetry_after_transform
+        self.distractor_anchor_aug = cfg.distractor_anchor_aug
+        self.distractor_rot_sample_method = cfg.distractor_rot_sample_method
+        self.multimodal_transform_base = cfg.multimodal_transform_base
 
         if self.dataset_indices is None or self.dataset_indices == "None":
             dataset_indices = self.get_existing_data_indices()
@@ -196,6 +201,9 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
 
         if self.num_demo is not None:
             self.filenames = self.filenames[: self.num_demo]
+
+        self.occlusion_cfg = cfg.occlusion_cfg
+        self.occlusion_fn = occlusion_fn(cfg.occlusion_cfg)
 
     def get_existing_data_indices(self):
         num_files = len(
@@ -224,11 +232,10 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
             if not os.path.exists(filename):
                 bad_demo_id.append(i)
                 continue
-            points_action, points_anchor, _, _, _, _ = self.load_data(
+            points_action, points_anchor = self.load_data(
                 filename,
                 action_class=self.action_class,
                 anchor_class=self.anchor_class,
-                skip_symmetry=True,
             )
             if (points_action.shape[1] < self.min_num_points) or (
                 points_anchor.shape[1] < self.min_num_points
@@ -237,8 +244,8 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
 
         return bad_demo_id
 
-    @functools.cache
-    def load_data(self, filename, action_class, anchor_class, skip_symmetry=False):
+    @functools.lru_cache(maxsize=100)
+    def load_data(self, filename, action_class, anchor_class):
         point_data = np.load(filename, allow_pickle=True)
         points_raw_np = point_data["clouds"]
         classes_raw_np = point_data["classes"]
@@ -272,58 +279,68 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
         points_action = points_action_np.astype(np.float32)[None, ...]
         points_anchor = points_anchor_np.astype(np.float32)[None, ...]
 
+        return (points_action, points_anchor)
+
+    def __getitem__(self, index: int) -> PlacementPointCloudData:
+        filename = self.filenames[index]
+
+        (points_action, points_anchor) = self.load_data(
+            filename,
+            action_class=self.action_class,
+            anchor_class=self.anchor_class,
+        )
+
+        if self.distractor_anchor_aug:
+            (
+                _,
+                points_action,
+                points_anchor1,
+                points_anchor2,
+                debug,
+            ) = get_random_distractor_demo(
+                None,
+                torch.from_numpy(points_action),
+                torch.from_numpy(points_anchor),
+                transform_base=self.multimodal_transform_base,
+                rot_sample_method=self.distractor_rot_sample_method,
+            )
+            points_action = points_action.numpy()
+            points_anchor = torch.cat([points_anchor1, points_anchor2], axis=1).numpy()
+
+        # Apply occlusions
+        if self.occlusion_cfg is not None:
+            points_action = self.occlusion_fn(
+                points_action, self.action_class, self.min_num_points
+            )
+            points_anchor = self.occlusion_fn(
+                points_anchor, self.anchor_class, self.min_num_points
+            )
+
+        # Downsample
+        points_action = maybe_downsample(points_action, self.min_num_points)
+        points_anchor = maybe_downsample(points_anchor, self.min_num_points)
+
+        # Symmetry
         (
             action_symmetry_features,
             anchor_symmetry_features,
             action_symmetry_rgb,
             anchor_symmetry_rgb,
-        ) = compute_demo_symmetry_features(
-            points_action,
-            points_anchor,
-            self.object_type,
-            self.action,
-            action_class,
-            anchor_class,
-            self.normalize_dist,
-            skip_symmetry=skip_symmetry,
+        ) = new_compute_demo_symmetry_features(
+            points_action[0],
+            points_anchor[0],
+            self.action_class,
+            self.anchor_class,
         )
 
         assert not isinstance(action_symmetry_features, torch.Tensor)
         assert not isinstance(anchor_symmetry_features, torch.Tensor)
 
         if action_symmetry_features is not None:
-            assert points_action.shape[1] == action_symmetry_features.shape[1]
-            assert points_anchor.shape[1] == anchor_symmetry_features.shape[1]
-
-        return (
-            points_action,
-            points_anchor,
-            action_symmetry_features,
-            anchor_symmetry_features,
-            action_symmetry_rgb,
-            anchor_symmetry_rgb,
-        )
-
-    def __getitem__(self, index: int) -> PlacementPointCloudData:
-        filename = self.filenames[index]
-
-        (
-            points_action,
-            points_anchor,
-            action_symmetry_features,
-            anchor_symmetry_features,
-            action_symmetry_rgb,
-            anchor_symmetry_rgb,
-        ) = self.load_data(
-            filename,
-            action_class=self.action_class,
-            anchor_class=self.anchor_class,
-            skip_symmetry=self.skip_symmetry,
-        )
-
-        raise NotImplementedError
-
-        # Still need to pass back downsampling and occlusion functions.
+            action_symmetry_features = np.expand_dims(action_symmetry_features, 0)
+            anchor_symmetry_features = np.expand_dims(anchor_symmetry_features, 0)
+            action_symmetry_rgb = np.expand_dims(action_symmetry_rgb, 0)
+            anchor_symmetry_rgb = np.expand_dims(anchor_symmetry_rgb, 0)
 
         return {
             "points_action": points_action,

@@ -1,5 +1,9 @@
 
 # This is the general structure of the datamodule for NDF tasks.
+defaults:
+  - ../@train_dset.demo_dset.occlusion_cfg: _augmentations
+  - ../@val_dset.demo_dset.occlusion_cfg: _augmentations
+  - ../@test_dset.demo_dset.occlusion_cfg: _augmentations
 
 train_dset:
   demo_dset:
@@ -12,7 +16,7 @@ train_dset:
     phase: ${task.phase.name}
     teleport_initial_to_final: true
     with_symmetry: True
-    occlusion_cfg: null
+    occlusion_cfg: ???
     num_points: 256
 
 val_dset:
@@ -26,7 +30,7 @@ val_dset:
     phase: ${task.phase.name}
     teleport_initial_to_final: true
     with_symmetry: True
-    occlusion_cfg: null
+    occlusion_cfg: ???
     num_points: 256
 
 test_dset:
@@ -40,5 +44,5 @@ test_dset:
     phase: ${task.phase.name}
     teleport_initial_to_final: true
     with_symmetry: True
-    occlusion_cfg: null
+    occlusion_cfg: ???
     num_points: 256

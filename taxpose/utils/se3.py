@@ -6,6 +6,7 @@ from pytorch3d.transforms import (
     Transform3d,
     Translate,
     axis_angle_to_matrix,
+    quaternion_to_matrix,
     rotation_6d_to_matrix,
     so3_rotation_angle,
 )
@@ -38,8 +39,52 @@ def transform3d_to(T, device):
 
 
 def random_se3(
-    N, rot_var=np.pi / 180 * 5, trans_var=0.1, device=None, fix_random=False
+    N,
+    rot_var=np.pi / 180 * 5,
+    trans_var=0.1,
+    device=None,
+    fix_random=False,
+    rot_sample_method="axis_angle",
 ):
+    assert rot_sample_method in ["axis_angle", "axis_angle_uniform_z", "quat_uniform"]
+
+    if rot_sample_method == "quat_uniform" and np.isclose(rot_var, np.pi):
+        # This true uniform SE(3) sampling tends to make it hard to train the models
+        # In contrast, the axis angle sampling tends to leave the objects close to upright
+        quat = torch.randn(N, 4, device=device)
+        quat = quat / torch.linalg.norm(quat)
+        R = quaternion_to_matrix(quat)
+    elif rot_sample_method == "axis_angle_uniform_z":
+        # this is random axis angle sampling
+        axis_angle_random = torch.randn(N, 3, device=device)
+        rot_ratio = (
+            torch.rand(1).item()
+            * rot_var
+            / torch.norm(axis_angle_random, dim=1).max().item()
+        )
+        constrained_axix_angle = rot_ratio * axis_angle_random  # max angle is rot_var
+        R_random = axis_angle_to_matrix(constrained_axix_angle)
+
+        # this is uniform z axis rotation sampling
+        theta = torch.rand(N, 1, device=device) * 2 * np.pi
+        axis_angle_z = torch.cat([torch.zeros(N, 2, device=device), theta], dim=1)
+        R_z = axis_angle_to_matrix(axis_angle_z)
+
+        R = torch.bmm(R_z, R_random)
+    else:
+        # this is random axis angle sampling (rot_sample_method == "axis_angle")
+        axis_angle_random = torch.randn(N, 3, device=device)
+        rot_ratio = (
+            torch.rand(1).item()
+            * rot_var
+            / torch.norm(axis_angle_random, dim=1).max().item()
+        )
+        constrained_axix_angle = rot_ratio * axis_angle_random  # max angle is rot_var
+        R = axis_angle_to_matrix(constrained_axix_angle)
+    random_translation = torch.randn(N, 3, device=device)
+    translation_ratio = trans_var / torch.norm(random_translation, dim=1).max().item()
+    t = torch.rand(1).item() * translation_ratio * random_translation
+    return Rotate(R, device=device).translate(t)
     axis_angle_random = torch.randn(N, 3, device=device)
     rot_ratio = (
         torch.rand(1).item()

@@ -5,7 +5,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from taxpose.datasets.ndf import OBJECT_DEMO_LABELS, ObjectClass
+from taxpose.datasets.enums import ObjectClass
+from taxpose.datasets.ndf import OBJECT_DEMO_LABELS
 from taxpose.utils.se3 import dualflow2pose, pure_translation_se3
 from taxpose.utils.symmetry_utils import (
     get_sym_label_pca_grasp,

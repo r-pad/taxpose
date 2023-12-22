@@ -4,7 +4,8 @@ import wandb
 from pytorch3d.transforms import Transform3d
 
 from scripts.evaluate_ndf_mug_standalone import dualflow2pose
-from taxpose.datasets.ndf import OBJECT_DEMO_LABELS, ObjectClass
+from taxpose.datasets.enums import ObjectClass
+from taxpose.datasets.ndf import OBJECT_DEMO_LABELS
 from taxpose.training.point_cloud_training_module import PointCloudTrainingModule
 from taxpose.utils.color_utils import get_color
 from taxpose.utils.se3 import get_degree_angle, get_translation, pure_translation_se3
