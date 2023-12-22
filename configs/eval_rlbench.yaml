@@ -1,10 +1,13 @@
 job_type: eval_rlbench_${task.name}
 
+data_root: ${oc.env:HOME}/datasets
+
 defaults:
   - _logging
   - _self_
 
-  - object_class: stack_wine #{mug, bottle, bowl}
+  - optional task: stack_wine #{mug, bottle, bowl}
+  - benchmark: rlbench
 
   # Machinery to load the correct model architecture.
   # The model config can be found in configs/model.
@@ -12,12 +15,13 @@ defaults:
   - model@place_model: taxpose
 
   # Task-specific settings.
-  - task@grasp_task: ${object_class}_grasp
-  - task@place_task: ${object_class}_place
+  - task/${benchmark}/${task}/task@task
+  - task@grasp_task: ${benchmark}/${task}/phase/grasp
+  - task@place_task: ${benchmark}/${task}/phase/place
 
   # Load the checkpoints appropriately.
-  - checkpoints/rlbench@grasp_checkpoints: ${object_class}/${model@grasp_model}
-  - checkpoints/rlbench@place_checkpoints: ${object_class}/${model@place_model}
+  - checkpoints/rlbench@grasp_checkpoints: ${task}/${model@grasp_model}
+  - checkpoints/rlbench@place_checkpoints: ${task}/${model@place_model}
 
 policy_spec:
   grasp_model: ${grasp_model}
@@ -29,6 +33,9 @@ checkpoints:
 
 num_trials: 100
 headless: True
+
+resources:
+  num_workers: 10
 
 # For prediction.
 z_offset: 0.03

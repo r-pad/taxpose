@@ -169,7 +169,7 @@ def remove_outliers_o3d(original_points):
     return np.asarray(points, dtype=np.float32)[None, ...]
 
 
-def remove_outliers(original_points):
+def remove_outliers(original_points, min_neighbors=1):
     """Remove outliers which are far from other points using pure numpy"""
     # Compute the distance between each point and every other point.
     dists = np.linalg.norm(
@@ -185,7 +185,8 @@ def remove_outliers(original_points):
     # Set diagonal to inf
     np.fill_diagonal(dists, np.inf)
 
-    outliers = np.all(dists > threshold, axis=0)
+    outliers = np.sum(dists > threshold, axis=0)
+    outliers = np.where(outliers < min_neighbors)[0]
 
     # Remove the outliers.
     points = np.delete(original_points, outliers, axis=1)

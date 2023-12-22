@@ -15,12 +15,14 @@ import torch
 import tqdm
 import wandb
 from omegaconf import OmegaConf
+from pyrep.const import RenderMode
 from pytorch3d.ops import sample_farthest_points
 from rlbench.action_modes.action_mode import MoveArmThenGripper
 from rlbench.action_modes.arm_action_modes import EndEffectorPoseViaPlanning
 from rlbench.action_modes.gripper_action_modes import Discrete
 from rlbench.environment import Environment
-from rlbench.tasks import StackWine
+from rlbench.observation_config import ObservationConfig
+from rlbench.utils import name_to_task_class
 from rpad.rlbench_utils.placement_dataset import (
     TASK_DICT,
     get_rgb_point_cloud_by_object_names,
@@ -28,7 +30,11 @@ from rpad.rlbench_utils.placement_dataset import (
 )
 from scipy.spatial.transform import Rotation as R
 
-from taxpose.datasets.rlbench import rotational_symmetry_labels
+from taxpose.datasets.rlbench import (
+    colorize_symmetry_labels,
+    remove_outliers,
+    rotational_symmetry_labels,
+)
 from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
@@ -75,6 +81,38 @@ def rack_symmetry_features(points):
     return np.ones((points.shape[0], 1), dtype=np.float32)
 
 
+def viz_symmetry_features(
+    action_pc,
+    anchor_pc,
+    action_symmetry_features,
+    anchor_symmetry_features,
+):
+    action_symmetry_rgb = colorize_symmetry_labels(action_symmetry_features[..., 0])
+    anchor_symmetry_rgb = colorize_symmetry_labels(anchor_symmetry_features[..., 0])
+
+    # Convert to 0-1 range.
+    action_symmetry_rgb = action_symmetry_rgb / 255.0
+    anchor_symmetry_rgb = anchor_symmetry_rgb / 255.0
+
+    action_symmetry_pc = o3d.geometry.PointCloud()
+    action_symmetry_pc.points = o3d.utility.Vector3dVector(action_pc.cpu().numpy())
+    action_symmetry_pc.colors = o3d.utility.Vector3dVector(action_symmetry_rgb)
+
+    anchor_symmetry_pc = o3d.geometry.PointCloud()
+    anchor_symmetry_pc.points = o3d.utility.Vector3dVector(anchor_pc.cpu().numpy())
+    anchor_symmetry_pc.colors = o3d.utility.Vector3dVector(anchor_symmetry_rgb)
+
+    o3d.visualization.draw_geometries(
+        [
+            action_symmetry_pc,
+            anchor_symmetry_pc,
+        ],
+        window_name="Symmetry Features",
+        width=1024,
+        height=768,
+    )
+
+
 class TAXPosePickPlacePredictor:
     def __init__(
         self,
@@ -99,6 +137,8 @@ class TAXPosePickPlacePredictor:
             task_cfg.place_task,
             run=run,
         )
+
+        self.task_name = task_cfg.task.name
 
         self.debug_viz = debug_viz
 
@@ -176,7 +216,9 @@ class TAXPosePickPlacePredictor:
         return model
 
     def grasp(self, obs) -> np.ndarray:
-        inputs = obs_to_input(obs, "stack_wine", "grasp")
+        inputs = obs_to_input(obs, self.task_name, "grasp")
+
+        device = self.grasp_model.device
 
         action_pc = inputs["action_pc"].unsqueeze(0).to(self.grasp_model.device)
         anchor_pc = inputs["anchor_pc"].unsqueeze(0).to(self.grasp_model.device)
@@ -184,7 +226,29 @@ class TAXPosePickPlacePredictor:
         action_pc, _ = sample_farthest_points(action_pc, K=256, random_start_point=True)
         anchor_pc, _ = sample_farthest_points(anchor_pc, K=256, random_start_point=True)
 
-        preds = self.grasp_model(action_pc, anchor_pc, None, None)
+        # TODO: ben - this is broken. Need to fix symmetry in general...
+
+        action_symmetry_features = bottle_symmetry_features(action_pc.cpu().numpy()[0])
+        anchor_symmetry_features = rack_symmetry_features(anchor_pc.cpu().numpy()[0])
+
+        if self.debug_viz:
+            viz_symmetry_features(
+                action_pc[0],
+                anchor_pc[0],
+                action_symmetry_features,
+                anchor_symmetry_features,
+            )
+
+        # Torchify and GPU
+        action_symmetry_features = torch.from_numpy(action_symmetry_features).to(device)
+        anchor_symmetry_features = torch.from_numpy(anchor_symmetry_features).to(device)
+
+        preds = self.grasp_model(
+            action_pc,
+            anchor_pc,
+            action_symmetry_features[None],
+            anchor_symmetry_features[None],
+        )
 
         # Get the current pose of the gripper.
         T_gripper_world = np.eye(4)
@@ -199,7 +263,7 @@ class TAXPosePickPlacePredictor:
         return T_gripperfinal_world
 
     def place(self, init_obs, post_grasp_obs) -> np.ndarray:
-        inputs = obs_to_input(init_obs, "stack_wine", "place")
+        inputs = obs_to_input(init_obs, self.task_name, "place")
 
         device = self.place_model.device
 
@@ -309,6 +373,10 @@ def obs_to_input(obs, task_name, phase):
         TASK_DICT[task_name]["phase"][phase]["anchor_obj_names"],
     )
 
+    # Remove outliers in the same way...
+    action_point_cloud = remove_outliers(action_point_cloud[None])[0]
+    anchor_point_cloud = remove_outliers(anchor_point_cloud[None])[0]
+
     return {
         "action_rgb": torch.from_numpy(action_rgb),
         "action_pc": torch.from_numpy(action_point_cloud).float(),
@@ -334,6 +402,41 @@ class TrialResult:
     failure_reason: FailureReason
 
 
+def get_obs_config():
+    """We have to do this to match the distribution of the training data!"""
+
+    img_size = (256, 256)
+    obs_config = ObservationConfig()
+    obs_config.set_all(True)
+    obs_config.right_shoulder_camera.image_size = img_size
+    obs_config.left_shoulder_camera.image_size = img_size
+    obs_config.overhead_camera.image_size = img_size
+    obs_config.wrist_camera.image_size = img_size
+    obs_config.front_camera.image_size = img_size
+
+    # Store depth as 0 - 1
+    obs_config.right_shoulder_camera.depth_in_meters = False
+    obs_config.left_shoulder_camera.depth_in_meters = False
+    obs_config.overhead_camera.depth_in_meters = False
+    obs_config.wrist_camera.depth_in_meters = False
+    obs_config.front_camera.depth_in_meters = False
+
+    # We DON'T want to save masks as rgb.
+    obs_config.left_shoulder_camera.masks_as_one_channel = True
+    obs_config.right_shoulder_camera.masks_as_one_channel = True
+    obs_config.overhead_camera.masks_as_one_channel = True
+    obs_config.wrist_camera.masks_as_one_channel = True
+    obs_config.front_camera.masks_as_one_channel = True
+
+    obs_config.right_shoulder_camera.render_mode = RenderMode.OPENGL3
+    obs_config.left_shoulder_camera.render_mode = RenderMode.OPENGL3
+    obs_config.overhead_camera.render_mode = RenderMode.OPENGL3
+    obs_config.wrist_camera.render_mode = RenderMode.OPENGL3
+    obs_config.front_camera.render_mode = RenderMode.OPENGL3
+
+    return obs_config
+
+
 @torch.no_grad()
 def run_trial(policy_spec, task_spec, env_spec, headless=True, run=None) -> TrialResult:
     # Seed the random number generator.
@@ -356,11 +459,12 @@ def run_trial(policy_spec, task_spec, env_spec, headless=True, run=None) -> Tria
             arm_action_mode=EndEffectorPoseViaPlanning(collision_checking=True),
             gripper_action_mode=Discrete(),
         ),
+        obs_config=get_obs_config(),
         headless=headless,
     )
 
     try:
-        task = env.get_task(StackWine)
+        task = env.get_task(name_to_task_class(task_spec.task.name))
         task.sample_variation()
 
         # Reset the environment.
@@ -369,9 +473,11 @@ def run_trial(policy_spec, task_spec, env_spec, headless=True, run=None) -> Tria
         # First, move the arm down a bit so that the cameras can see it!
         # This is a hack to get around the fact that the cameras are not
         # in the same position as the robot's arm.
-        down_action = np.array([*obs.gripper_pose, 1.0])
-        down_action[2] -= 0.4
-        obs, reward, terminate = task.step(down_action)
+        # breakpoint()
+
+        # down_action = np.array([*obs.gripper_pose, 1.0])
+        # down_action[2] -= 0.4
+        # obs, reward, terminate = task.step(down_action)
 
         # Make predictions for grasp and place.
         try:
@@ -446,11 +552,11 @@ def run_trials(
     num_trials,
     headless=True,
     run=None,
-    parallelize=True,
+    num_workers=10,
 ):
     # TODO: Parallelize this. Should all be picklable.
 
-    if not parallelize:
+    if num_workers <= 1:
         results = []
         for i in range(num_trials):
             result = run_trial(
@@ -460,7 +566,7 @@ def run_trials(
             results.append(result)
     else:
         # Try with joblib. Let's see if this works.
-        job_results = joblib.Parallel(n_jobs=10, return_as="generator")(
+        job_results = joblib.Parallel(n_jobs=num_workers, return_as="generator")(
             joblib.delayed(run_trial)(
                 policy_spec,
                 task_spec,
@@ -475,7 +581,7 @@ def run_trials(
     return results
 
 
-@hydra.main(config_path="../configs", config_name="eval_rlbench")
+@hydra.main(version_base="1.2", config_path="../configs", config_name="eval_rlbench")
 def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
 
@@ -498,6 +604,7 @@ def main(cfg):
         cfg.num_trials,
         headless=cfg.headless,
         run=run,
+        num_workers=cfg.resources.num_workers,
     )
 
     # Compute some metrics.

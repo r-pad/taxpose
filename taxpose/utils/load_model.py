@@ -17,10 +17,10 @@ def get_weights_path(
             artifact = api.artifact(checkpoint_reference)
 
         try:
-            ckpt_file = artifact.get_path(weights_file).download(root=artifact_dir)
+            ckpt_file = artifact.get_entry(weights_file).download(root=artifact_dir)
         except KeyError:
             # I re-uploaded a few failed runs...
-            ckpt_file = artifact.get_path("last.ckpt").download(root=artifact_dir)
+            ckpt_file = artifact.get_entry("last.ckpt").download(root=artifact_dir)
     else:
         ckpt_file = checkpoint_reference
 

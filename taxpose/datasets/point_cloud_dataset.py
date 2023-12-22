@@ -75,8 +75,8 @@ class PointCloudDataset(Dataset):
         self.trans_var = cfg.translation_variance
         self.action_rot_sample_method = cfg.action_rot_sample_method
         self.anchor_rot_sample_method = cfg.anchor_rot_sample_method
-        self.action_class = cfg.demo_dset.action_class
-        self.anchor_class = cfg.demo_dset.anchor_class
+        # self.action_class = cfg.demo_dset.action_class
+        # self.anchor_class = cfg.demo_dset.anchor_class
         self.symmetric_class = cfg.symmetric_class  # None if no symmetric class exists
         self.angle_degree = cfg.angle_degree
 
