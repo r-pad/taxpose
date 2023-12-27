@@ -85,18 +85,6 @@ def random_se3(
     translation_ratio = trans_var / torch.norm(random_translation, dim=1).max().item()
     t = torch.rand(1).item() * translation_ratio * random_translation
     return Rotate(R, device=device).translate(t)
-    axis_angle_random = torch.randn(N, 3, device=device)
-    rot_ratio = (
-        torch.rand(1).item()
-        * rot_var
-        / torch.norm(axis_angle_random, dim=1).max().item()
-    )
-    constrained_axix_angle = rot_ratio * axis_angle_random  # max angle is rot_var
-    R = axis_angle_to_matrix(constrained_axix_angle)
-    random_translation = torch.randn(N, 3, device=device)
-    translation_ratio = trans_var / torch.norm(random_translation, dim=1).max().item()
-    t = torch.rand(1).item() * translation_ratio * random_translation
-    return Rotate(R, device=device).translate(t)
 
 
 def get_degree_angle(T):

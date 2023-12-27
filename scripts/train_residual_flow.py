@@ -10,9 +10,17 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
+from taxpose.nets.multimodal_transformer_flow import (
+    Multimodal_ResidualFlow_DiffEmbTransformer,
+    Multimodal_ResidualFlow_DiffEmbTransformer_WithPZCondX,
+)
 from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
+)
+from taxpose.training.multimodal_flow_equivariance_training_module_nocentering import (
+    Multimodal_EquivarianceTrainingModule,
+    Multimodal_EquivarianceTrainingModule_WithPZCondX,
 )
 
 
@@ -43,14 +51,254 @@ def load_emb_weights(checkpoint_reference, wandb_cfg=None, run=None):
         ]
 
 
-def maybe_load_from_wandb(checkpoint_reference, wandb_cfg, run):
+def maybe_load_from_wandb(checkpoint_reference, wandb_cfg=None, run=None):
     if checkpoint_reference.startswith(wandb_cfg.entity):
         # download checkpoint locally (if not already cached)
-        artifact_dir = wandb_cfg.artifact_dir
-        artifact = run.use_artifact(checkpoint_reference)
+        artifact_dir = os.path.join(wandb_cfg.artifact_dir, checkpoint_reference)
+        if run is None or not isinstance(run, wandb.sdk.wandb_run.Run):
+            # Download without a run
+            api = wandb.Api()
+            artifact = api.artifact(checkpoint_reference, type="model")
+        else:
+            artifact = run.use_artifact(checkpoint_reference)
         ckpt_file = artifact.get_path("model.ckpt").download(root=artifact_dir)
     else:
         ckpt_file = checkpoint_reference
+    return ckpt_file
+
+
+def maybe_load_training_model_weights(model, cfg, logger):
+    if cfg.model.name in ["taxposed", "taxposed_mlat_s100", "taxposed_mlat_s256"]:
+        if (
+            not cfg.training.joint_train_prior
+            and cfg.training.init_cond_x
+            and (not cfg.training.freeze_embnn or not cfg.training.freeze_residual_flow)
+        ):
+            raise ValueError("YOU PROBABLY DIDN'T MEAN TO DO JOINT TRAINING")
+        if (
+            not cfg.training.joint_train_prior
+            and cfg.training.init_cond_x
+            and cfg.training.checkpoint_file is None
+        ):
+            raise ValueError(
+                "YOU PROBABLY DIDN'T MEAN TO TRAIN BOTH P(Z|X) AND P(Z|Y) FROM SCRATCH"
+            )
+
+        # TODO: Add support for loading pretraining
+        if cfg.training.load_from_checkpoint:
+            assert cfg.training.checkpoint_file is not None
+            print(f"--------------- Loading Checkpoint File: ---------------")
+            print(cfg.training.checkpoint_file)
+
+            # If using p(z|X) training model
+            if cfg.training.init_cond_x:
+                # If loading p(z|X) from checkpoint
+                if cfg.training.load_cond_x:
+                    model.load_state_dict(
+                        torch.load(
+                            hydra.utils.to_absolute_path(
+                                maybe_load_from_wandb(
+                                    cfg.training.checkpoint_file,
+                                    cfg.wandb,
+                                    logger.experiment,
+                                )
+                            )
+                        )["state_dict"]
+                    )
+                    print("--------------- Loaded P(z|X) ---------------")
+                # Otherwise load p(z|Y) from checkpoint
+                else:
+                    model.training_module_no_cond_x.load_state_dict(
+                        torch.load(
+                            hydra.utils.to_absolute_path(
+                                maybe_load_from_wandb(
+                                    cfg.training.checkpoint_file,
+                                    cfg.wandb,
+                                    logger.experiment,
+                                )
+                            )
+                        )["state_dict"]
+                    )
+                    print("--------------- Loaded P(z|Y) for P(z|X) ---------------")
+            # Otherwise load p(z|Y) from checkpoint
+            else:
+                model.load_state_dict(
+                    torch.load(
+                        hydra.utils.to_absolute_path(
+                            maybe_load_from_wandb(
+                                cfg.training.checkpoint_file,
+                                cfg.wandb,
+                                logger.experiment,
+                            )
+                        )
+                    )["state_dict"]
+                )
+                print("--------------- Loaded P(z|Y) ---------------")
+            print("--------------- Done Loading Checkpoint File ---------------\n")
+
+    else:
+        if cfg.training.load_from_checkpoint:
+            print("loaded checkpoint from")
+            print(cfg.training.checkpoint_file)
+            model.load_state_dict(
+                torch.load(hydra.utils.to_absolute_path(cfg.training.checkpoint_file))[
+                    "state_dict"
+                ]
+            )
+
+        else:
+            # Might be empty and not have those keys defined.
+            # TODO: move this pretraining into the model itself.
+            # TODO: figure out if we can get rid of the dictionary and make it null.
+            if cfg.model.pretraining:
+                if cfg.model.pretraining.checkpoint_file_action is not None:
+                    # # Check to see if it's a wandb checkpoint.
+                    # TODO: need to retrain a few things... checkpoint didn't stick...
+                    emb_nn_action_state_dict = load_emb_weights(
+                        cfg.pretraining.checkpoint_file_action,
+                        cfg.wandb,
+                        logger.experiment,
+                    )
+                    # checkpoint_file_fn = maybe_load_from_wandb(
+                    #     cfg.pretraining.checkpoint_file_action, cfg.wandb, logger.experiment.run
+                    # )
+
+                    model.model.emb_nn_action.load_state_dict(emb_nn_action_state_dict)
+                    print(
+                        "-----------------------Pretrained EmbNN Action Model Loaded!-----------------------"
+                    )
+                    print(
+                        "Loaded Pretrained EmbNN Action: {}".format(
+                            cfg.pretraining.checkpoint_file_action
+                        )
+                    )
+                if cfg.pretraining.checkpoint_file_anchor is not None:
+                    emb_nn_anchor_state_dict = load_emb_weights(
+                        cfg.pretraining.checkpoint_file_anchor,
+                        cfg.wandb,
+                        logger.experiment,
+                    )
+                    model.model.emb_nn_anchor.load_state_dict(emb_nn_anchor_state_dict)
+                    print(
+                        "-----------------------Pretrained EmbNN Anchor Model Loaded!-----------------------"
+                    )
+                    print(
+                        "Loaded Pretrained EmbNN Anchor: {}".format(
+                            cfg.pretraining.checkpoint_file_anchor
+                        )
+                    )
+
+
+def get_training_network(cfg):
+    if cfg.model.name in ["taxposed", "taxposed_mlat_s100", "taxposed_mlat_s256"]:
+        TP_input_dims = Multimodal_ResidualFlow_DiffEmbTransformer.TP_INPUT_DIMS[
+            cfg.model.conditioning
+        ]
+
+        taxpose_decoder_network = ResidualFlow_DiffEmbTransformer(
+            emb_dims=cfg.model.emb_dims,
+            input_dims=TP_input_dims,
+            emb_nn=cfg.model.emb_nn,
+            return_flow_component=True,
+            center_feature=cfg.model.center_feature,
+            pred_weight=cfg.model.pred_weight,
+            multilaterate=cfg.model.multilaterate,
+            sample=cfg.model.mlat_sample,
+            mlat_nkps=cfg.model.mlat_nkps,
+            break_symmetry=cfg.break_symmetry,
+            conditioning_size=cfg.model.latent_z_linear_size
+            if cfg.model.conditioning in ["latent_z_linear_internalcond"]
+            else 0,
+        )
+        print("--------------- Initializing P(z|Y) ---------------")
+        pzY_prediction_network = Multimodal_ResidualFlow_DiffEmbTransformer(
+            residualflow_diffembtransformer=taxpose_decoder_network,
+            gumbel_temp=cfg.model.gumbel_temp,
+            freeze_residual_flow=cfg.training.freeze_residual_flow,
+            center_feature=cfg.model.center_feature,
+            freeze_z_embnn=cfg.training.freeze_z_embnn,
+            division_smooth_factor=cfg.model.division_smooth_factor,
+            add_smooth_factor=cfg.model.add_smooth_factor,
+            conditioning=cfg.model.conditioning,
+            latent_z_linear_size=cfg.model.latent_z_linear_size,
+            taxpose_centering=cfg.model.taxpose_centering,
+        )
+        network = pzY_prediction_network
+    else:
+        network = ResidualFlow_DiffEmbTransformer(
+            emb_dims=cfg.model.emb_dims,
+            emb_nn=cfg.model.emb_nn,
+            return_flow_component=cfg.model.return_flow_component,
+            center_feature=cfg.model.center_feature,
+            pred_weight=cfg.model.pred_weight,
+            multilaterate=cfg.model.multilaterate,
+            sample=cfg.model.mlat_sample,
+            mlat_nkps=cfg.model.mlat_nkps,
+            break_symmetry=cfg.break_symmetry,
+        )
+    return network
+
+
+def get_training_model(training_network, cfg, logger):
+    if cfg.model.name in ["taxposed", "taxposed_mlat_s100", "taxposed_mlat_s256"]:
+        training_model = Multimodal_EquivarianceTrainingModule(
+            training_network,
+            lr=cfg.training.lr,
+            image_log_period=cfg.training.image_logging_period,
+            point_loss_type=cfg.training.point_loss_type,
+            return_flow_component=True,
+            rotation_weight=cfg.training.rotation_weight,
+            weight_normalize=cfg.task.phase.weight_normalize,
+            consistency_weight=cfg.training.consistency_weight,
+            smoothness_weight=cfg.training.smoothness_weight,
+            action_weight=cfg.training.action_weight,
+            vae_reg_loss_weight=cfg.training.vae_reg_loss_weight,
+            sigmoid_on=cfg.training.sigmoid_on,
+            softmax_temperature=cfg.task.phase.softmax_temperature,
+            min_err_across_racks_debug=cfg.training.min_err_across_racks_debug,
+            error_mode_2rack=cfg.training.error_mode_2rack,
+        )
+
+        if cfg.training.init_cond_x:
+            print(f"--------------- Initializing P(z|X) ---------------")
+            pzX_prediction_network = (
+                Multimodal_ResidualFlow_DiffEmbTransformer_WithPZCondX(
+                    residualflow_embnn=training_network,
+                    encoder_type=cfg.model.pzcondx_encoder_type,
+                    shuffle_for_pzX=cfg.model.shuffle_for_pzX,
+                )
+            )
+
+            training_model_cond_x = Multimodal_EquivarianceTrainingModule_WithPZCondX(
+                pzX_prediction_network,
+                training_model,
+                goal_emb_cond_x_loss_weight=cfg.training.goal_emb_cond_x_loss_weight,
+                joint_train_prior=cfg.training.joint_train_prior,
+                joint_train_prior_freeze_embnn=cfg.training.joint_train_prior_freeze_embnn,
+                freeze_residual_flow=cfg.training.freeze_residual_flow,
+                freeze_z_embnn=cfg.training.freeze_z_embnn,
+                freeze_embnn=cfg.training.freeze_embnn,
+            )
+
+        model = training_model_cond_x if cfg.training.init_cond_x else training_model
+
+    else:
+        model = EquivarianceTrainingModule(
+            training_network,
+            lr=cfg.training.lr,
+            image_log_period=cfg.training.image_logging_period,
+            displace_loss_weight=cfg.training.displace_loss_weight,
+            consistency_loss_weight=cfg.training.consistency_loss_weight,
+            direct_correspondence_loss_weight=cfg.training.direct_correspondence_loss_weight,
+            weight_normalize=cfg.task.phase.weight_normalize,
+            sigmoid_on=cfg.training.sigmoid_on,
+            softmax_temperature=cfg.task.phase.softmax_temperature,
+            flow_supervision=cfg.training.flow_supervision,
+        )
+
+    model.cuda()
+    model.train()
+    return model
 
 
 @hydra.main(version_base="1.1", config_path="../configs", config_name="train_ndf")
@@ -103,6 +351,8 @@ def main(cfg):
             ),
         ],
         max_epochs=cfg.training.max_epochs,
+        max_steps=cfg.training.max_steps,
+        gradient_clip_val=cfg.training.gradient_clipping,
     )
 
     dm = MultiviewDataModule(
@@ -110,82 +360,14 @@ def main(cfg):
         num_workers=cfg.resources.num_workers,
         cfg=cfg.dm,
     )
-
     dm.setup()
 
-    network = ResidualFlow_DiffEmbTransformer(
-        emb_dims=cfg.model.emb_dims,
-        emb_nn=cfg.model.emb_nn,
-        return_flow_component=cfg.model.return_flow_component,
-        center_feature=cfg.model.center_feature,
-        pred_weight=cfg.model.pred_weight,
-        multilaterate=cfg.model.multilaterate,
-        sample=cfg.model.mlat_sample,
-        mlat_nkps=cfg.model.mlat_nkps,
-        break_symmetry=cfg.break_symmetry,
-    )
+    network = get_training_network(cfg)
 
-    model = EquivarianceTrainingModule(
-        network,
-        lr=cfg.training.lr,
-        image_log_period=cfg.training.image_logging_period,
-        displace_loss_weight=cfg.training.displace_loss_weight,
-        consistency_loss_weight=cfg.training.consistency_loss_weight,
-        direct_correspondence_loss_weight=cfg.training.direct_correspondence_loss_weight,
-        weight_normalize=cfg.task.phase.weight_normalize,
-        sigmoid_on=cfg.training.sigmoid_on,
-        softmax_temperature=cfg.task.phase.softmax_temperature,
-        flow_supervision=cfg.training.flow_supervision,
-    )
+    model = get_training_model(network, cfg, logger)
 
-    model.cuda()
-    model.train()
-    if cfg.training.load_from_checkpoint:
-        print("loaded checkpoint from")
-        print(cfg.training.checkpoint_file)
-        model.load_state_dict(
-            torch.load(hydra.utils.to_absolute_path(cfg.training.checkpoint_file))[
-                "state_dict"
-            ]
-        )
+    maybe_load_training_model_weights(model, cfg, logger)
 
-    else:
-        # Might be empty and not have those keys defined.
-        # TODO: move this pretraining into the model itself.
-        # TODO: figure out if we can get rid of the dictionary and make it null.
-        if cfg.model.pretraining:
-            if cfg.model.pretraining.checkpoint_file_action is not None:
-                # # Check to see if it's a wandb checkpoint.
-                # TODO: need to retrain a few things... checkpoint didn't stick...
-                emb_nn_action_state_dict = load_emb_weights(
-                    cfg.pretraining.checkpoint_file_action, cfg.wandb, logger.experiment
-                )
-                # checkpoint_file_fn = maybe_load_from_wandb(
-                #     cfg.pretraining.checkpoint_file_action, cfg.wandb, logger.experiment.run
-                # )
-
-                model.model.emb_nn_action.load_state_dict(emb_nn_action_state_dict)
-                print(
-                    "-----------------------Pretrained EmbNN Action Model Loaded!-----------------------"
-                )
-                print(
-                    "Loaded Pretrained EmbNN Action: {}".format(
-                        cfg.pretraining.checkpoint_file_action
-                    )
-                )
-            if cfg.pretraining.checkpoint_file_anchor is not None:
-                emb_nn_anchor_state_dict = load_emb_weights(
-                    cfg.pretraining.checkpoint_file_anchor, cfg.wandb, logger.experiment
-                )
-                model.model.emb_nn_anchor.load_state_dict(emb_nn_anchor_state_dict)
-                print(
-                    "-----------------------Pretrained EmbNN Anchor Model Loaded!-----------------------"
-                )
-                print(
-                    "Loaded Pretrained EmbNN Anchor: {}".format(
-                        cfg.pretraining.checkpoint_file_anchor
-                    )
-                )
     trainer.fit(model, dm)
 
 

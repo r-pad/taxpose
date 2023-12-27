@@ -18,7 +18,7 @@ defaults:
 
   # Set up the model and checkpointing. Happens before dataset because order
   # matters for interpolation.
-  - model: taxpose  # {taxpose, mlat_s256_vnn}
+  - model: taxposed  # {taxpose, taxposed, mlat_s256_vnn}
 
   # Task information for setting up the datamodule.
   - datamodule  # This datamodule will be used in evaluation, so factor it out.
@@ -29,7 +29,7 @@ defaults:
   - task/${benchmark}/${task}/phase/${phase}@task.phase
 
   # Set the pretraining checkpoint.
-  - /checkpoints/${benchmark}/${task}/pretraining/${phase}@model.pretraining
+  # - /checkpoints/${benchmark}/${task}/pretraining/${phase}@model.pretraining
 
   # - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
 
@@ -49,15 +49,33 @@ training:
 
   sigmoid_on: True
 
+  # TPD Training Settings
+  load_cond_x: False
+  init_cond_x: False
+  freeze_embnn: False
+  freeze_residual_flow: False
+  freeze_z_embnn: False
+  joint_train_prior: False
+  joint_train_prior_freeze_embnn: False
+
   # Optimizer Settings
   lr: 1e-4
-  gradient_clipping: null
+  gradient_clipping: 0.001
 
   # Loss Settings
-  flow_supervision: both
-  displace_loss_weight: 1
-  direct_correspondence_loss_weight: 1
-  consistency_loss_weight: 0.1
+  flow_supervision: action2anchor # {both, action2anchor, anchor2action}
+  point_loss_type: 0
+  min_err_across_racks_debug: True
+  error_mode_2rack: demo_rack
+  rotation_weight: 0
+  consistency_weight: 1
+  smoothness_weight: 0.1
+  action_weight: 1
+  vae_reg_loss_weight: 0 #1
+  goal_emb_cond_x_loss_weight: 1 #0.01
+  # displace_loss_weight: 1
+  # direct_correspondence_loss_weight: 1
+  # consistency_loss_weight: 0.1
 
   # Checkpoint Settings
   load_from_checkpoint: False

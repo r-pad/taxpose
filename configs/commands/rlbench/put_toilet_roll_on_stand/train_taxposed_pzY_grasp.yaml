@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_train_taxposed@_here_
+  - override /model: taxposed
+  - override /task:  put_toilet_roll_on_stand
+  - override /phase: grasp
+  - _self_
+
+break_symmetry: False
