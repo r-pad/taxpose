@@ -9,6 +9,7 @@ train_dset:
   demo_dset:
     dataset_root: ${benchmark.dataset_root}
     task_name: ${task.name}
+    use_first_as_init_keyframe: False
     episodes: all
     action_class: ${task.phase.action_class}
     anchor_class: ${task.phase.anchor_class}
@@ -23,6 +24,7 @@ val_dset:
   demo_dset:
     dataset_root: ${benchmark.dataset_root}
     task_name: ${task.name}
+    use_first_as_init_keyframe: False
     episodes: all
     action_class: ${task.phase.action_class}
     anchor_class: ${task.phase.anchor_class}
@@ -31,12 +33,13 @@ val_dset:
     teleport_initial_to_final: true
     with_symmetry: True
     occlusion_cfg: ???
-    num_points: 256
+    num_points: ${...train_dset.demo_dset.num_points}
 
 test_dset:
   demo_dset:
     dataset_root: ${benchmark.dataset_root}
     task_name: ${task.name}
+    use_first_as_init_keyframe: False
     episodes: all
     action_class: ${task.phase.action_class}
     anchor_class: ${task.phase.anchor_class}
@@ -45,4 +48,4 @@ test_dset:
     teleport_initial_to_final: true
     with_symmetry: True
     occlusion_cfg: ???
-    num_points: 256
+    num_points: ${...train_dset.demo_dset.num_points}

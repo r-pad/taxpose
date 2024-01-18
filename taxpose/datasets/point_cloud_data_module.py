@@ -1,5 +1,6 @@
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from taxpose.datasets.point_cloud_dataset import PointCloudDataset
 
@@ -24,10 +25,17 @@ class MultiviewDataModule(pl.LightningDataModule):
         if stage == "train" or stage is None:
             self.train_dataset = PointCloudDataset(self.cfg.train_dset)
 
+            # Iterate once over the dataset to make sure it's been processed.
+            _ = [x for x in tqdm(self.train_dataset.dataset)]
+
         if stage == "val" or stage is None:
             self.val_dataset = PointCloudDataset(self.cfg.val_dset)
+            # Iterate once over the dataset to make sure it's been processed.
+            _ = [x for x in tqdm(self.val_dataset.dataset)]
         if stage == "test":
             self.test_dataset = PointCloudDataset(self.cfg.test_dset)
+            # Iterate once over the dataset to make sure it's been processed.
+            _ = [x for x in tqdm(self.test_dataset.dataset)]
 
     def train_dataloader(self):
         return DataLoader(

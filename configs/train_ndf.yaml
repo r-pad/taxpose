@@ -5,7 +5,7 @@ job_type: train_${task.name}_${task.phase.name}
 # This has to happen before the benchmark stuff.
 # This sets the data root for all data in the config.
 # Something like autobot will override it.
-data_root: ${oc.env:HOME}/datasets
+data_root: /data
 
 
 # TODO: Fix all the training scripts.

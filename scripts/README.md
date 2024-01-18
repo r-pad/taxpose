@@ -139,3 +139,20 @@ CUDA_VISIBLE_DEVICES=0 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.p
 CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/mlat_bottle_arbitrary seed=10 wandb.group=mlat_s256_vnn
 CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/mlat_bowl_upright seed=10 wandb.group=mlat_s256_vnn
 CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf_evals/mlat_bowl_arbitrary seed=10 wandb.group=mlat_s256_vnn
+
+# New RLBench.
+
+## Stack Wine.
+
+./launch.sh local 0 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxpose_pregrasp.yaml wandb.group=rlbench_taxpose
+./launch.sh local 0 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxpose_grasp.yaml wandb.group=rlbench_taxpose
+./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxpose_lift.yaml wandb.group=rlbench_taxpose
+./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxpose_preplace.yaml wandb.group=rlbench_taxpose
+./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxpose_place.yaml wandb.group=rlbench_taxpose
+
+## Put knife on chopping board
+
+./launch.sh local 0 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_pregrasp.yaml wandb.group=rlbench_put_knife_on_chopping_board
+./launch.sh local 0 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_grasp.yaml wandb.group=rlbench_put_knife_on_chopping_board
+./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_lift.yaml wandb.group=rlbench_put_knife_on_chopping_board
+./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_place.yaml wandb.group=rlbench_put_knife_on_chopping_board

@@ -1,6 +1,6 @@
 # @package task
 
-name: grasp
+name: pregrasp
 action_class: gripper
 anchor_class: wine_bottle
 softmax_temperature: 0.1

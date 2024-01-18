@@ -7,7 +7,7 @@ import numpy as np
 import numpy.typing as npt
 import open3d as o3d
 import torch
-from rpad.rlbench_utils.placement_dataset import RLBenchPlacementDataset, StackWinePhase
+from rpad.rlbench_utils.placement_dataset import RLBenchPlacementDataset
 from torch.utils.data import Dataset
 
 from taxpose.datasets.augmentations import OcclusionConfig, maybe_downsample
@@ -68,6 +68,7 @@ DEMO_SYMMETRY_LABELS = {
     },
     "place_hanger_on_rack": None,
     "solve_puzzle": None,
+    "put_knife_on_chopping_board": None,
 }
 
 
@@ -205,7 +206,8 @@ class RLBenchPointCloudDatasetConfig:
     task_name: str = "stack_wine"
     episodes: Union[List[int], Literal["all"]] = "all"
     cached: bool = True
-    phase: StackWinePhase = "grasp"
+    phase: str = "grasp"
+    use_first_as_init_keyframe: bool = True
 
     # Occlusion config.
     occlusion_cfg: Optional[OcclusionConfig] = None
@@ -228,6 +230,7 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             task_name=cfg.task_name,
             n_demos=-1,
             phase=cfg.phase,
+            use_first_as_init_keyframe=cfg.use_first_as_init_keyframe,
         )
 
         # Induce a subset if necessary.
@@ -284,8 +287,11 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
         # TODO: implement occlusions here.
 
         # Downsample if necessary.
-        points_action = maybe_downsample(points_action, self.cfg.num_points)
-        points_anchor = maybe_downsample(points_anchor, self.cfg.num_points)
+        try:
+            points_action = maybe_downsample(points_action, self.cfg.num_points)
+            points_anchor = maybe_downsample(points_anchor, self.cfg.num_points)
+        except:
+            print(f"Failed to downsample {index}.")
 
         if self.cfg.with_symmetry:
             T_action_key_world = data["T_action_key_world"].numpy().astype(np.float32)

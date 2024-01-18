@@ -1,7 +1,7 @@
 # @package task
 
-name: grasp
-action_class: gripper
-anchor_class: wine_bottle
+name: preplace
+action_class: wine_bottle
+anchor_class: wine_rack
 softmax_temperature: 0.1
 weight_normalize: softmax

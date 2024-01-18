@@ -2,6 +2,6 @@
 
 name: grasp
 action_class: gripper
-anchor_class: wine_bottle
+anchor_class: knife
 softmax_temperature: 0.1
 weight_normalize: softmax

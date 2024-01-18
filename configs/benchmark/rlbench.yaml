@@ -1,2 +1,2 @@
 name: rlbench
-dataset_root: ${..data_root}/rlbench
+dataset_root: ${..data_root}/rlbench10
