@@ -14,6 +14,7 @@ authors = [
 ]
 dependencies = [
   # "chamferdist",
+  "dill",
   "dgl ~= 1.0",
   "dglgo ~= 0.0.2",
   "h5py",

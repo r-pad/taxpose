@@ -2,9 +2,9 @@ import logging
 import pickle
 from abc import abstractmethod
 from dataclasses import dataclass
-from enum import Enum, auto
+from enum import Enum
 from pathlib import Path
-from typing import Protocol
+from typing import List, Protocol
 
 import hydra
 import joblib
@@ -42,6 +42,12 @@ from taxpose.training.flow_equivariance_training_module_nocentering import (
 from taxpose.utils.load_model import get_weights_path
 
 
+class RelativePosePredictor(Protocol):
+    @abstractmethod
+    def predict(self, obs, phase: str) -> np.ndarray:
+        pass
+
+
 class PickPlacePredictor(Protocol):
     @abstractmethod
     def grasp(self, obs) -> np.ndarray:
@@ -50,11 +56,6 @@ class PickPlacePredictor(Protocol):
     @abstractmethod
     def place(self, init_obs, post_grasp_obs) -> np.ndarray:
         pass
-
-
-@dataclass
-class TAXPosePickPlacePredictorConfig:
-    pass
 
 
 def create_coordinate_frame(T, size=0.1):
@@ -113,7 +114,7 @@ def viz_symmetry_features(
     )
 
 
-class TAXPosePickPlacePredictor:
+class TAXPoseRelativePosePredictor(RelativePosePredictor):
     def __init__(
         self,
         policy_spec,
@@ -123,23 +124,17 @@ class TAXPosePickPlacePredictor:
         run=None,
         debug_viz=False,
     ):
-        self.grasp_model = self.load_model(
-            checkpoints_cfg.grasp,
-            policy_spec.grasp_model,
-            wandb_cfg,
-            task_cfg.grasp_task,
-            run=run,
-        )
-        self.place_model = self.load_model(
-            checkpoints_cfg.place,
-            policy_spec.place_model,
-            wandb_cfg,
-            task_cfg.place_task,
-            run=run,
-        )
+        self.models = {}
+        for phase in TASK_DICT[task_cfg.name]["phase_order"]:
+            self.models[phase] = self.load_model(
+                checkpoints_cfg[phase].ckpt_file,
+                policy_spec,
+                wandb_cfg,
+                task_cfg.phases[phase],
+                run=run,
+            )
 
-        self.task_name = task_cfg.task.name
-
+        self.task_name = task_cfg.name
         self.debug_viz = debug_viz
 
     @staticmethod
@@ -215,18 +210,16 @@ class TAXPosePickPlacePredictor:
         model = model.cuda()
         return model
 
-    def grasp(self, obs) -> np.ndarray:
-        inputs = obs_to_input(obs, self.task_name, "grasp")
+    def predict(self, obs, phase: str) -> np.ndarray:
+        inputs = obs_to_input(obs, self.task_name, phase)
+        model = self.models[phase]
+        device = model.device
 
-        device = self.grasp_model.device
-
-        action_pc = inputs["action_pc"].unsqueeze(0).to(self.grasp_model.device)
-        anchor_pc = inputs["anchor_pc"].unsqueeze(0).to(self.grasp_model.device)
+        action_pc = inputs["action_pc"].unsqueeze(0).to(device)
+        anchor_pc = inputs["anchor_pc"].unsqueeze(0).to(device)
 
         action_pc, _ = sample_farthest_points(action_pc, K=256, random_start_point=True)
         anchor_pc, _ = sample_farthest_points(anchor_pc, K=256, random_start_point=True)
-
-        # TODO: ben - this is broken. Need to fix symmetry in general...
 
         action_symmetry_features = bottle_symmetry_features(action_pc.cpu().numpy()[0])
         anchor_symmetry_features = rack_symmetry_features(anchor_pc.cpu().numpy()[0])
@@ -243,7 +236,7 @@ class TAXPosePickPlacePredictor:
         action_symmetry_features = torch.from_numpy(action_symmetry_features).to(device)
         anchor_symmetry_features = torch.from_numpy(anchor_symmetry_features).to(device)
 
-        preds = self.grasp_model(
+        preds = model(
             action_pc,
             anchor_pc,
             action_symmetry_features[None],
@@ -262,48 +255,8 @@ class TAXPosePickPlacePredictor:
 
         return T_gripperfinal_world
 
-    def place(self, init_obs, post_grasp_obs) -> np.ndarray:
-        inputs = obs_to_input(init_obs, self.task_name, "place")
 
-        device = self.place_model.device
-
-        action_pc = inputs["action_pc"].unsqueeze(0).to(device)
-        anchor_pc = inputs["anchor_pc"].unsqueeze(0).to(device)
-
-        action_pc, _ = sample_farthest_points(action_pc, K=256, random_start_point=True)
-        anchor_pc, _ = sample_farthest_points(anchor_pc, K=256, random_start_point=True)
-
-        action_symmetry_features = bottle_symmetry_features(action_pc.cpu().numpy()[0])
-        anchor_symmetry_features = rack_symmetry_features(anchor_pc.cpu().numpy()[0])
-
-        # Torchify and GPU
-        action_symmetry_features = torch.from_numpy(action_symmetry_features).to(device)
-        anchor_symmetry_features = torch.from_numpy(anchor_symmetry_features).to(device)
-
-        preds = self.place_model(
-            action_pc,
-            anchor_pc,
-            action_symmetry_features[None],
-            anchor_symmetry_features[None],
-        )
-
-        # Get the current pose of the gripper.
-        T_gripper_world = np.eye(4)
-        T_gripper_world[:3, 3] = post_grasp_obs.gripper_pose[:3]
-        T_gripper_world[:3, :3] = R.from_quat(
-            post_grasp_obs.gripper_pose[3:]
-        ).as_matrix()
-
-        T_gripperfinal_gripper = preds["pred_T_action"].get_matrix()[0].T.cpu().numpy()
-        T_gripperfinal_world = T_gripperfinal_gripper @ T_gripper_world
-
-        if self.debug_viz:
-            self.render(init_obs, inputs, preds, T_gripper_world, T_gripperfinal_world)
-
-        return T_gripperfinal_world
-
-
-class RandomPickPlacePredictor(PickPlacePredictor):
+class RandomPickPlacePredictor(RelativePosePredictor):
     def __init__(self, cfg, xrange, yrange, zrange, grip_rot=None):
         self.cfg = cfg
         self.xrange = xrange
@@ -332,23 +285,13 @@ class RandomPickPlacePredictor(PickPlacePredictor):
             R_rand = R.random().as_matrix()
         else:
             R_rand = R.from_quat(grip_rot).as_matrix()
-        # R_rand = R.random().as_matrix()
-        # R_rand = np.eye(3)
-        # # Rotate 180 degrees about the x-axis.
-        # R_rand[1, 1] = -1
-        # R_rand[2, 2] = -1
 
         T_rand = np.eye(4)
         T_rand[:3, :3] = R_rand
         T_rand[:3, 3] = t_rand
         return T_rand
 
-    def grasp(self, obs) -> np.ndarray:
-        return self._get_random_pose(
-            self.xrange, self.yrange, self.zrange, self.grip_rot
-        )
-
-    def place(self, obs) -> np.ndarray:
+    def predict(self, obs, phase) -> np.ndarray:
         return self._get_random_pose(
             self.xrange, self.yrange, self.zrange, self.grip_rot
         )
@@ -386,20 +329,26 @@ def obs_to_input(obs, task_name, phase):
 
 
 # We may need to add more failure reasons.
-class FailureReason(Enum):
-    NO_FAILURE = auto()
-    GRASP_FAILURE = auto()
-    GRASP_MOTION_PLANNING_FAILURE = auto()
-    PLACE_FAILURE = auto()
-    PLACE_MOTION_PLANNING_FAILURE = auto()
-    PREDICTION_FAILURE = auto()
-    UNKNOWN_FAILURE = auto()
+class FailureReason(str, Enum):
+    NOT_ATTEMPTED = "not_attempted"
+    NO_FAILURE = "no_failure"
+    MOTION_PLANNING_FAILURE = "motion_planning_failure"
+    PREDICTION_FAILURE = "prediction_failure"
+    UNKNOWN_FAILURE = "unknown_failure"
+
+
+@dataclass
+class PhaseResult:
+    phase: str
+    failure_reason: FailureReason
 
 
 @dataclass
 class TrialResult:
     success: bool
-    failure_reason: FailureReason
+
+    # Failure is either a global failure, or a map from phase to failure reason.
+    failure_reason: List[PhaseResult]
 
 
 def get_obs_config():
@@ -438,20 +387,40 @@ def get_obs_config():
 
 
 @torch.no_grad()
-def run_trial(policy_spec, task_spec, env_spec, headless=True, run=None) -> TrialResult:
+def run_trial(
+    policy_spec,
+    task_spec,
+    env_spec,
+    checkpoints,
+    wandb_cfg,
+    headless=True,
+    run=None,
+) -> TrialResult:
     # Seed the random number generator.
 
     # TODO: beisner need to seeeeeed.
 
     # Create the policy.
-    policy = TAXPosePickPlacePredictor(
+    # policy = TAXPosePickPlacePredictor(
+    #     policy_spec,
+    #     task_spec,
+    #     task_spec.wandb,
+    #     task_spec.checkpoints,
+    #     run=run,
+    #     debug_viz=not headless,
+    # )
+
+    policy: RelativePosePredictor = TAXPoseRelativePosePredictor(
         policy_spec,
         task_spec,
-        task_spec.wandb,
-        task_spec.checkpoints,
+        wandb_cfg,
+        checkpoints,
         run=run,
         debug_viz=not headless,
     )
+    # policy: RelativePosePredictor = RandomPickPlacePredictor(
+    #     policy_spec, (-0.3, 0.3), (-0.3, 0.3), (0.3, 0.5)
+    # )
 
     # Create the environment.
     env = Environment(
@@ -464,81 +433,60 @@ def run_trial(policy_spec, task_spec, env_spec, headless=True, run=None) -> Tria
     )
 
     try:
-        task = env.get_task(name_to_task_class(task_spec.task.name))
+        task = env.get_task(name_to_task_class(task_spec.name))
         task.sample_variation()
 
-        # Reset the environment.
-        descriptions, obs = task.reset()
+        # Reset the environment. For now, ignore descriptions.
+        _, obs = task.reset()
 
-        # First, move the arm down a bit so that the cameras can see it!
-        # This is a hack to get around the fact that the cameras are not
-        # in the same position as the robot's arm.
-        # breakpoint()
+        phase_order = TASK_DICT[task_spec.name]["phase_order"]
 
-        # down_action = np.array([*obs.gripper_pose, 1.0])
-        # down_action[2] -= 0.4
-        # obs, reward, terminate = task.step(down_action)
+        # Keep track of the results for each phase.
+        phase_results = {phase: FailureReason.NOT_ATTEMPTED for phase in phase_order}
 
-        # Make predictions for grasp and place.
-        try:
-            T_grippergrasp_world = policy.grasp(obs)
-        except Exception as e:
-            print(e)
-            return TrialResult(False, FailureReason.PREDICTION_FAILURE)
+        # Helper function to order the phases sequentially in the results.
+        def pr():
+            return [PhaseResult(phase, phase_results[phase]) for phase in phase_order]
 
-        # Execute the grasp. The transform needs to be converted from a 4x4 matrix to xyz+quat.
-        # And the gripper action is a single dimensional action.
-        p_grippergrasp_world = T_grippergrasp_world[:3, 3]
-        q_grippergrasp_world = R.from_matrix(T_grippergrasp_world[:3, :3]).as_quat()
-        gripper_close = np.array([0.0])
-        grasp_action = np.concatenate(
-            [p_grippergrasp_world, q_grippergrasp_world, gripper_close]
-        )
+        # Loop through the phases, and predict.
+        for phase in phase_order:
+            # Try to make a predictions.
+            try:
+                T_gripper_world = policy.predict(obs, phase)
+            except Exception as e:
+                print(e)
+                phase_results[phase] = FailureReason.PREDICTION_FAILURE
+                return TrialResult(False, pr())
 
-        try:
-            post_grasp_obs, reward, terminate = task.step(grasp_action)
-        except Exception as e:
-            print(e)
-            return TrialResult(False, FailureReason.GRASP_MOTION_PLANNING_FAILURE)
+            # Compute the transform.
+            p_gripper_world = T_gripper_world[:3, 3]
+            q_gripper_world = R.from_matrix(T_gripper_world[:3, :3]).as_quat()
+            if TASK_DICT[task_spec.name]["phase"][phase]["gripper_open"]:
+                gripper_state = np.array([1.0])
+            else:
+                gripper_state = np.array([0.0])
+            action = np.concatenate([p_gripper_world, q_gripper_world, gripper_state])
 
-        # Lift the object off the table. Add .1 to the z-coordinate. This should not fail!
-        p_gripperlift_world = np.copy(post_grasp_obs.gripper_pose[:3])
-        p_gripperlift_world[2] += 0.1
-        q_gripperlift_world = post_grasp_obs.gripper_pose[3:]
-        grasp_action = np.concatenate(
-            [p_gripperlift_world, q_gripperlift_world, gripper_close]
-        )
-        _, reward, terminate = task.step(grasp_action)
+            # Attempt the action.
+            try:
+                obs, reward, terminate = task.step(action)
+            except Exception as e:
+                print(e)
+                phase_results[phase] = FailureReason.MOTION_PLANNING_FAILURE
+                return TrialResult(False, pr())
 
-        # Make predictions for place.
-        try:
-            T_bottle_world = policy.place(obs, post_grasp_obs)
-        except Exception as e:
-            print(e)
-            return TrialResult(False, FailureReason.PREDICTION_FAILURE)
+            if terminate:
+                raise ValueError()
 
-        # Execute the place.
-        p_bottle_world = T_bottle_world[:3, 3]
-        q_bottle_world = R.from_matrix(T_bottle_world[:3, :3]).as_quat()
-        gripper_open = np.array([1.0])
+            phase_results[phase] = FailureReason.NO_FAILURE
 
-        # Add 0.03 to the z-coordinate.
-        # TODO: beisner, this is a hack. It should be dead on, but the motion planner doesn't like this.
-        # The "right" fix would be to do some sort of motion planning improvement to get like, a min-collision
-        # trajectory...
-        p_bottle_world[2] += task_spec.z_offset
-        place_action = np.concatenate([p_bottle_world, q_bottle_world, gripper_open])
+            if reward == 1:
+                return TrialResult(True, pr())
 
-        try:
-            obs, reward, terminate = task.step(place_action)
-        except Exception as e:
-            print(e)
-            return TrialResult(False, FailureReason.PLACE_MOTION_PLANNING_FAILURE)
-
-        return TrialResult(True, FailureReason.NO_FAILURE)
+        return TrialResult(False, [])
     except Exception as e:
         print(e)
-        return TrialResult(False, FailureReason.UNKNOWN_FAILURE)
+        return TrialResult(False, pr())
 
     finally:
         # Close the environment.
@@ -549,6 +497,8 @@ def run_trials(
     policy_spec,
     task_spec,
     env_spec,
+    checkpoints,
+    wandb_cfg,
     num_trials,
     headless=True,
     run=None,
@@ -560,7 +510,13 @@ def run_trials(
         results = []
         for i in range(num_trials):
             result = run_trial(
-                policy_spec, task_spec, env_spec, headless=headless, run=run
+                policy_spec,
+                task_spec,
+                env_spec,
+                checkpoints,
+                wandb_cfg,
+                headless=headless,
+                run=run,
             )
             logging.info(f"Trial {i}: {result}")
             results.append(result)
@@ -571,6 +527,8 @@ def run_trials(
                 policy_spec,
                 task_spec,
                 env_spec,
+                checkpoints,
+                wandb_cfg,
                 headless=headless,
                 run=None,  # run is unpickleable...
             )
@@ -599,8 +557,10 @@ def main(cfg):
 
     results = run_trials(
         cfg.policy_spec,
-        cfg,
+        cfg.task,
         None,
+        cfg.checkpoints,
+        cfg.wandb,
         cfg.num_trials,
         headless=cfg.headless,
         run=run,
@@ -614,9 +574,23 @@ def main(cfg):
     print(f"Failures: {num_failures}")
 
     # Count failure reasons
-    failure_reasons = [r.failure_reason for r in results if not r.success]
-    failure_reason_counts = {r.name: failure_reasons.count(r) for r in FailureReason}
-    print(failure_reason_counts)
+    # Aggregate per-phase failure reasons.
+    failure_reason_counts = {
+        phase: {reason.name: 0 for reason in FailureReason}
+        for phase in TASK_DICT[cfg.task.name]["phase_order"]
+    }
+    for result in results:
+        if not result.success:
+            for pr in result.failure_reason:
+                pr: PhaseResult
+                failure_reason_counts[pr.phase][pr.failure_reason.name] += 1
+
+    # Flatten the structure so that the keys are phase_reason.
+    failure_reason_counts = {
+        f"{phase}_{reason}": count
+        for phase, reasons in failure_reason_counts.items()
+        for reason, count in reasons.items()
+    }
 
     results_dir = Path(cfg.output_dir)
 
@@ -631,6 +605,7 @@ def main(cfg):
             **failure_reason_counts,
         }
     )
+    print(df)
 
     # Save the results to wandb as a table.
     run.log(
@@ -640,8 +615,22 @@ def main(cfg):
     )
 
     # Pickle the results and stats.
+    # breakpoint()
+    # Somehow, pickle isn't working with nested enum stuff.
+
+    pkl_results = [
+        {
+            "success": r.success,
+            "failure_reason": [
+                {"phase": pr.phase, "failure_reason": pr.failure_reason.name}
+                for pr in r.failure_reason
+            ],
+        }
+        for r in results
+    ]
+
     with open(results_dir / "results.pkl", "wb") as f:
-        pickle.dump(results, f)
+        pickle.dump(pkl_results, f)
 
     with open(results_dir / "stats.pkl", "wb") as f:
         pickle.dump(
