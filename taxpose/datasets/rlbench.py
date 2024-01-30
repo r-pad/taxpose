@@ -224,30 +224,24 @@ class RLBenchPointCloudDatasetConfig:
 class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
     def __init__(self, cfg: RLBenchPointCloudDatasetConfig):
         super().__init__()
-
         self.dataset = RLBenchPlacementDataset(
             dataset_root=cfg.dataset_root,
             task_name=cfg.task_name,
-            n_demos=-1,
+            demos=cfg.episodes,
             phase=cfg.phase,
             use_first_as_init_keyframe=cfg.use_first_as_init_keyframe,
-        )
-
-        # Induce a subset if necessary.
-        self.episode_ixs = (
-            list(range(len(self.dataset))) if cfg.episodes == "all" else cfg.episodes
         )
 
         self.cfg = cfg
 
     def __len__(self):
-        return len(self.episode_ixs)
+        return len(self.dataset)
 
     @functools.lru_cache(maxsize=100)
     def _load_data(
         self, index: int
     ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, torch.Tensor]]:
-        data = self.dataset[self.episode_ixs[index]]
+        data = self.dataset[index]
         # This dataset should really be about the keyframes, but there are some
         # occlusions at keyframes. We may want to switch to using an "imagined"
         # version of point clouds.
@@ -359,4 +353,6 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             "anchor_symmetry_features": anchor_symmetry_features,
             "action_symmetry_rgb": action_symmetry_rgb,
             "anchor_symmetry_rgb": anchor_symmetry_rgb,
+            "phase": data["phase"],
+            "phase_onehot": torch.as_tensor(data["phase_onehot"]),
         }
