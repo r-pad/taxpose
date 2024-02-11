@@ -70,6 +70,7 @@ def main(cfg):
         sample=cfg.model.mlat_sample,
         mlat_nkps=cfg.model.mlat_nkps,
         break_symmetry=cfg.model.break_symmetry,
+        conditional=cfg.model.conditional if "conditional" in cfg.model else False,
     )
 
     model = EquivarianceTrainingModule(
@@ -97,6 +98,7 @@ def main(cfg):
             weights = torch.load(ckpt_file)["state_dict"]
             model.load_state_dict(weights)
         except RuntimeError:
+            p
             # This is an "older" style model, so we need to load the weights
             # manually.
             model.model.load_state_dict(weights)
@@ -113,8 +115,10 @@ def main(cfg):
     elif cfg.split == "test":
         loader = dm.test_dataloader()
 
+    print("setting up train")
     dm.setup(stage="train")
     train_dataloader = dm.train_dataloader()
+    print("setting up val")
     dm.setup(stage="val")
     val_dataloader = dm.val_dataloader()
 
@@ -131,12 +135,14 @@ def main(cfg):
             anchor_symmetry_features = batch["anchor_symmetry_features"].cuda()
             action_symmetry_rgb = batch["action_symmetry_rgb"].cuda()
             anchor_symmetry_rgb = batch["anchor_symmetry_rgb"].cuda()
+            phase_onehot = batch["phase_onehot"].cuda()
 
             res = model(
                 points_action_trans,
                 points_anchor_trans,
                 action_symmetry_features,
                 anchor_symmetry_features,
+                phase_onehot,
             )
 
             if "sampled_ixs_action" in res:

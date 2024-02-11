@@ -1,5 +1,5 @@
 defaults:
-  - rlbench/_default@_here_
+  - ../_default@_here_
   - _self_
 
 # Dataset Settings
@@ -9,11 +9,11 @@ train_dset:
     episodes:
       # - 0
       - 1
-      - 2
-      - 3
-      - 4
-      - 5
-      - 6
+      # - 2
+      # - 3
+      # - 4
+      # - 5
+      # - 6
       # - 7
 
 val_dset:
@@ -21,7 +21,7 @@ val_dset:
     dataset_type: ${benchmark.name}
     episodes:
       - 8
-      - 9
+      # - 9
 
 test_dset:
   demo_dset:

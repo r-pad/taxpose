@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Optional, cast
 
 import numpy as np
-import numpy.typing as npt
 import torch
 from torch.utils.data import Dataset
 
@@ -23,7 +22,8 @@ class PointCloudDatasetConfig:
 
     # Config for the dataset wrapper.
     num_points: int = 1024
-    rotation_variance: float = np.pi
+    action_rotation_variance: float = np.pi
+    anchor_rotation_variance: float = np.pi
     translation_variance: float = 0.5
     action_rot_sample_method: str = "axis_angle"
     anchor_rot_sample_method: str = "axis_angle"
@@ -71,7 +71,8 @@ class PointCloudDataset(Dataset):
         self.dataset_size = cfg.dataset_size
         self.num_points = cfg.num_points
         # Path('/home/bokorn/src/ndf_robot/notebooks')
-        self.rot_var = cfg.rotation_variance
+        self.action_rot_var = cfg.action_rotation_variance
+        self.anchor_rot_var = cfg.anchor_rotation_variance
         self.trans_var = cfg.translation_variance
         self.action_rot_sample_method = cfg.action_rot_sample_method
         self.anchor_rot_sample_method = cfg.anchor_rot_sample_method
@@ -190,14 +191,14 @@ class PointCloudDataset(Dataset):
 
         T0 = random_se3(
             1,
-            rot_var=self.rot_var,
+            rot_var=self.action_rot_var,
             trans_var=self.trans_var,
             device=points_action.device,
             rot_sample_method=self.action_rot_sample_method,
         )
         T1 = random_se3(
             1,
-            rot_var=self.rot_var,
+            rot_var=self.anchor_rot_var,
             trans_var=self.trans_var,
             device=points_anchor.device,
             rot_sample_method=self.anchor_rot_sample_method,
@@ -296,7 +297,7 @@ class PointCloudDataset(Dataset):
         points_action_trans = T0.transform_points(points_action)
         points_anchor_trans = T1.transform_points(points_anchor)
 
-        data = {
+        out_dict = {
             "points_action": points_action.squeeze(0),
             "points_anchor": points_anchor.squeeze(0),
             "points_action_trans": points_action_trans.squeeze(0),
@@ -305,12 +306,15 @@ class PointCloudDataset(Dataset):
             "T1": T1.get_matrix().squeeze(0),
         }
         if action_sym_feats is not None:
-            data["action_symmetry_features"] = action_sym_feats.squeeze(0)
-            data["anchor_symmetry_features"] = anchor_sym_feats.squeeze(0)
-            data["action_symmetry_rgb"] = action_sym_rgb.squeeze(0)
-            data["anchor_symmetry_rgb"] = anchor_sym_rgb.squeeze(0)
+            out_dict["action_symmetry_features"] = action_sym_feats.squeeze(0)
+            out_dict["anchor_symmetry_features"] = anchor_sym_feats.squeeze(0)
+            out_dict["action_symmetry_rgb"] = action_sym_rgb.squeeze(0)
+            out_dict["anchor_symmetry_rgb"] = anchor_sym_rgb.squeeze(0)
 
-        return data
+        if "phase_onehot" in data:
+            out_dict["phase_onehot"] = data["phase_onehot"]
+
+        return out_dict
 
     def __len__(self):
         return self.dataset_size

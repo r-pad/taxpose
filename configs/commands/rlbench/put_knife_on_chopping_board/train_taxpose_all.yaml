@@ -1,17 +1,16 @@
 # @package _global_
 
 defaults:
-  - /commands/rlbench/_eval@_here_
+  - /commands/rlbench/_train@_here_
   - override /model: taxpose
   - override /task: put_knife_on_chopping_board
-  - override /phase: place
+  - override /phase: all
   - _self_
 
 break_symmetry: False
 
 model:
-  # conditional: True
-  break_symmetry: False
+  conditional: True
 
 dm:
   train_dset:

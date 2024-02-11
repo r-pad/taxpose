@@ -1,6 +1,6 @@
 
 
-job_type: eval_metrics_${task.name}
+job_type: eval_metrics_${task.name}_${task.phase.name}
 
 data_root: ${oc.env:HOME}/datasets
 
@@ -18,9 +18,9 @@ defaults:
   - optional phase: place
   - task/${benchmark}/${task}/task@task
   - task/${benchmark}/${task}/phase/${phase}@task.phase
-  - checkpoints/rlbench@checkpoints: ${task}/${model}
+  - checkpoints/rlbench@checkpoints: ${task}/${model}/${phase}
 
-checkpoint: ${checkpoints.place}
+checkpoint: ${checkpoints.ckpt_file}
 # checkpoint: null
 
 seed: 0

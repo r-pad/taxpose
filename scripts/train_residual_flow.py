@@ -123,6 +123,7 @@ def main(cfg):
         sample=cfg.model.mlat_sample,
         mlat_nkps=cfg.model.mlat_nkps,
         break_symmetry=cfg.break_symmetry,
+        conditional=cfg.model.conditional if "conditional" in cfg.model else False,
     )
 
     model = EquivarianceTrainingModule(

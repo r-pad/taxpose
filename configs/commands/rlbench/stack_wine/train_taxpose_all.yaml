@@ -8,3 +8,6 @@ defaults:
   - _self_
 
 break_symmetry: False
+
+model:
+  conditional: True

@@ -6,9 +6,11 @@ defaults:
 
 dm:
   train_dset:
-    rotation_variance: 1e-4
+    action_rotation_variance: 1e-4
+    anchor_rotation_variance: 1e-4
     translation_variance: 1e-4
 
   val_dset:
-    rotation_variance: 3.1415
+    action_rotation_variance: 3.1415
+    anchor_rotation_variance: 3.1415
     translation_variance: 0.5

@@ -50,7 +50,7 @@ dataset_index: None
 action_class: 0
 anchor_class: 1
 dataset_size: 300
-rotation_variance: 180
+action_rotation_variance: 180
 translation_variance: 0.5
 batch_size: 1
 num_workers: 4

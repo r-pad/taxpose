@@ -1,10 +1,9 @@
 # @package _global_
 
 defaults:
-  - /commands/rlbench/_eval@_here_
+  - /eval_rlbench.yaml
   - override /model: taxpose
   - override /task: put_knife_on_chopping_board
-  - override /phase: place
   - _self_
 
 break_symmetry: False
@@ -12,6 +11,10 @@ break_symmetry: False
 model:
   # conditional: True
   break_symmetry: False
+  num_points: 128
+
+  z_offset: 0.05
+
 
 dm:
   train_dset:

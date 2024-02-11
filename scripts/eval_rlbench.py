@@ -134,6 +134,7 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
                 run=run,
             )
 
+        self.policy_spec = policy_spec
         self.task_name = task_cfg.name
         self.debug_viz = debug_viz
 
@@ -195,6 +196,7 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
             sample=model_cfg.mlat_sample,
             mlat_nkps=model_cfg.mlat_nkps,
             break_symmetry=model_cfg.break_symmetry,
+            conditional=model_cfg.conditional if "conditional" in model_cfg else False,
         )
         model = EquivarianceTrainingModule(
             network,
@@ -218,29 +220,54 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         action_pc = inputs["action_pc"].unsqueeze(0).to(device)
         anchor_pc = inputs["anchor_pc"].unsqueeze(0).to(device)
 
-        action_pc, _ = sample_farthest_points(action_pc, K=256, random_start_point=True)
-        anchor_pc, _ = sample_farthest_points(anchor_pc, K=256, random_start_point=True)
+        K = self.policy_spec.num_points
+        action_pc, _ = sample_farthest_points(action_pc, K=K, random_start_point=True)
+        anchor_pc, _ = sample_farthest_points(anchor_pc, K=K, random_start_point=True)
 
-        action_symmetry_features = bottle_symmetry_features(action_pc.cpu().numpy()[0])
-        anchor_symmetry_features = rack_symmetry_features(anchor_pc.cpu().numpy()[0])
-
-        if self.debug_viz:
-            viz_symmetry_features(
-                action_pc[0],
-                anchor_pc[0],
-                action_symmetry_features,
-                anchor_symmetry_features,
+        if self.policy_spec.break_symmetry:
+            raise NotImplementedError()
+            action_symmetry_features = bottle_symmetry_features(
+                action_pc.cpu().numpy()[0]
+            )
+            anchor_symmetry_features = rack_symmetry_features(
+                anchor_pc.cpu().numpy()[0]
             )
 
-        # Torchify and GPU
-        action_symmetry_features = torch.from_numpy(action_symmetry_features).to(device)
-        anchor_symmetry_features = torch.from_numpy(anchor_symmetry_features).to(device)
+            if self.debug_viz:
+                viz_symmetry_features(
+                    action_pc[0],
+                    anchor_pc[0],
+                    action_symmetry_features,
+                    anchor_symmetry_features,
+                )
+
+            # Torchify and GPU
+            action_symmetry_features = torch.from_numpy(action_symmetry_features).to(
+                device
+            )
+            anchor_symmetry_features = torch.from_numpy(anchor_symmetry_features).to(
+                device
+            )
+            action_symmetry_features = action_symmetry_features[None]
+            anchor_symmetry_features = anchor_symmetry_features[None]
+        else:
+            action_symmetry_features = None
+            anchor_symmetry_features = None
+
+        if "conditional" in self.policy_spec and self.policy_spec.conditional:
+            phase_ix = TASK_DICT[self.task_name]["phase_order"].index(phase)
+            phase_onehot = np.zeros(len(TASK_DICT[self.task_name]["phase_order"]))
+            phase_onehot[phase_ix] = 1
+            phase_onehot = torch.from_numpy(phase_onehot).to(device)[None]
+        else:
+            phase_onehot = None
 
         preds = model(
             action_pc,
             anchor_pc,
-            action_symmetry_features[None],
-            anchor_symmetry_features[None],
+            action_symmetry_features,
+            anchor_symmetry_features,
+            phase_onehot,
         )
 
         # Get the current pose of the gripper.
@@ -469,19 +496,27 @@ def run_trial(
 
             # Attempt the action.
             try:
-                obs, reward, terminate = task.step(action)
+                if phase == "place":
+                    task._action_mode.arm_action_mode._collision_checking = False
+                    # This is a hack.
+                    action[2] += policy_spec.z_offset
+                    obs, reward, terminate = task.step(action)
+                    task._action_mode.arm_action_mode._collision_checking = True
+                else:
+                    obs, reward, terminate = task.step(action)
+
             except Exception as e:
                 print(e)
                 phase_results[phase] = FailureReason.MOTION_PLANNING_FAILURE
                 return TrialResult(False, pr())
 
-            if terminate:
-                raise ValueError()
-
             phase_results[phase] = FailureReason.NO_FAILURE
 
             if reward == 1:
                 return TrialResult(True, pr())
+
+            if terminate:
+                raise ValueError()
 
         return TrialResult(False, [])
     except Exception as e:

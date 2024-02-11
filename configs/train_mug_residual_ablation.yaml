@@ -42,7 +42,7 @@ num_demo: 10
 dataset_index: None
 object_type: mug #
 dataset_size: 1000
-rotation_variance: 180
+action_rotation_variance: 180
 translation_variance: 0.5
 synthetic_occlusion: True
 plane_occlusion: True

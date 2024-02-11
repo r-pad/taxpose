@@ -2,7 +2,7 @@
 
 defaults:
   - /commands/rlbench/_eval@_here_
-  - override /model: taxpose
+  - override /model: taxpose_all
   - override /task: put_knife_on_chopping_board
   - override /phase: place
   - _self_

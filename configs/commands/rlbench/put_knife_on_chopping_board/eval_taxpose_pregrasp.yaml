@@ -4,7 +4,7 @@ defaults:
   - /commands/rlbench/_eval@_here_
   - override /model: taxpose
   - override /task: put_knife_on_chopping_board
-  - override /phase: place
+  - override /phase: pregrasp
   - _self_
 
 break_symmetry: False

@@ -156,3 +156,19 @@ CUDA_VISIBLE_DEVICES=1 DISPLAY=:0.0 python scripts/evaluate_ndf_mug_standalone.p
 ./launch.sh local 0 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_grasp.yaml wandb.group=rlbench_put_knife_on_chopping_board
 ./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_lift.yaml wandb.group=rlbench_put_knife_on_chopping_board
 ./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_place.yaml wandb.group=rlbench_put_knife_on_chopping_board
+./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_place.yaml wandb.group=all
+
+### Eval.
+
+
+#### TAXPOSE
+python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopping_board/eval_taxpose_pregrasp data_root=/data wandb.group=rlbench_put_knife_on_chopping_board_taxpose
+python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopping_board/eval_taxpose_grasp data_root=/data wandb.group=rlbench_put_knife_on_chopping_board_taxpose
+python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopping_board/eval_taxpose_lift data_root=/data wandb.group=rlbench_put_knife_on_chopping_board_taxpose dm.train_dset.anchor_rotation_variance=1e-5 dm.train_dset.action_rot_sample_method=axis_angle_uniform_z dm.train_dset.anchor_rot_sample_method=axis_angle_uniform_z
+python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopping_board/eval_taxpose_place data_root=/data wandb.group=rlbench_put_knife_on_chopping_board_taxpose dm.train_dset.anchor_rotation_variance=1e-5 dm.train_dset.action_rot_sample_method=axis_angle_uniform_z dm.train_dset.anchor_rot_sample_method=axis_angle_uniform_z
+
+#### TAXPOSE-ALL
+python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopping_board/eval_taxpose_all_pregrasp data_root=/data wandb.group=rlbench_put_knife_on_chopping_board_taxpose_all dm.train_dset.anchor_rotation_variance=1e-5 dm.train_dset.action_rot_sample_method=axis_angle_uniform_z dm.train_dset.anchor_rot_sample_method=axis_angle_uniform_z
+python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopping_board/eval_taxpose_all_grasp data_root=/data wandb.group=rlbench_put_knife_on_chopping_board_taxpose_all dm.train_dset.anchor_rotation_variance=1e-5 dm.train_dset.action_rot_sample_method=axis_angle_uniform_z dm.train_dset.anchor_rot_sample_method=axis_angle_uniform_z
+python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopping_board/eval_taxpose_all_lift data_root=/data wandb.group=rlbench_put_knife_on_chopping_board_taxpose_all dm.train_dset.anchor_rotation_variance=1e-5 dm.train_dset.action_rot_sample_method=axis_angle_uniform_z dm.train_dset.anchor_rot_sample_method=axis_angle_uniform_z
+python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopping_board/eval_taxpose_all_place data_root=/data wandb.group=rlbench_put_knife_on_chopping_board_taxpose_all dm.train_dset.anchor_rotation_variance=1e-5 dm.train_dset.action_rot_sample_method=axis_angle_uniform_z dm.train_dset.anchor_rot_sample_method=axis_angle_uniform_z
