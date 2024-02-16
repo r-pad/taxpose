@@ -172,3 +172,18 @@ python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopp
 python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopping_board/eval_taxpose_all_grasp data_root=/data wandb.group=rlbench_put_knife_on_chopping_board_taxpose_all dm.train_dset.anchor_rotation_variance=1e-5 dm.train_dset.action_rot_sample_method=axis_angle_uniform_z dm.train_dset.anchor_rot_sample_method=axis_angle_uniform_z
 python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopping_board/eval_taxpose_all_lift data_root=/data wandb.group=rlbench_put_knife_on_chopping_board_taxpose_all dm.train_dset.anchor_rotation_variance=1e-5 dm.train_dset.action_rot_sample_method=axis_angle_uniform_z dm.train_dset.anchor_rot_sample_method=axis_angle_uniform_z
 python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopping_board/eval_taxpose_all_place data_root=/data wandb.group=rlbench_put_knife_on_chopping_board_taxpose_all dm.train_dset.anchor_rotation_variance=1e-5 dm.train_dset.action_rot_sample_method=axis_angle_uniform_z dm.train_dset.anchor_rot_sample_method=axis_angle_uniform_z
+
+### RLBench Eval.
+taskset -c 0-40 python scripts/eval_rlbench.py --config-name commands/rlbench/put_knife_on_chopping_board/eval_rlbench_taxpose_all num_trials=100 resources.num_workers=10 wandb.group=rlbench_put_knife_on_chopping_board headless=True
+
+## Reach Target
+
+### Train
+
+./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/reach_target/train_taxpose_all.yaml wandb.group=rlbench_reach_target
+
+### Eval
+python scripts/eval_metrics.py --config-name commands/rlbench/reach_target/eval_taxpose_all_reach data_root=/data wandb.group=rlbench_reach_target
+
+### RLBench Eval
+taskset -c 0-40 python scripts/eval_rlbench.py --config-name commands/rlbench/reach_target/eval_rlbench_taxpose_all num_trials=100 resources.num_workers=10 wandb.group=rlbench_reach_target headless=True

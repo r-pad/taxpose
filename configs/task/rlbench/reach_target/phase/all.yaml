@@ -1,0 +1,5 @@
+name: all
+action_class: Null
+anchor_class: Null
+softmax_temperature: 0.1
+weight_normalize: softmax

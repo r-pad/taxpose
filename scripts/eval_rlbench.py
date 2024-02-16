@@ -1,4 +1,5 @@
 import logging
+import os
 import pickle
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -40,6 +41,58 @@ from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
 from taxpose.utils.load_model import get_weights_path
+
+
+class TaskVideoRecorder:
+    def __init__(self, scene, cam_name: str):
+        self.frames = []
+        self.scene = scene
+        self.cam_name = cam_name
+
+    def step(self):
+        obs = self.scene.get_observation()
+
+        # the cam_name is an attribute of the observation, not a dict key.
+        if not hasattr(obs, self.cam_name):
+            raise ValueError(f"Camera {self.cam_name} not found in observation.")
+
+        self.frames.append(getattr(obs, self.cam_name))
+
+    def write_video(self, video_path: str):
+        if len(self.frames) == 0:
+            return
+
+        import cv2
+
+        # Write the video.
+        height, width, _ = self.frames[0].shape
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        out = cv2.VideoWriter(video_path, fourcc, 20.0, (width, height))
+
+        for frame in self.frames:
+            out.write(frame)
+
+        out.release()
+
+
+# # HEHEH extremely hacky way to add a method to a class.
+# def RecordedTask(task: Type[Task], video_path: str) -> Type[Task]:
+
+#     def step(self):
+#         super(task, self).step()
+#         breakpoint()
+
+#     _RecordedTask = type(
+#         task.__name__,
+#         (task,),
+#         {
+#             "video_path": video_path,
+#             "frames": [],
+#             "step": step,
+#         },
+#     )
+
+#     return _RecordedTask
 
 
 class RelativePosePredictor(Protocol):
@@ -347,6 +400,21 @@ def obs_to_input(obs, task_name, phase):
     action_point_cloud = remove_outliers(action_point_cloud[None])[0]
     anchor_point_cloud = remove_outliers(anchor_point_cloud[None])[0]
 
+    # Visualize the point clouds.
+    # act_pc = o3d.geometry.PointCloud()
+    # act_pc.points = o3d.utility.Vector3dVector(action_point_cloud)
+    # act_pc.colors = o3d.utility.Vector3dVector(
+    #     np.array([1, 0, 0]) * np.ones((action_point_cloud.shape[0], 3))
+    # )
+
+    # anc_pc = o3d.geometry.PointCloud()
+    # anc_pc.points = o3d.utility.Vector3dVector(anchor_point_cloud)
+    # anc_pc.colors = o3d.utility.Vector3dVector(
+    #     np.array([0, 1, 0]) * np.ones((anchor_point_cloud.shape[0], 3))
+    # )
+
+    # o3d.visualization.draw_geometries([act_pc, anc_pc])
+
     return {
         "action_rgb": torch.from_numpy(action_rgb),
         "action_pc": torch.from_numpy(action_point_cloud).float(),
@@ -359,9 +427,12 @@ def obs_to_input(obs, task_name, phase):
 class FailureReason(str, Enum):
     NOT_ATTEMPTED = "not_attempted"
     NO_FAILURE = "no_failure"
+    PREDICTION_OUTSIDE_WORKSPACE = "prediction_outside_workspace"
     MOTION_PLANNING_FAILURE = "motion_planning_failure"
     PREDICTION_FAILURE = "prediction_failure"
+    CAUSED_TERMINATION = "caused_termination"
     UNKNOWN_FAILURE = "unknown_failure"
+    FINAL_PHASE_NO_SUCCESS = "final_phase_no_success"
 
 
 @dataclass
@@ -422,6 +493,7 @@ def run_trial(
     wandb_cfg,
     headless=True,
     run=None,
+    trial_num=0,
 ) -> TrialResult:
     # Seed the random number generator.
 
@@ -459,21 +531,33 @@ def run_trial(
         headless=headless,
     )
 
+    phase_order = TASK_DICT[task_spec.name]["phase_order"]
+
+    # Keep track of the results for each phase.
+    phase_results = {phase: FailureReason.NOT_ATTEMPTED for phase in phase_order}
+
+    # Helper function to order the phases sequentially in the results.
+    def pr():
+        return [PhaseResult(phase, phase_results[phase]) for phase in phase_order]
+
     try:
-        task = env.get_task(name_to_task_class(task_spec.name))
+        task_cls = name_to_task_class(task_spec.name)
+        # task_cls = RecordedTask(task_cls, video_path="video.mp4")
+        task = env.get_task(task_cls)
         task.sample_variation()
+
+        recorder = TaskVideoRecorder(task._scene, "front_rgb")
+
+        task._scene.register_step_callback(recorder.step)
 
         # Reset the environment. For now, ignore descriptions.
         _, obs = task.reset()
+    except Exception as e:
+        env.shutdown()
+        print(f"Failed to reset the environment: {e}")
+        return TrialResult(False, pr())
 
-        phase_order = TASK_DICT[task_spec.name]["phase_order"]
-
-        # Keep track of the results for each phase.
-        phase_results = {phase: FailureReason.NOT_ATTEMPTED for phase in phase_order}
-
-        # Helper function to order the phases sequentially in the results.
-        def pr():
-            return [PhaseResult(phase, phase_results[phase]) for phase in phase_order]
+    try:
 
         # Loop through the phases, and predict.
         for phase in phase_order:
@@ -497,17 +581,19 @@ def run_trial(
             # Attempt the action.
             try:
                 if phase == "place":
-                    task._action_mode.arm_action_mode._collision_checking = False
+                    # task._action_mode.arm_action_mode._collision_checking = False
                     # This is a hack.
                     action[2] += policy_spec.z_offset
                     obs, reward, terminate = task.step(action)
-                    task._action_mode.arm_action_mode._collision_checking = True
+                    # task._action_mode.arm_action_mode._collision_checking = True
                 else:
                     obs, reward, terminate = task.step(action)
 
             except Exception as e:
-                print(e)
-                phase_results[phase] = FailureReason.MOTION_PLANNING_FAILURE
+                if "workspace" in str(e):
+                    phase_results[phase] = FailureReason.PREDICTION_OUTSIDE_WORKSPACE
+                else:
+                    phase_results[phase] = FailureReason.MOTION_PLANNING_FAILURE
                 return TrialResult(False, pr())
 
             phase_results[phase] = FailureReason.NO_FAILURE
@@ -516,9 +602,16 @@ def run_trial(
                 return TrialResult(True, pr())
 
             if terminate:
-                raise ValueError()
+                phase_results[phase] = FailureReason.CAUSED_TERMINATION
+                return TrialResult(False, pr())
 
-        return TrialResult(False, [])
+            # Check if it's the final phase, and if we haven't succeeded...
+            if phase == phase_order[-1]:
+                phase_results[phase] = FailureReason.FINAL_PHASE_NO_SUCCESS
+                return TrialResult(False, pr())
+
+        print("unknown failure")
+        return TrialResult(False, pr())
     except Exception as e:
         print(e)
         return TrialResult(False, pr())
@@ -526,6 +619,12 @@ def run_trial(
     finally:
         # Close the environment.
         env.shutdown()
+
+        if not os.path.exists("videos"):
+            os.makedirs("videos")
+
+        fn = f"videos/{trial_num}.mp4"
+        recorder.write_video(fn)
 
 
 def run_trials(
@@ -552,6 +651,7 @@ def run_trials(
                 wandb_cfg,
                 headless=headless,
                 run=run,
+                trial_num=i,
             )
             logging.info(f"Trial {i}: {result}")
             results.append(result)
@@ -566,8 +666,9 @@ def run_trials(
                 wandb_cfg,
                 headless=headless,
                 run=None,  # run is unpickleable...
+                trial_num=i,
             )
-            for _ in range(num_trials)
+            for i in range(num_trials)
         )
         results = [r for r in tqdm.tqdm(job_results, total=num_trials)]
 
@@ -615,10 +716,9 @@ def main(cfg):
         for phase in TASK_DICT[cfg.task.name]["phase_order"]
     }
     for result in results:
-        if not result.success:
-            for pr in result.failure_reason:
-                pr: PhaseResult
-                failure_reason_counts[pr.phase][pr.failure_reason.name] += 1
+        for pr in result.failure_reason:
+            pr: PhaseResult
+            failure_reason_counts[pr.phase][pr.failure_reason.name] += 1
 
     # Flatten the structure so that the keys are phase_reason.
     failure_reason_counts = {
@@ -640,7 +740,14 @@ def main(cfg):
             **failure_reason_counts,
         }
     )
-    print(df)
+
+    for phase in TASK_DICT[cfg.task.name]["phase_order"]:
+        # Get all columns that start with the phase name.
+        print(f"Phase: {phase}")
+        phase_cols = [col for col in df.columns if col.startswith(phase)]
+        phase_df = df[phase_cols]
+        phase_df = phase_df.rename(columns=lambda x: x[len(phase) + 1 :])
+        print(phase_df)
 
     # Save the results to wandb as a table.
     run.log(

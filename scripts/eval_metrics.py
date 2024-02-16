@@ -98,7 +98,6 @@ def main(cfg):
             weights = torch.load(ckpt_file)["state_dict"]
             model.load_state_dict(weights)
         except RuntimeError:
-            p
             # This is an "older" style model, so we need to load the weights
             # manually.
             model.model.load_state_dict(weights)

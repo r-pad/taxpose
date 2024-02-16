@@ -69,6 +69,7 @@ DEMO_SYMMETRY_LABELS = {
     "place_hanger_on_rack": None,
     "solve_puzzle": None,
     "put_knife_on_chopping_board": None,
+    "reach_target": None,
 }
 
 
@@ -186,8 +187,9 @@ def remove_outliers(original_points, min_neighbors=1):
     # Set diagonal to inf
     np.fill_diagonal(dists, np.inf)
 
-    outliers = np.sum(dists > threshold, axis=0)
-    outliers = np.where(outliers < min_neighbors)[0]
+    # Detect points which have fewer than min_neighbors neighbors.
+    neighbors = np.sum(dists < threshold, axis=0)
+    outliers = np.where(neighbors < min_neighbors)[0]
 
     # Remove the outliers.
     points = np.delete(original_points, outliers, axis=1)

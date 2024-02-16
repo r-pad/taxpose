@@ -1,0 +1,13 @@
+# @package _global_
+
+defaults:
+  - /eval_rlbench.yaml
+  - override /model: taxpose_all
+  - override /task: reach_target
+  - _self_
+
+break_symmetry: False
+
+model:
+  break_symmetry: False
+  num_points: 256
