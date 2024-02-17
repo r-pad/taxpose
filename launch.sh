@@ -30,18 +30,25 @@ if [ $PLATFORM == "autobot" ]; then
     echo "Running on autobot"
 
     # Run on signularity.
-    SINGULARITYENV_CUDA_VISIBLE_DEVICES=$GPU_INDEX \
-    SINGULARITYENV_WANDB_DOCKER_IMAGE=taxpose \
-    singularity exec \
+    APPTAINERENV_CUDA_VISIBLE_DEVICES=$GPU_INDEX \
+    APPTAINERENV_WANDB_DOCKER_IMAGE=taxpose \
+    APPTAINERENV_MPLCONFIGDIR=/opt/.config \
+    apptainer exec \
     --nv \
+    --no-mount hostfs \
+    --pwd /opt/$(whoami)/code \
+    --workdir /opt/tmp \
     -B /home/$(whoami)/code/rpad/taxpose:/opt/$(whoami)/code \
     -B /scratch/$(whoami)/data:/data \
     -B /scratch/$(whoami)/logs:/opt/logs \
     -B /scratch/$(whoami)/artifacts:/opt/artifacts \
+    -B /scratch/$(whoami)/.cache:/home/${whoami}/.cache \
+    -B /scratch/$(whoami)/.config:/opt/.config \
+    -B /scratch/$(whoami)/tmp:/tmp \
     docker://beisner/taxpose \
     $COMMAND \
     log_dir=/opt/logs \
-    data_dir=/data \
+    data_root=/data \
     wandb.artifact_dir=/opt/artifacts \
 
 

@@ -39,7 +39,7 @@ RUN pip install fvcore iopath && \
 # Download CoppeliaSim
 RUN mkdir $CODING_ROOT/.coppelia
 WORKDIR $CODING_ROOT/.coppelia
-RUN curl https://www.coppeliarobotics.com/files/V4_1_0/CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz -o CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz && \
+RUN curl -L https://www.coppeliarobotics.com/files/V4_1_0/CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz -o CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz && \
     tar -xf CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz && \
     rm CoppeliaSim_Edu_V4_1_0_Ubuntu20_04.tar.xz
 
