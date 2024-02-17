@@ -70,6 +70,7 @@ DEMO_SYMMETRY_LABELS = {
     "solve_puzzle": None,
     "put_knife_on_chopping_board": None,
     "reach_target": None,
+    "pick_and_lift": None,
 }
 
 

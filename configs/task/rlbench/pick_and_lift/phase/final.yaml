@@ -1,0 +1,7 @@
+# @package task
+
+name: final
+action_class: block
+anchor_class: goal
+softmax_temperature: 0.1
+weight_normalize: softmax

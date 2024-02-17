@@ -1,0 +1,7 @@
+# @package task
+
+name: pregrasp
+action_class: gripper
+anchor_class: block
+softmax_temperature: 0.1
+weight_normalize: softmax
