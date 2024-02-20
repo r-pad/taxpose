@@ -71,6 +71,12 @@ DEMO_SYMMETRY_LABELS = {
     "put_knife_on_chopping_board": None,
     "reach_target": None,
     "pick_and_lift": None,
+    "pick_up_cup": None,
+    "put_money_in_safe": None,
+    "push_button": None,
+    "slide_block_to_target": None,
+    "take_money_out_safe": None,
+    "take_umbrella_out_of_umbrella_stand": None,
 }
 
 

@@ -1,0 +1,7 @@
+# @package task
+
+name: preplace
+action_class: money
+anchor_class: safe
+softmax_temperature: 0.1
+weight_normalize: softmax

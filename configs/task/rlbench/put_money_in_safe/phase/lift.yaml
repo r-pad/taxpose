@@ -1,0 +1,7 @@
+# @package task
+
+name: lift
+action_class: money
+anchor_class: money
+softmax_temperature: 0.1
+weight_normalize: softmax
