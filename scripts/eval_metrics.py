@@ -46,7 +46,7 @@ def maybe_load_from_wandb(checkpoint_reference, wandb_cfg, run):
 
 
 @torch.no_grad()
-@hydra.main(config_path="../configs", config_name="eval_metrics")
+@hydra.main(config_path="../configs", config_name="eval_metrics", version_base="1.1")
 def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
 
@@ -120,6 +120,8 @@ def main(cfg):
     print("setting up val")
     dm.setup(stage="val")
     val_dataloader = dm.val_dataloader()
+
+    csv_strs = [cfg.task.phase.name]
 
     for name, loader in zip(["train", "val"], [train_dataloader, val_dataloader]):
         # for name, loader in zip(["val"], [val_dataloader]):
@@ -273,6 +275,8 @@ def main(cfg):
         ang_err_mean = metrics["angle_err"].mean()
         t_err_mean = metrics["t_err"].mean()
 
+        csv_strs.append(f"{ang_err_mean},{t_err_mean}")
+
         metrics_table = wandb.Table(
             columns=["angle_err", "t_err"],
             data=[
@@ -281,6 +285,8 @@ def main(cfg):
         )
 
         wandb.log({f"{name}_metrics": metrics_table})
+
+    print("CSV string: ", ",".join(csv_strs))
 
 
 if __name__ == "__main__":

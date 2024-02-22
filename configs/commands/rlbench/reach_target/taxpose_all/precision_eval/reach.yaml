@@ -1,0 +1,14 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_eval@_here_
+  - override /model: taxpose_all
+  - override /task:  reach_target
+  - override /phase: reach
+  - _self_
+
+break_symmetry: False
+
+model:
+  break_symmetry: False
+  num_points: 256

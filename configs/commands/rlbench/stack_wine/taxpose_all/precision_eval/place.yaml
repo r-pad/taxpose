@@ -1,0 +1,13 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_eval@_here_
+  - override /model: taxpose_all
+  - override /task:  stack_wine
+  - override /phase: place
+  - _self_
+
+break_symmetry: False
+
+model:
+  conditional: True

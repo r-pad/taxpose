@@ -1,17 +1,16 @@
 # @package _global_
 
 defaults:
-  - /commands/rlbench/_train@_here_
+  - /commands/rlbench/_eval@_here_
   - override /model: taxpose_all
-  - override /task: pick_and_lift
-  - override /phase: all
+  - override /task: take_money_out_safe
+  - override /phase: grasp
   - _self_
 
 break_symmetry: False
 
 model:
   conditional: True
-  break_symmetry: False
 
 dm:
   train_dset:

@@ -1,0 +1,12 @@
+# @package _global_
+
+break_symmetry: false
+defaults:
+- /eval_rlbench.yaml
+- override /model: taxpose_all
+- override /task: stack_wine
+- _self_
+model:
+  break_symmetry: false
+  conditional: true
+  z_offset: 0.0

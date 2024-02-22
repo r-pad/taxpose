@@ -187,3 +187,37 @@ python scripts/eval_metrics.py --config-name commands/rlbench/reach_target/eval_
 
 ### RLBench Eval
 taskset -c 0-40 python scripts/eval_rlbench.py --config-name commands/rlbench/reach_target/eval_rlbench_taxpose_all num_trials=100 resources.num_workers=10 wandb.group=rlbench_reach_target headless=True
+
+
+
+## RLBench Single eval.
+<!-- - [ ] "pick_and_lift",
+- [ ] "pick_up_cup",
+- [ ] "put_knife_on_chopping_board",
+- [ ] "put_money_in_safe",
+- [ ] "push_button",
+- [ ] "reach_target",
+- [ ] "slide_block_to_target",
+- [ ] "stack_wine",
+- [ ] "take_money_out_safe",
+- [ ] "take_umbrella_out_of_umbrella_stand",
+ -->
+WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name commands/rlbench/pick_and_lift/taxpose_all/eval_rlbench.yaml num_trials=1 resources.num_workers=0 wandb.group=rlbench_pick_and_lift headless=True
+
+WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name commands/rlbench/pick_up_cup/taxpose_all/eval_rlbench.yaml num_trials=1 resources.num_workers=0 wandb.group=rlbench_pick_up_cup headless=True
+
+WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name commands/rlbench/put_knife_on_chopping_board/taxpose_all/eval_rlbench.yaml num_trials=1 resources.num_workers=0 wandb.group=rlbench_put_knife_on_chopping_board headless=True
+
+WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name commands/rlbench/put_money_in_safe/taxpose_all/eval_rlbench.yaml num_trials=1 resources.num_workers=0 wandb.group=rlbench_put_money_in_safe headless=True
+
+WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name commands/rlbench/push_button/taxpose_all/eval_rlbench.yaml num_trials=1 resources.num_workers=0 wandb.group=rlbench_push_button headless=True
+
+WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name commands/rlbench/reach_target/taxpose_all/eval_rlbench.yaml num_trials=1 resources.num_workers=0 wandb.group=rlbench_reach_target headless=True
+
+WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name commands/rlbench/slide_block_to_target/taxpose_all/eval_rlbench.yaml num_trials=1 resources.num_workers=0 wandb.group=rlbench_slide_block_to_target headless=True
+
+WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name commands/rlbench/stack_wine/taxpose_all/eval_rlbench.yaml num_trials=1 resources.num_workers=0 wandb.group=rlbench_stack_wine headless=True
+
+WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name commands/rlbench/take_money_out_safe/taxpose_all/eval_rlbench.yaml num_trials=1 resources.num_workers=0 wandb.group=rlbench_take_money_out_safe headless=True
+
+WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name commands/rlbench/take_umbrella_out_of_umbrella_stand/taxpose_all/eval_rlbench.yaml num_trials=1 resources.num_workers=0 wandb.group=rlbench_take_umbrella_out_of_umbrella_stand headless=True
