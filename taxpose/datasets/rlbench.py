@@ -228,6 +228,7 @@ class RLBenchPointCloudDatasetConfig:
     # the initial, onoccluded observation to the final, occluded position.
     teleport_initial_to_final: bool = True
     with_symmetry: bool = True
+    whole_scene_anchor: bool = False
 
 
 class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
@@ -239,6 +240,7 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             demos=cfg.episodes,
             phase=cfg.phase,
             use_first_as_init_keyframe=cfg.use_first_as_init_keyframe,
+            whole_scene_anchor=cfg.whole_scene_anchor,
         )
 
         self.cfg = cfg
@@ -279,7 +281,8 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
 
         # Quickly remove outliers...
         points_action = remove_outliers(points_action)
-        points_anchor = remove_outliers(points_anchor)
+        if not self.cfg.whole_scene_anchor:
+            points_anchor = remove_outliers(points_anchor)
 
         return points_action, points_anchor, data
 
@@ -292,7 +295,11 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
         # Downsample if necessary.
         try:
             points_action = maybe_downsample(points_action, self.cfg.num_points)
-            points_anchor = maybe_downsample(points_anchor, self.cfg.num_points)
+
+            num_anchor_points = (
+                self.cfg.num_points if not self.cfg.whole_scene_anchor else 1024
+            )
+            points_anchor = maybe_downsample(points_anchor, num_anchor_points)
         except:
             print(f"Failed to downsample {index}.")
 
