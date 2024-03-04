@@ -19,7 +19,8 @@ train_dset:
     with_symmetry: True
     occlusion_cfg: ???
     num_points: 256
-    whole_scene_anchor: False
+    action_mode: "object"
+    anchor_mode: "single_object"
 
 val_dset:
   demo_dset:
@@ -35,7 +36,8 @@ val_dset:
     with_symmetry: True
     occlusion_cfg: ???
     num_points: ${...train_dset.demo_dset.num_points}
-    whole_scene_anchor: ${...train_dset.demo_dset.whole_scene_anchor}
+    action_mode: ${...train_dset.demo_dset.action_mode}
+    anchor_mode: ${...train_dset.demo_dset.anchor_mode}
 
 test_dset:
   demo_dset:
@@ -51,4 +53,5 @@ test_dset:
     with_symmetry: True
     occlusion_cfg: ???
     num_points: ${...train_dset.demo_dset.num_points}
-    whole_scene_anchor: ${...train_dset.demo_dset.whole_scene_anchor}
+    action_mode: ${...train_dset.demo_dset.action_mode}
+    anchor_mode: ${...train_dset.demo_dset.anchor_mode}

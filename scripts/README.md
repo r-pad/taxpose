@@ -221,3 +221,33 @@ WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name
 WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name commands/rlbench/take_money_out_safe/taxpose_all/eval_rlbench.yaml num_trials=1 resources.num_workers=0 wandb.group=rlbench_take_money_out_safe headless=True
 
 WANDB_MODE=disabled taskset -c 0-50 python scripts/eval_rlbench.py --config-name commands/rlbench/take_umbrella_out_of_umbrella_stand/taxpose_all/eval_rlbench.yaml num_trials=1 resources.num_workers=0 wandb.group=rlbench_take_umbrella_out_of_umbrella_stand headless=True
+
+
+### Try using whole scene
+
+WANDB_MODE=disabled python scripts/eval_metrics.py --config-name commands/rlbench/put_knife_on_chopping_board/taxpose_all/precision_eval/lift.yaml data_root=/data wandb.group=rlbench_put_knife_on_chopping_board dm.train_dset.demo_dset.anchor_mode="raw" checkpoints.ckpt_file=r-pad/taxpose/model-2t9piqya:v0
+
+
+### Try various partial scenes...
+./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_all.yaml dm.train_dset.demo_dset.anchor_mode="background_robot_removed" wandb.group=rlbench_reach_target
+
+
+
+./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_all.yaml dm.train_dset.demo_dset.anchor_mode="background_robot_removed" dm.train_dset.demo_dset.action_mode="gripper_and_object" dm.train_dset.demo_dset.num_points=512  wandb.group=rlbench_reach_target
+
+
+
+# Cool thing I'm trying...
+
+
+<!-- Knife on chopping -->
+./scripts/train_eval.sh \
+    "./launch.sh local 0 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_all.yaml dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 wandb.group=rlbench_reach_target resources.num_workers=20"  \
+    "./configs/commands/rlbench/put_knife_on_chopping_board/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512" \
+    echo
+
+<!-- Put money in safe -->
+./scripts/train_eval.sh \
+    "./launch.sh local 0 python scripts/train_residual_flow.py --config-name commands/rlbench/put_money_in_safe/train_taxpose_all.yaml dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 wandb.group=rlbench_reach_target resources.num_workers=20"  \
+    "./configs/commands/rlbench/put_money_in_safe/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512" \
+    echo

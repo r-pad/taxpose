@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class ObjectClass(str, Enum):
     MUG = "mug"
     RACK = "rack"

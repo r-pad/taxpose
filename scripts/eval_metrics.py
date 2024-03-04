@@ -107,6 +107,8 @@ def main(cfg):
     model.cuda()
     model.eval()
 
+    # model = torch.compile(model)
+
     if cfg.split == "train":
         loader = dm.train_dataloader()
     elif cfg.split == "val":

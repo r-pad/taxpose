@@ -7,7 +7,7 @@ import numpy as np
 import numpy.typing as npt
 import open3d as o3d
 import torch
-from rpad.rlbench_utils.placement_dataset import RLBenchPlacementDataset
+from rpad.rlbench_utils.placement_dataset import AnchorMode, RLBenchPlacementDataset
 from torch.utils.data import Dataset
 
 from taxpose.datasets.augmentations import OcclusionConfig, maybe_downsample
@@ -228,7 +228,8 @@ class RLBenchPointCloudDatasetConfig:
     # the initial, onoccluded observation to the final, occluded position.
     teleport_initial_to_final: bool = True
     with_symmetry: bool = True
-    whole_scene_anchor: bool = False
+    anchor_mode: str = "single_object"
+    action_mode: str = "object"
 
 
 class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
@@ -240,7 +241,8 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             demos=cfg.episodes,
             phase=cfg.phase,
             use_first_as_init_keyframe=cfg.use_first_as_init_keyframe,
-            whole_scene_anchor=cfg.whole_scene_anchor,
+            anchor_mode=cfg.anchor_mode,
+            action_mode=cfg.action_mode,
         )
 
         self.cfg = cfg
@@ -281,7 +283,7 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
 
         # Quickly remove outliers...
         points_action = remove_outliers(points_action)
-        if not self.cfg.whole_scene_anchor:
+        if not self.cfg.anchor_mode == AnchorMode.RAW:
             points_anchor = remove_outliers(points_anchor)
 
         return points_action, points_anchor, data
@@ -297,7 +299,9 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             points_action = maybe_downsample(points_action, self.cfg.num_points)
 
             num_anchor_points = (
-                self.cfg.num_points if not self.cfg.whole_scene_anchor else 1024
+                self.cfg.num_points
+                if not self.cfg.anchor_mode == AnchorMode.RAW
+                else 1024
             )
             points_anchor = maybe_downsample(points_anchor, num_anchor_points)
         except:

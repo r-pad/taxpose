@@ -25,7 +25,10 @@ from rlbench.environment import Environment
 from rlbench.observation_config import ObservationConfig
 from rlbench.utils import name_to_task_class
 from rpad.rlbench_utils.placement_dataset import (
+    GRIPPER_OBJ_NAMES,
     TASK_DICT,
+    ActionMode,
+    AnchorMode,
     get_rgb_point_cloud_by_object_names,
     obs_to_rgb_point_cloud,
 )
@@ -378,27 +381,45 @@ class RandomPickPlacePredictor(RelativePosePredictor):
 
 
 # TODO: put this in the original rlbench library.
-def obs_to_input(obs, task_name, phase):
+def obs_to_input(
+    obs, task_name, phase, action_mode: ActionMode, anchor_mode: AnchorMode
+):
     rgb, point_cloud, mask = obs_to_rgb_point_cloud(obs)
 
+    action_names = TASK_DICT[task_name]["phase"][phase]["action_obj_names"]
+    if action_mode == ActionMode.GRIPPER_AND_OBJECT:
+        action_names += GRIPPER_OBJ_NAMES
+    elif action_mode == ActionMode.OBJECT:
+        pass
+    else:
+        raise ValueError(f"Invalid action mode: {action_mode}")
+
     action_rgb, action_point_cloud = get_rgb_point_cloud_by_object_names(
-        rgb,
-        point_cloud,
-        mask,
-        TASK_DICT[task_name]["phase"][phase]["action_obj_names"],
+        rgb, point_cloud, mask, action_names
     )
 
-    # Get the rgb and point cloud for the anchor objects.
-    anchor_rgb, anchor_point_cloud = get_rgb_point_cloud_by_object_names(
-        rgb,
-        point_cloud,
-        mask,
-        TASK_DICT[task_name]["phase"][phase]["anchor_obj_names"],
-    )
+    if anchor_mode == AnchorMode.RAW:
+        raise NotImplementedError()
+    elif anchor_mode == AnchorMode.BACKGROUND_REMOVED:
+        raise NotImplementedError()
+    elif anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED:
+        raise NotImplementedError()
+    elif anchor_mode == AnchorMode.SINGLE_OBJECT:
+        # Get the rgb and point cloud for the anchor objects.
+        anchor_rgb, anchor_point_cloud = get_rgb_point_cloud_by_object_names(
+            rgb,
+            point_cloud,
+            mask,
+            TASK_DICT[task_name]["phase"][phase]["anchor_obj_names"],
+        )
+    else:
+        raise ValueError(f"Invalid anchor mode: {anchor_mode}")
 
     # Remove outliers in the same way...
     action_point_cloud = remove_outliers(action_point_cloud[None])[0]
-    anchor_point_cloud = remove_outliers(anchor_point_cloud[None])[0]
+
+    if anchor_mode != AnchorMode.RAW:
+        anchor_point_cloud = remove_outliers(anchor_point_cloud[None])[0]
 
     # Visualize the point clouds.
     # act_pc = o3d.geometry.PointCloud()

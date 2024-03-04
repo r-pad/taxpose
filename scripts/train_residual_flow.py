@@ -189,6 +189,9 @@ def main(cfg):
                 )
     trainer.fit(model, dm)
 
+    # Print he run id of the current run
+    print("Run ID: {} ".format(logger.experiment.id))
+
 
 if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")

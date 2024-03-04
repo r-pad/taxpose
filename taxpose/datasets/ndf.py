@@ -2,7 +2,6 @@ import fnmatch
 import functools
 import os
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 from typing import ClassVar, Dict, List, Literal, Optional, Tuple
 
@@ -11,8 +10,8 @@ import torch
 from torch.utils.data import Dataset
 
 from taxpose.datasets.augmentations import (
-    maybe_downsample,
     OcclusionConfig,
+    maybe_downsample,
     occlusion_fn,
 )
 from taxpose.datasets.base import PlacementPointCloudData
@@ -25,7 +24,6 @@ from taxpose.utils.symmetry_utils import (
     get_sym_label_pca_grasp,
     get_sym_label_pca_place,
 )
-
 
 #  0 for mug, 1 for rack, 2 for gripper
 # These are the labels used in the NDF dataset

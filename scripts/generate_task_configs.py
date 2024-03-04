@@ -211,12 +211,17 @@ def generate_precision_eval_script(
     ]
 
     contents = "#!/bin/bash\n\n"
+    # We want to pass all arguments provided to the script to each command.
+    contents += "set -e\n\n"
+    contents += "echo 'Running precision eval'\n\n"
     for phase, command in commands:
         contents += 'echo "' + "-" * 80 + '"\n'
         contents += f"echo 'Evaluating {phase}'\n"
         contents += 'echo "' + "-" * 80 + '"\n'
         contents += 'echo "' + command + '"\n\n'
-        contents += command + "\n\n"
+
+        # Pass the arguments to the command.
+        contents += command + " $@\n\n"
 
     write_file(script_file, contents, dry_run=dry_run)
 

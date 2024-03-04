@@ -1,9 +1,8 @@
-from taxpose.utils.se3 import random_se3
 import numpy as np
 import torch
-
-from pytorch3d.transforms import Transform3d, Rotate, Translate, axis_angle_to_matrix
 from pytorch3d.ops import sample_farthest_points
+
+from taxpose.utils.se3 import random_se3
 
 
 def points_to_axis_aligned_rect(points, buffer=0.1):
