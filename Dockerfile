@@ -84,5 +84,10 @@ RUN pip install gdown
 # Copy the download script.
 COPY ./download_data.sh $CODING_ROOT/code/download_data.sh
 
+# Enable the RLBench X server
+RUN nvidia-xconfig -a --use-display-device=None --virtual=1280x1024
+RUN echo -e 'Section "ServerFlags"\n\tOption "MaxClients" "2048"\nEndSection\n' \
+    | tee /etc/X11/xorg.conf.d/99-maxclients.conf
+
 # Set up the entry point
 CMD ["python", "-c", "import torch; print(torch.cuda.is_available())"]

@@ -218,7 +218,7 @@ def generate_precision_eval_script(
         contents += 'echo "' + "-" * 80 + '"\n'
         contents += f"echo 'Evaluating {phase}'\n"
         contents += 'echo "' + "-" * 80 + '"\n'
-        contents += 'echo "' + command + '"\n\n'
+        contents += 'echo "' + command + ' $@"\n\n'
 
         # Pass the arguments to the command.
         contents += command + " $@\n\n"

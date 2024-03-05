@@ -18,10 +18,13 @@ defaults:
   - optional phase: place
   - task/${benchmark}/${task}/task@task
   - task/${benchmark}/${task}/phase/${phase}@task.phase
-  - checkpoints/rlbench@checkpoints: ${task}/${model}/${phase}
+  - optional checkpoints/rlbench@checkpoints: ${task}/${model}/${phase}
+
+checkpoints:
+  ckpt_file: ???
 
 checkpoint: ${checkpoints.ckpt_file}
-# checkpoint: null
+
 
 seed: 0
 break_symmetry: True
