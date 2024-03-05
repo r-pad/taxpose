@@ -42,9 +42,9 @@ if [ $PLATFORM == "autobot" ]; then
     -B /scratch/$(whoami)/data:/data \
     -B /scratch/$(whoami)/logs:/opt/logs \
     -B /scratch/$(whoami)/artifacts:/opt/artifacts \
-    -B /scratch/$(whoami)/.cache:/home/${whoami}/.cache \
     -B /scratch/$(whoami)/.config:/opt/.config \
     -B /scratch/$(whoami)/tmp:/tmp \
+    -B /scratch/$(whoami)/home:/home/$(whoami) \
     docker://beisner/taxpose \
     $COMMAND \
     log_dir=/opt/logs \

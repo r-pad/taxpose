@@ -320,3 +320,25 @@ mkdir -p configs/checkpoints/rlbench/stack_wine/pretraining && touch configs/che
     "./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/take_umbrella_out_of_umbrella_stand/train_taxpose_all.yaml dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 wandb.group=rlbench_take_umbrella_out_of_umbrella_stand resources.num_workers=20 data_root=/home/beisner/datasets"  \
     "./launch.sh local 1 ./configs/commands/rlbench/take_umbrella_out_of_umbrella_stand/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 data_root=/home/beisner/datasets" \
     echo
+
+
+### Redo the evals...
+./launch.sh autobot 0 ./configs/commands/rlbench/pick_and_lift/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 checkpoints.ckpt_file=r-pad/taxpose/model-a8vhdn5b:v0
+
+./launch.sh autobot 1 ./configs/commands/rlbench/pick_up_cup/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 checkpoints.ckpt_file=r-pad/taxpose/model-nay0eueg:v0
+
+./launch.sh autobot 2 ./configs/commands/rlbench/put_knife_on_chopping_board/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 checkpoints.ckpt_file=r-pad/taxpose/model-opjzx3mi:v0
+
+./launch.sh autobot 3 ./configs/commands/rlbench/put_money_in_safe/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 checkpoints.ckpt_file=r-pad/taxpose/model-m2eb9u1s:v0
+
+./launch.sh autobot 4 ./configs/commands/rlbench/push_button/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 checkpoints.ckpt_file=r-pad/taxpose/model-gjzsgkkh:v0
+
+./launch.sh autobot 5 ./configs/commands/rlbench/reach_target/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 checkpoints.ckpt_file=r-pad/taxpose/model-yz9e7iz8:v0
+
+./launch.sh autobot 6 ./configs/commands/rlbench/slide_block_to_target/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 checkpoints.ckpt_file=r-pad/taxpose/model-kpbx8qf4:v0
+
+./launch.sh autobot 7 ./configs/commands/rlbench/stack_wine/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 checkpoints.ckpt_file=r-pad/taxpose/model-nixx3qii:v0
+
+./launch.sh autobot 8 ./configs/commands/rlbench/take_money_out_safe/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 checkpoints.ckpt_file=r-pad/taxpose/model-1gmi342v:v0
+
+./launch.sh autobot 9 ./configs/commands/rlbench/take_umbrella_out_of_umbrella_stand/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 checkpoints.ckpt_file=r-pad/taxpose/model-1y7t5g4o:v0
