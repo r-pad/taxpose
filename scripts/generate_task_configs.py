@@ -1,5 +1,6 @@
 import os
 import shutil
+from typing import List
 
 import typer
 import yaml
@@ -256,9 +257,16 @@ def generate_method_checkpoint_configs(
     # For each phase, create a file called "phase.yaml" in the method directory.
     for phase in TASK_DICT[task_name]["phase_order"]:
         phase_file = os.path.join(method_dir, f"{phase}.yaml")
-        contents = {"ckpt_file": "r-pad/taxpose/model-???:v0"}
+        # contents = {"ckpt_file": "r-pad/taxpose/model-???:v0"}
+        contents = {"defaults": ["_model"]}
         contents = yaml.dump(contents)
         write_file(phase_file, contents, dry_run=dry_run, overwrite=False)
+
+    # Create a file called _model.yaml
+    model_file = os.path.join(method_dir, "_model.yaml")
+    contents = {"ckpt_file": f"r-pad/{method_name}/model-???:v0"}
+    contents = yaml.dump(contents)
+    write_file(model_file, contents, dry_run=dry_run, overwrite=False)
 
     # Create a file called method_name in the task directory.
     method_file = os.path.join(checkpoint_dir, f"{method_name}.yaml")
@@ -272,35 +280,36 @@ def generate_method_checkpoint_configs(
     write_file(method_file, contents_str, dry_run=dry_run)
 
 
-def main(task_name: str, dry_run: bool = False, evals: bool = True):
-    print(f"Generating task configs for {task_name}")
+def main(task_names: List[str], dry_run: bool = False, evals: bool = True):
+    for task_name in task_names:
+        print(f"Generating task configs for {task_name}")
 
-    config_root = "configs"
+        config_root = "configs"
 
-    if not evals:
-        generate_task_configs(task_name, config_root, dry_run=dry_run)
+        if not evals:
+            generate_task_configs(task_name, config_root, dry_run=dry_run)
 
-        generate_dataset_configs(task_name, config_root, dry_run=dry_run)
+            generate_dataset_configs(task_name, config_root, dry_run=dry_run)
 
-        generate_training_command_configs(task_name, config_root, dry_run=dry_run)
+            generate_training_command_configs(task_name, config_root, dry_run=dry_run)
 
-        generate_checkpoint_configs(task_name, config_root, dry_run=dry_run)
+            generate_checkpoint_configs(task_name, config_root, dry_run=dry_run)
 
-    else:
-        generate_method_checkpoint_configs(
-            task_name, config_root, "taxpose_all", dry_run=dry_run
-        )
-        generate_precision_eval_command_configs(
-            task_name, config_root, "taxpose_all", dry_run=dry_run
-        )
+        else:
+            generate_method_checkpoint_configs(
+                task_name, config_root, "taxpose_all", dry_run=dry_run
+            )
+            generate_precision_eval_command_configs(
+                task_name, config_root, "taxpose_all", dry_run=dry_run
+            )
 
-        generate_precision_eval_script(
-            task_name, config_root, "taxpose_all", dry_run=dry_run
-        )
+            generate_precision_eval_script(
+                task_name, config_root, "taxpose_all", dry_run=dry_run
+            )
 
-        generate_rlbench_eval_command_configs(
-            task_name, config_root, "taxpose_all", dry_run=dry_run
-        )
+            generate_rlbench_eval_command_configs(
+                task_name, config_root, "taxpose_all", dry_run=dry_run
+            )
 
 
 if __name__ == "__main__":
