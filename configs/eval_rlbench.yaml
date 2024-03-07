@@ -19,10 +19,15 @@ defaults:
   # Load the checkpoints appropriately.
   # - checkpoints/rlbench@grasp_checkpoints: ${task}/${model@grasp_model}
   # - checkpoints/rlbench@place_checkpoints: ${task}/${model@place_model}
-  - checkpoints/rlbench@checkpoints: ${task}/${model}
+  - optional checkpoints/rlbench@checkpoints: ${task}/${model}
 
 policy_spec: ${model}
 
+checkpoints:
+
+task:
+  action_mode: object
+  anchor_mode: single_object
 
 num_trials: 100
 headless: True
@@ -32,3 +37,5 @@ resources:
 
 # For prediction.
 z_offset: 0.03
+
+seed: 123456

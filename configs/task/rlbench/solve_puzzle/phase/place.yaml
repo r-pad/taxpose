@@ -1,10 +1,7 @@
 # @package task
 
+action_class: solve_puzzle_piece_visual2
+anchor_class: solve_puzzle_piece1
 name: place
-action_class: 0
-anchor_class: 1
-cloud_type: teleport
-softmax_temperature: 1
-weight_normalize: l1
-action_name: puzzle_piece
-anchor_name: puzzle
+softmax_temperature: 0.1
+weight_normalize: softmax

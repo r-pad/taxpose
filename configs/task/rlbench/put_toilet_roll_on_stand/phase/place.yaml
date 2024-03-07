@@ -1,10 +1,7 @@
 # @package task
 
+action_class: toilet_roll_visual
+anchor_class: holder_visual
 name: place
-action_class: 0
-anchor_class: 1
-cloud_type: teleport
-softmax_temperature: 1
-weight_normalize: l1
-action_name: toilet_roll
-anchor_name: toilet_roll_stand
+softmax_temperature: 0.1
+weight_normalize: softmax

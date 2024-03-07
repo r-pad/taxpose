@@ -16,6 +16,7 @@ import torch
 import tqdm
 import wandb
 from omegaconf import OmegaConf
+from pyrep.backend import sim
 from pyrep.const import RenderMode
 from pytorch3d.ops import sample_farthest_points
 from rlbench.action_modes.action_mode import MoveArmThenGripper
@@ -25,10 +26,13 @@ from rlbench.environment import Environment
 from rlbench.observation_config import ObservationConfig
 from rlbench.utils import name_to_task_class
 from rpad.rlbench_utils.placement_dataset import (
+    BACKGROUND_NAMES,
     GRIPPER_OBJ_NAMES,
+    ROBOT_NONGRIPPER_NAMES,
     TASK_DICT,
     ActionMode,
     AnchorMode,
+    filter_out_names,
     get_rgb_point_cloud_by_object_names,
     obs_to_rgb_point_cloud,
 )
@@ -193,6 +197,8 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         self.policy_spec = policy_spec
         self.task_name = task_cfg.name
         self.debug_viz = debug_viz
+        self.action_mode = task_cfg.action_mode
+        self.anchor_mode = task_cfg.anchor_mode
 
     @staticmethod
     def render(obs, inputs, preds, T_action_world, T_actionfinal_world):
@@ -268,8 +274,15 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         model = model.cuda()
         return model
 
-    def predict(self, obs, phase: str) -> np.ndarray:
-        inputs = obs_to_input(obs, self.task_name, phase)
+    def predict(self, obs, phase: str, handlemap) -> np.ndarray:
+        inputs = obs_to_input(
+            obs,
+            self.task_name,
+            phase,
+            self.action_mode,
+            self.anchor_mode,
+            handlemap,
+        )
         model = self.models[phase]
         device = model.device
 
@@ -380,9 +393,22 @@ class RandomPickPlacePredictor(RelativePosePredictor):
         )
 
 
+def get_handle_mapping():
+    handles = {
+        sim.simGetObjectName(handle): handle
+        for handle in sim.simGetObjects(sim.sim_handle_all)
+    }
+    return handles
+
+
 # TODO: put this in the original rlbench library.
 def obs_to_input(
-    obs, task_name, phase, action_mode: ActionMode, anchor_mode: AnchorMode
+    obs,
+    task_name,
+    phase,
+    action_mode: ActionMode,
+    anchor_mode: AnchorMode,
+    handlemap,
 ):
     rgb, point_cloud, mask = obs_to_rgb_point_cloud(obs)
 
@@ -403,7 +429,13 @@ def obs_to_input(
     elif anchor_mode == AnchorMode.BACKGROUND_REMOVED:
         raise NotImplementedError()
     elif anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED:
-        raise NotImplementedError()
+        anchor_rgb, anchor_point_cloud = filter_out_names(
+            rgb,
+            point_cloud,
+            mask,
+            handlemap,
+            BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES,
+        )
     elif anchor_mode == AnchorMode.SINGLE_OBJECT:
         # Get the rgb and point cloud for the anchor objects.
         anchor_rgb, anchor_point_cloud = get_rgb_point_cloud_by_object_names(
@@ -571,6 +603,8 @@ def run_trial(
 
         task._scene.register_step_callback(recorder.step)
 
+        handlemap = get_handle_mapping()
+
         # Reset the environment. For now, ignore descriptions.
         _, obs = task.reset()
     except Exception as e:
@@ -584,7 +618,7 @@ def run_trial(
         for phase in phase_order:
             # Try to make a predictions.
             try:
-                T_gripper_world = policy.predict(obs, phase)
+                T_gripper_world = policy.predict(obs, phase, handlemap)
             except Exception as e:
                 print(e)
                 phase_results[phase] = FailureReason.PREDICTION_FAILURE

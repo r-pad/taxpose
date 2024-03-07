@@ -21,7 +21,7 @@ defaults:
   - optional checkpoints/rlbench@checkpoints: ${task}/${model}/${phase}
 
 checkpoints:
-  ckpt_file: ???
+  ckpt_file: None
 
 checkpoint: ${checkpoints.ckpt_file}
 

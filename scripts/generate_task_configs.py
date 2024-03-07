@@ -258,9 +258,18 @@ def generate_method_checkpoint_configs(
     for phase in TASK_DICT[task_name]["phase_order"]:
         phase_file = os.path.join(method_dir, f"{phase}.yaml")
         # contents = {"ckpt_file": "r-pad/taxpose/model-???:v0"}
-        contents = {"defaults": ["_model"]}
+        contents = {
+            "defaults": [
+                f"/checkpoints/rlbench/{task_name}/{method_name}/_model@_here_"
+            ]
+        }
         contents = yaml.dump(contents)
-        write_file(phase_file, contents, dry_run=dry_run, overwrite=False)
+
+        # Prepend the contents with "# @package checkpoints.{task_name}.{method_name}".
+        # contents = (
+        #     f"# @package checkpoints.rlbench.{task_name}.{method_name}\n\n" + contents
+        # )
+        write_file(phase_file, contents, dry_run=dry_run, overwrite=True)
 
     # Create a file called _model.yaml
     model_file = os.path.join(method_dir, "_model.yaml")
@@ -293,7 +302,9 @@ def main(task_names: List[str], dry_run: bool = False, evals: bool = True):
 
             generate_training_command_configs(task_name, config_root, dry_run=dry_run)
 
-            generate_checkpoint_configs(task_name, config_root, dry_run=dry_run)
+            generate_checkpoint_configs(
+                task_name, config_root, "taxpose_all", dry_run=dry_run
+            )
 
         else:
             generate_method_checkpoint_configs(

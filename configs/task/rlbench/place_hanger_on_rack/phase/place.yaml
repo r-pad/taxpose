@@ -1,10 +1,7 @@
 # @package task
 
+action_class: clothes_hanger_visual
+anchor_class: clothes_rack
 name: place
-action_class: 0
-anchor_class: 1
-cloud_type: teleport
-softmax_temperature: 1
-weight_normalize: l1
-action_name: hanger
-anchor_name: hanger_rack
+softmax_temperature: 0.1
+weight_normalize: softmax

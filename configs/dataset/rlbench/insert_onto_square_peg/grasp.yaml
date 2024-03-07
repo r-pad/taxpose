@@ -1,0 +1,3 @@
+defaults:
+- rlbench/insert_onto_square_peg/_default@_here_
+- _self_

@@ -1,1 +1,4 @@
+defaults:
+- phase@phases.grasp: grasp
+- phase@phases.place: place
 name: place_hanger_on_rack

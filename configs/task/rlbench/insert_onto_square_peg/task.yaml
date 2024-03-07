@@ -1,1 +1,4 @@
+defaults:
+- phase@phases.grasp: grasp
+- phase@phases.place: place
 name: insert_onto_square_peg

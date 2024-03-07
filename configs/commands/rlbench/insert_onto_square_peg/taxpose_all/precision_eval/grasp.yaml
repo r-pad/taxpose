@@ -1,0 +1,18 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_eval@_here_
+  - override /model: taxpose_all
+  - override /task: insert_onto_square_peg
+  - override /phase: grasp
+  - _self_
+
+break_symmetry: False
+
+model:
+  conditional: True
+
+dm:
+  train_dset:
+    demo_dset:
+      num_points: 256
