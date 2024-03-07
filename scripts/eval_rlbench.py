@@ -450,7 +450,10 @@ def obs_to_input(
     # Remove outliers in the same way...
     action_point_cloud = remove_outliers(action_point_cloud[None])[0]
 
-    if anchor_mode != AnchorMode.RAW:
+    if (
+        anchor_mode != AnchorMode.RAW
+        and anchor_mode != AnchorMode.BACKGROUND_ROBOT_REMOVED
+    ):
         anchor_point_cloud = remove_outliers(anchor_point_cloud[None])[0]
 
     # Visualize the point clouds.

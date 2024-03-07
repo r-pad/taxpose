@@ -263,8 +263,8 @@ mkdir -p configs/checkpoints/rlbench/pick_and_lift/pretraining && touch configs/
 <!-- pick_up_cup -->
 mkdir -p configs/checkpoints/rlbench/pick_up_cup/pretraining && touch configs/checkpoints/rlbench/pick_up_cup/pretraining/all.yaml
 ./scripts/train_eval.sh \
-    "./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/pick_up_cup/train_taxpose_all.yaml dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 wandb.group=rlbench_pick_up_cup resources.num_workers=20"  \
-    "./launch.sh local 1 ./configs/commands/rlbench/pick_up_cup/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512" \
+    "./launch.sh autobot 1 python scripts/train_residual_flow.py --config-name commands/rlbench/pick_up_cup/train_taxpose_all.yaml dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 wandb.group=rlbench_pick_up_cup resources.num_workers=20"  \
+    "./launch.sh autobot 1 ./configs/commands/rlbench/pick_up_cup/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512" \
     echo
 
 <!-- put_knife_on_chopping_board -->
@@ -310,15 +310,17 @@ mkdir -p configs/checkpoints/rlbench/stack_wine/pretraining && touch configs/che
     echo
 
 <!-- take_money_out_safe -->
+mkdir -p configs/checkpoints/rlbench/take_money_out_safe/pretraining && touch configs/checkpoints/rlbench/take_money_out_safe/pretraining/all.yaml
 ./scripts/train_eval.sh \
-    "./launch.sh local 0 python scripts/train_residual_flow.py --config-name commands/rlbench/take_money_out_safe/train_taxpose_all.yaml dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 wandb.group=rlbench_take_money_out_safe resources.num_workers=20 data_root=/home/beisner/datasets"  \
-    "./launch.sh local 0 ./configs/commands/rlbench/take_money_out_safe/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 data_root=/home/beisner/datasets" \
+    "./launch.sh autobot 0 python scripts/train_residual_flow.py --config-name commands/rlbench/take_money_out_safe/train_taxpose_all.yaml dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 wandb.group=rlbench_take_money_out_safe resources.num_workers=20 data_root=/home/beisner/datasets"  \
+    "./launch.sh autobot 0 ./configs/commands/rlbench/take_money_out_safe/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 data_root=/home/beisner/datasets" \
     echo
 
 <!-- take_umbrella_out_of_umbrella_stand -->
+mkdir -p configs/checkpoints/rlbench/take_umbrella_out_of_umbrella_stand/pretraining && touch configs/checkpoints/rlbench/take_umbrella_out_of_umbrella_stand/pretraining/all.yaml
 ./scripts/train_eval.sh \
-    "./launch.sh local 1 python scripts/train_residual_flow.py --config-name commands/rlbench/take_umbrella_out_of_umbrella_stand/train_taxpose_all.yaml dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 wandb.group=rlbench_take_umbrella_out_of_umbrella_stand resources.num_workers=20 data_root=/home/beisner/datasets"  \
-    "./launch.sh local 1 ./configs/commands/rlbench/take_umbrella_out_of_umbrella_stand/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 data_root=/home/beisner/datasets" \
+    "./launch.sh autobot 1 python scripts/train_residual_flow.py --config-name commands/rlbench/take_umbrella_out_of_umbrella_stand/train_taxpose_all.yaml dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 wandb.group=rlbench_take_umbrella_out_of_umbrella_stand resources.num_workers=20 data_root=/home/beisner/datasets"  \
+    "./launch.sh autobot 1 ./configs/commands/rlbench/take_umbrella_out_of_umbrella_stand/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 data_root=/home/beisner/datasets" \
     echo
 
 

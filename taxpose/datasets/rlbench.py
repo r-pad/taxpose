@@ -283,7 +283,10 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
 
         # Quickly remove outliers...
         points_action = remove_outliers(points_action)
-        if not self.cfg.anchor_mode == AnchorMode.RAW:
+        if (
+            not self.cfg.anchor_mode == AnchorMode.RAW
+            and not self.cfg.anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED
+        ):
             points_anchor = remove_outliers(points_anchor)
 
         return points_action, points_anchor, data
