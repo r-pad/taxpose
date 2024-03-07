@@ -2,7 +2,7 @@
 
 defaults:
   - /commands/rlbench/_train@_here_
-  - override /model: taxpose_all
+  - override /model: taxpose
   - override /task: pick_and_lift
   - override /phase: all
   - _self_
@@ -11,9 +11,8 @@ break_symmetry: False
 
 model:
   conditional: True
-  break_symmetry: False
 
 dm:
   train_dset:
     demo_dset:
-      num_points: 128
+      num_points: 256

@@ -1,8 +1,7 @@
-name: stack_wine
-
 defaults:
-  - phase@phases.pregrasp: pregrasp
-  - phase@phases.grasp: grasp
-  - phase@phases.lift: lift
-  - phase@phases.preplace: preplace
-  - phase@phases.place: place
+- phase@phases.pregrasp: pregrasp
+- phase@phases.grasp: grasp
+- phase@phases.lift: lift
+- phase@phases.preplace: preplace
+- phase@phases.place: place
+name: stack_wine

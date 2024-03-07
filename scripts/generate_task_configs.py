@@ -94,6 +94,17 @@ def generate_dataset_configs(task_name: str, config_root: str, dry_run: bool = F
     task_file = os.path.join(dataset_dir, "_default.yaml")
     copy_file(default_file, task_file, dry_run=dry_run)
 
+    # Parse the _default.yaml file as a yaml file.
+    with open(task_file, "r") as f:
+        contents = yaml.load(f, Loader=yaml.FullLoader)
+
+    contents["train_dset"]["demo_dset"]["episodes"] = list(range(100))
+    contents["val_dset"]["demo_dset"]["episodes"] = list(range(10))
+
+    # Write the contents back to the file.
+    contents_str = yaml.dump(contents)
+    write_file(task_file, contents_str, dry_run=dry_run, overwrite=True)
+
     for phase in TASK_DICT[task_name]["phase_order"] + ["all"]:
         content = {
             "defaults": [

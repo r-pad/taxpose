@@ -1,4 +1,3 @@
-name: reach_target
-
 defaults:
-  - phase@phases.reach: reach
+- phase@phases.reach: reach
+name: reach_target

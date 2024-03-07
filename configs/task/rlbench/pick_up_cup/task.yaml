@@ -1,6 +1,5 @@
-name: pick_up_cup
-
 defaults:
-  - phase@phases.pregrasp: pregrasp
-  - phase@phases.grasp: grasp
-  - phase@phases.lift: lift
+- phase@phases.pregrasp: pregrasp
+- phase@phases.grasp: grasp
+- phase@phases.lift: lift
+name: pick_up_cup

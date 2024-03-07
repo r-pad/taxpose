@@ -1,7 +1,7 @@
 # @package task
 
+action_class: knife_visual
+anchor_class: chopping_board_visual
 name: place
-action_class: knife
-anchor_class: chopping_board
 softmax_temperature: 0.1
 weight_normalize: softmax

@@ -15,4 +15,4 @@ model:
 dm:
   train_dset:
     demo_dset:
-      num_points: 128
+      num_points: 256
