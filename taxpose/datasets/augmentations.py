@@ -16,7 +16,13 @@ def maybe_downsample(
         return points
 
     if points.shape[1] < num_points:
-        raise ValueError("Cannot downsample to more points than exist in the cloud.")
+        # Randomly sample with replacement.
+        n_missing = num_points - points.shape[1]
+        missing_points = points[:, np.random.choice(points.shape[1], n_missing)]
+        points = np.concatenate([points, missing_points], axis=1)
+        return points
+
+        # raise ValueError("Cannot downsample to more points than exist in the cloud.")
 
     points, ids = sample_farthest_points(
         torch.from_numpy(points), K=num_points, random_start_point=True
