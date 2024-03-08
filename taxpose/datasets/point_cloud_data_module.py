@@ -1,7 +1,18 @@
+import joblib
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from taxpose.datasets.point_cloud_dataset import PointCloudDataset
+
+
+def parallel_iterate(dataset, n_jobs):
+    joblib.Parallel(n_jobs=n_jobs)(
+        joblib.delayed(dataset.__getitem__)(ix) for ix in tqdm(range(len(dataset)))
+    )
+
+    # Iterate once over the dataset to make sure it's been processed.
+    # _ = [dataset[ix] for ix in tqdm(range(len(dataset)))]
 
 
 class MultiviewDataModule(pl.LightningDataModule):
@@ -23,27 +34,17 @@ class MultiviewDataModule(pl.LightningDataModule):
 
         if stage == "train" or stage is None:
             self.train_dataset = PointCloudDataset(self.cfg.train_dset)
-
             # Iterate once over the dataset to make sure it's been processed.
-            # _ = [
-            #     self.train_dataset.dataset[ix]
-            #     for ix in tqdm(range(len(self.train_dataset.dataset)))
-            # ]
+            parallel_iterate(self.train_dataset.dataset, self.num_workers)
 
         if stage == "val" or stage is None:
             self.val_dataset = PointCloudDataset(self.cfg.val_dset)
             # Iterate once over the dataset to make sure it's been processed.
-            # _ = [
-            #     self.val_dataset.dataset[ix]
-            #     for ix in tqdm(range(len(self.val_dataset.dataset)))
-            # ]
+            parallel_iterate(self.val_dataset.dataset, self.num_workers)
         if stage == "test":
             self.test_dataset = PointCloudDataset(self.cfg.test_dset)
             # Iterate once over the dataset to make sure it's been processed.
-            # _ = [
-            #     self.test_dataset.dataset[ix]
-            #     for ix in tqdm(range(len(self.test_dataset.dataset)))
-            # ]
+            parallel_iterate(self.test_dataset.dataset, self.num_workers)
 
     def train_dataloader(self):
         return DataLoader(
