@@ -250,7 +250,7 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
     def __len__(self):
         return len(self.dataset)
 
-    @functools.lru_cache(maxsize=100)
+    @functools.lru_cache(maxsize=1000)
     def _load_data(
         self, index: int
     ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, torch.Tensor]]:
