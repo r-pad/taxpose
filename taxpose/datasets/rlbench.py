@@ -289,7 +289,13 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
         ):
             points_anchor = remove_outliers(points_anchor)
 
-        return points_action, points_anchor, data
+        new_data = {
+            "T_action_key_world": data["T_action_key_world"],
+            "T_anchor_key_world": data["T_anchor_key_world"],
+            "phase": data["phase"],
+            "phase_onehot": data["phase_onehot"],
+        }
+        return points_action, points_anchor, new_data
 
     def __getitem__(self, index: int) -> PlacementPointCloudData:
         # Load the data.
