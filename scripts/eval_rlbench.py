@@ -186,8 +186,12 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
     ):
         self.models = {}
         for phase in TASK_DICT[task_cfg.name]["phase_order"]:
+            if "single_model_override" in checkpoints_cfg:
+                model_path = checkpoints_cfg.single_model_override
+            else:
+                model_path = checkpoints_cfg[phase].ckpt_file
             self.models[phase] = self.load_model(
-                checkpoints_cfg[phase].ckpt_file,
+                model_path,
                 policy_spec,
                 wandb_cfg,
                 task_cfg.phases[phase],

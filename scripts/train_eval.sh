@@ -23,4 +23,5 @@ echo $cmd2 checkpoints.ckpt_file=r-pad/taxpose/model-${run_id}:v0
 $cmd2 checkpoints.ckpt_file=r-pad/taxpose/model-${run_id}:v0
 
 # Run the third command, passing output1 as an argument
-# $cmd3 $output1
+echo $cmd3 +checkpoints.single_model_override=r-pad/taxpose/model-${run_id}:v0
+$cmd3 +checkpoints.single_model_override=r-pad/taxpose/model-${run_id}:v0
