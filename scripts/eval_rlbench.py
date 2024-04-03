@@ -187,7 +187,7 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
     ):
         self.models = {}
         for phase in TASK_DICT[task_cfg.name]["phase_order"]:
-            if "single_model_override" in checkpoints_cfg:
+            if hasattr(checkpoints_cfg, "single_model_override"):
                 model_path = checkpoints_cfg.single_model_override
             else:
                 model_path = checkpoints_cfg[phase].ckpt_file
