@@ -43,7 +43,7 @@ if [ $PLATFORM == "autobot" ]; then
     APPTAINERENV_CUDA_VISIBLE_DEVICES=$GPU_INDEX \
     APPTAINERENV_WANDB_DOCKER_IMAGE=taxpose \
     APPTAINERENV_MPLCONFIGDIR=/opt/.config \
-    apptainer exec \
+    apptainer run \
     --nv \
     --no-mount hostfs \
     --pwd /opt/$(whoami)/code \
