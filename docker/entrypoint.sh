@@ -12,8 +12,15 @@ sleep 2
 
 echo "Xvfb started on display $DISPLAY"
 
+# If VGL_DEVICE is set, then use it. Else use egl0.
+if [ -z "$VGL_DEVICE" ]; then
+    VGL_DEVICE="egl0"
+fi
+
+echo "Using VirtualGL device: $VGL_DEVICE"
+
 # Run your OpenGL application with VirtualGL (add +v command if needed.)
 vglrun \
-    -d egl0 \
+    -d $VGL_DEVICE \
     -ld /opt/baeisner/.pyenv/versions/3.9.12/lib/python3.9/site-packages/torch/lib \
     "$@"

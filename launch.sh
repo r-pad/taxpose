@@ -51,6 +51,51 @@ if [ $PLATFORM == "autobot" ]; then
     data_root=/data \
     wandb.artifact_dir=/opt/artifacts \
 
+# If the platform is "local-docker", then we need to use docker to run the command.
+elif [ $PLATFORM == "local-docker" ]; then
+    echo "Running locally with docker"
+
+    docker run \
+    --gpus "device=$GPU_INDEX" \
+    -it \
+    -e WANDB_API_KEY="${WANDB_API_KEY}" \
+    -e WANDB_DOCKER_IMAGE=taxpose \
+    -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json \
+    -v /home/beisner/datasets/:/data \
+    -v /home/beisner/code/rpad/taxpose/artifacts:/opt/artifacts \
+    -v /home/beisner/code/rpad/taxpose/logs:/opt/logs \
+    beisner/taxpose \
+    $COMMAND \
+    log_dir=/opt/logs \
+    data_root=/data \
+    wandb.artifact_dir=/opt/artifacts
+
+elif [ $PLATFORM == "local-apptainer" ]; then
+    echo "Running locally with apptainer"
+
+    APPTAINERENV_CUDA_VISIBLE_DEVICES=$GPU_INDEX \
+    APPTAINERENV_WANDB_DOCKER_IMAGE=taxpose \
+    APPTAINERENV_MPLCONFIGDIR=/opt/.config \
+    APPTAINERENV_VGL_DEVICE=egl$GPU_INDEX \
+    APPTAINERENV_PYENV_VERSION= \
+    apptainer exec \
+    --nv \
+    --no-mount hostfs \
+    --pwd /opt/$(whoami)/code \
+    --contain \
+    -B /home/$(whoami)/code/rpad/taxpose:/opt/$(whoami)/code \
+    -B /home/$(whoami)/datasets:/data \
+    -B /home/$(whoami)/code/rpad/taxpose/logs:/opt/logs \
+    -B /home/$(whoami)/code/rpad/taxpose/artifacts:/opt/artifacts \
+    -B /home/$(whoami)/.config:/opt/.config \
+    -B /home/$(whoami)/.tmp:/tmp \
+    -B /home/$(whoami)/tmp_home:/home/$(whoami) \
+    -B /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json \
+    docker://beisner/taxpose \
+    $COMMAND \
+    log_dir=/opt/logs \
+    data_root=/data \
+    wandb.artifact_dir=/opt/artifacts
 
 # If the platform is "local", then we can just run the command.
 elif [ $PLATFORM == "local" ]; then
