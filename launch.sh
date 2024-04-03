@@ -29,6 +29,16 @@ echo Command: $COMMAND
 if [ $PLATFORM == "autobot" ]; then
     echo "Running on autobot"
 
+    # For the following directories, check to see if they exist. If they don't, create them. Use an array.
+    # Directories to check:
+    DIRECTORIES=("/scratch/$(whoami)/data" "/scratch/$(whoami)/logs" "/scratch/$(whoami)/artifacts" "/scratch/$(whoami)/.config" "/scratch/$(whoami)/tmp" "/scratch/$(whoami)/home")
+
+    for DIRECTORY in "${DIRECTORIES[@]}"; do
+        if [ ! -d $DIRECTORY ]; then
+            mkdir -p $DIRECTORY
+        fi
+    done
+
     # Run on signularity.
     APPTAINERENV_CUDA_VISIBLE_DEVICES=$GPU_INDEX \
     APPTAINERENV_WANDB_DOCKER_IMAGE=taxpose \
