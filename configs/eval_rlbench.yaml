@@ -21,7 +21,10 @@ defaults:
   # - checkpoints/rlbench@place_checkpoints: ${task}/${model@place_model}
   - optional checkpoints/rlbench@checkpoints: ${task}/${model}
 
-policy_spec: ${model}
+# policy_spec: ${model}
+policy_spec:
+  collision_checking: True
+  model: ${model}
 
 checkpoints:
 

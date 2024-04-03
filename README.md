@@ -98,6 +98,9 @@ pip install --pre dgl -f https://data.dgl.ai/wheels/cu113/repo.html
 pip install --pre dglgo -f https://data.dgl.ai/wheels-test/repo.html
 ```
 
+# NOTE
+Cursed vglrun requires us to pipe in our own custom LD_LIBRARY_PATH. This is a hacky way to do it, but it works for now.
+
 ## Install `taxpose`.
 
 This part should be really simple:
@@ -148,6 +151,9 @@ sudo apt-get install python-dev
 cd third_party/ndf_robot/pybullet-planning/pybullet_tools/ikfast/franka_panda
 python setup.py
 ```
+
+
+
 
 
 # Code Structure
@@ -661,6 +667,11 @@ These are granular results of the experiments in Table 1.
 
 ```
 docker build -t beisner/taxpose .
+```
+
+### This command works for RLBench eval. Hard-fought.
+```
+docker run --gpus "device=1" -it --rm -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json -v /home/beisner/datasets/:/data -v ./artifacts:/opt/artifacts beisner/taxpose python scripts/eval_rlbench.py --config-name commands/rlbench/reach_target/taxpose_all/eval_rlbench.yaml num_trials=100 resources.num_workers=20 wandb.artifact_dir=/opt/artifacts wandb.group=rlbench_push_button headless=True task.action_mode=gripper_and_object task.anchor_mode=background_robot_removed model.num_points=512
 ```
 
 ### Run training.

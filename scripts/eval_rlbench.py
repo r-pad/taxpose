@@ -44,6 +44,7 @@ from taxpose.datasets.rlbench import (
     rotational_symmetry_labels,
 )
 from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
+from taxpose.train_pm_placement import theta_err
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
@@ -192,13 +193,13 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
                 model_path = checkpoints_cfg[phase].ckpt_file
             self.models[phase] = self.load_model(
                 model_path,
-                policy_spec,
+                policy_spec.model,
                 wandb_cfg,
                 task_cfg.phases[phase],
                 run=run,
             )
 
-        self.policy_spec = policy_spec
+        self.model_cfg = policy_spec.model
         self.task_name = task_cfg.name
         self.debug_viz = debug_viz
         self.action_mode = task_cfg.action_mode
@@ -293,11 +294,11 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         action_pc = inputs["action_pc"].unsqueeze(0).to(device)
         anchor_pc = inputs["anchor_pc"].unsqueeze(0).to(device)
 
-        K = self.policy_spec.num_points
+        K = self.model_cfg.num_points
         action_pc, _ = sample_farthest_points(action_pc, K=K, random_start_point=True)
         anchor_pc, _ = sample_farthest_points(anchor_pc, K=K, random_start_point=True)
 
-        if self.policy_spec.break_symmetry:
+        if self.model_cfg.break_symmetry:
             raise NotImplementedError()
             action_symmetry_features = bottle_symmetry_features(
                 action_pc.cpu().numpy()[0]
@@ -327,7 +328,7 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
             action_symmetry_features = None
             anchor_symmetry_features = None
 
-        if "conditional" in self.policy_spec and self.policy_spec.conditional:
+        if "conditional" in self.model_cfg and self.model_cfg.conditional:
             phase_ix = TASK_DICT[self.task_name]["phase_order"].index(phase)
             phase_onehot = np.zeros(len(TASK_DICT[self.task_name]["phase_order"]))
             phase_onehot[phase_ix] = 1
@@ -544,6 +545,39 @@ def get_obs_config():
     return obs_config
 
 
+def move(action: np.ndarray, task, max_tries=10):
+    try_count = 0
+
+    p_desired = action[:3]
+    q_desired = action[3:7]
+
+    while try_count < max_tries:
+        # Take a step.
+        obs, reward, terminate = task.step(action)
+
+        # Check to make sure that the achieved pose is close to the desired pose.
+        p_achieved = obs.gripper_pose[:3]
+        q_achieved = obs.gripper_pose[3:7]
+
+        p_diff = np.linalg.norm(p_desired - p_achieved)
+        q_diff = theta_err(
+            torch.from_numpy(R.from_quat(q_desired).as_matrix()),
+            torch.from_numpy(R.from_quat(q_achieved).as_matrix()),
+        )
+
+        criteria = (p_diff < 5e-3, q_diff < 1)
+
+        if all(criteria) or reward == 1:
+            break
+
+        logging.warning(
+            f"Too far away (pos: {p_diff:.3f}, rot: {q_diff:.3f}... Retrying..."
+        )
+        try_count += 1
+
+    return obs, reward, terminate
+
+
 @torch.no_grad()
 def run_trial(
     policy_spec,
@@ -582,9 +616,14 @@ def run_trial(
     # )
 
     # Create the environment.
+    collision_checking = (
+        policy_spec.collision_checking if "collision_checking" in policy_spec else True
+    )
     env = Environment(
         action_mode=MoveArmThenGripper(
-            arm_action_mode=EndEffectorPoseViaPlanning(collision_checking=True),
+            arm_action_mode=EndEffectorPoseViaPlanning(
+                collision_checking=collision_checking
+            ),
             gripper_action_mode=Discrete(),
         ),
         obs_config=get_obs_config(),
@@ -640,16 +679,15 @@ def run_trial(
                 gripper_state = np.array([0.0])
             action = np.concatenate([p_gripper_world, q_gripper_world, gripper_state])
 
+            if phase == "place":
+                # Add the z offset.
+                action[2] += policy_spec.z_offset
+
             # Attempt the action.
             try:
-                if phase == "place":
-                    # task._action_mode.arm_action_mode._collision_checking = False
-                    # This is a hack.
-                    action[2] += policy_spec.z_offset
-                    obs, reward, terminate = task.step(action)
-                    # task._action_mode.arm_action_mode._collision_checking = True
-                else:
-                    obs, reward, terminate = task.step(action)
+                obs, reward, terminate = move(
+                    action, task, max_tries=10
+                )  # Eventually add collision checking.
 
             except Exception as e:
                 if "workspace" in str(e):
@@ -740,7 +778,6 @@ def run_trials(
 @hydra.main(version_base="1.2", config_path="../configs", config_name="eval_rlbench")
 def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
-
     # Force the hydra config cfg to be resolved
     cfg = OmegaConf.create(OmegaConf.to_yaml(cfg, resolve=True))
 
