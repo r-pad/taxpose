@@ -156,8 +156,8 @@ COPY ./download_data.sh $CODING_ROOT/code/download_data.sh
 # Install:
 
 
-COPY ./docker/entrypoint.sh /home/baeisner/code/entrypoint.sh
-ENTRYPOINT ["/home/baeisner/code/entrypoint.sh"]
+COPY ./docker/entrypoint.sh /opt/baeisner/code/entrypoint.sh
+ENTRYPOINT ["/opt/baeisner/code/entrypoint.sh"]
 
 # RUN pip install --force-reinstall torch-scatter==2.0.9 torch-sparse==0.6.15 torch-cluster==1.6.0 torch-spline-conv==1.2.1 pyg_lib==0.1.0 -f https://data.pyg.org/whl/torch-1.13.0+cu116.html
 
