@@ -296,6 +296,12 @@ EXTRA_PARAMS="dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.tr
     "./launch.sh local-docker 0 ./configs/commands/rlbench/reach_target/taxpose_all/precision_eval/precision_eval.sh ${EXTRA_PARAMS}" \
     "./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/reach_target/taxpose_all/eval_rlbench.yaml num_trials=100 resources.num_workers=10 wandb.group=rlbench_reach_target headless=True ${EXTRA_PARAMS}"
 
+EXTRA_PARAMS="dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512" \
+    ./scripts/train_eval.sh \
+    "./launch.sh autobot 0 python scripts/train_residual_flow.py --config-name commands/rlbench/reach_target/train_taxpose_all.yaml wandb.group=rlbench_reach_target resources.num_workers=10 ${EXTRA_PARAMS}"  \
+    "./launch.sh autobot 0 ./configs/commands/rlbench/reach_target/taxpose_all/precision_eval/precision_eval.sh ${EXTRA_PARAMS}" \
+    "./launch.sh autobot 0 python scripts/eval_rlbench.py --config-name commands/rlbench/reach_target/taxpose_all/eval_rlbench.yaml num_trials=100 resources.num_workers=10 wandb.group=rlbench_reach_target headless=True ${EXTRA_PARAMS}"
+
 <!-- slide_block_to_target -->
 mkdir -p configs/checkpoints/rlbench/slide_block_to_target/pretraining && touch configs/checkpoints/rlbench/slide_block_to_target/pretraining/all.yaml
 ./scripts/train_eval.sh \
