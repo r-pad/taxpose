@@ -88,7 +88,7 @@ elif [ $PLATFORM == "local-apptainer" ]; then
     APPTAINERENV_MPLCONFIGDIR=/opt/.config \
     APPTAINERENV_VGL_DEVICE=egl$GPU_INDEX \
     APPTAINERENV_PYENV_VERSION= \
-    apptainer exec \
+    apptainer run \
     --nv \
     --no-mount hostfs \
     --pwd /opt/$(whoami)/code \
