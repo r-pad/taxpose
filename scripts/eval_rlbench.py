@@ -50,6 +50,62 @@ from taxpose.training.flow_equivariance_training_module_nocentering import (
 )
 from taxpose.utils.load_model import get_weights_path
 
+TASK_TO_IGNORE_COLLISIONS = {
+    "pick_and_lift": {
+        "pregrasp": False,
+        "grasp": False,
+        "lift": True,
+        "final": True,
+    },
+    "pick_up_cup": {
+        "pregrasp": False,
+        "grasp": False,
+        "lift": True,
+    },
+    "put_knife_on_chopping_board": {
+        "pregrasp": False,
+        "grasp": False,
+        "lift": True,
+        "place": True,
+    },
+    "put_money_in_safe": {
+        "pregrasp": False,
+        "grasp": False,
+        "lift": True,
+        "preplace": False,
+        "place": False,
+    },
+    "push_button": {
+        "prepush": False,
+        "postpush": True,
+    },
+    "reach_target": {
+        "reach": False,
+    },
+    "slide_block_to_target": {
+        "preslide": False,
+        "postslide": True,
+    },
+    "stack_wine": {
+        "pregrasp": False,
+        "grasp": False,
+        "lift": True,
+        "preplace": False,
+        "place": False,
+    },
+    "take_money_out_safe": {
+        "pregrasp": False,
+        "grasp": True,
+        "lift": True,
+        "place": False,
+    },
+    "take_umbrella_out_of_umbrella_stand": {
+        "pregrasp": False,
+        "grasp": False,
+        "lift": True,
+    },
+}
+
 
 class TaskVideoRecorder:
     def __init__(self, scene, cam_name: str):
@@ -545,14 +601,15 @@ def get_obs_config():
     return obs_config
 
 
-def move(action: np.ndarray, task, max_tries=10):
+def move(action: np.ndarray, task, env, max_tries=10, ignore_collisions=False):
     try_count = 0
 
     p_desired = action[:3]
     q_desired = action[3:7]
 
+    env._action_mode.arm_action_mode._collision_checking = not ignore_collisions
+
     while try_count < max_tries:
-        # Take a step.
         obs, reward, terminate = task.step(action)
 
         # Check to make sure that the achieved pose is close to the desired pose.
@@ -679,14 +736,18 @@ def run_trial(
                 gripper_state = np.array([0.0])
             action = np.concatenate([p_gripper_world, q_gripper_world, gripper_state])
 
-            if phase == "place":
-                # Add the z offset.
-                action[2] += policy_spec.z_offset
+            # if phase == "place":
+            #     # Add the z offset.
+            #     action[2] += policy_spec.z_offset
 
             # Attempt the action.
             try:
                 obs, reward, terminate = move(
-                    action, task, max_tries=10
+                    action,
+                    task,
+                    env,
+                    max_tries=10,
+                    ignore_collisions=TASK_TO_IGNORE_COLLISIONS[task_spec.name][phase],
                 )  # Eventually add collision checking.
 
             except Exception as e:

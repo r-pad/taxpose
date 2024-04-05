@@ -74,6 +74,7 @@ elif [ $PLATFORM == "local-docker" ]; then
     -v /home/beisner/datasets/:/data \
     -v /home/beisner/code/rpad/taxpose/artifacts:/opt/artifacts \
     -v /home/beisner/code/rpad/taxpose/logs:/opt/logs \
+    -v /home/beisner/code/rpad/taxpose:/opt/baeisner/code \
     beisner/taxpose \
     $COMMAND \
     log_dir=/opt/logs \
