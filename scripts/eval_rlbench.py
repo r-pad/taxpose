@@ -5,13 +5,15 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Protocol
+from typing import Any, Dict, List, Protocol, Tuple
 
 import hydra
 import joblib
 import numpy as np
 import open3d as o3d
 import pandas as pd
+import plotly.graph_objects as go
+import rpad.visualize_3d.plots as rvp
 import torch
 import tqdm
 import wandb
@@ -130,6 +132,7 @@ class TaskVideoRecorder:
 
         # Write the video.
         height, width, _ = self.frames[0].shape
+        # fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         out = cv2.VideoWriter(video_path, fourcc, 20.0, (width, height))
 
@@ -161,7 +164,7 @@ class TaskVideoRecorder:
 
 class RelativePosePredictor(Protocol):
     @abstractmethod
-    def predict(self, obs, phase: str) -> np.ndarray:
+    def predict(self, obs, phase: str) -> Tuple[np.ndarray, Dict[str, Any]]:
         pass
 
 
@@ -335,7 +338,7 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         model = model.cuda()
         return model
 
-    def predict(self, obs, phase: str, handlemap) -> np.ndarray:
+    def predict(self, obs, phase: str, handlemap) -> Tuple[np.ndarray, Dict[str, Any]]:
         inputs = obs_to_input(
             obs,
             self.task_name,
@@ -410,7 +413,30 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         if self.debug_viz:
             self.render(obs, inputs, preds, T_gripper_world, T_gripperfinal_world)
 
-        return T_gripperfinal_world
+        fig = rvp.segmentation_fig(
+            np.concatenate(
+                [
+                    inputs["action_pc"].cpu().numpy(),
+                    inputs["anchor_pc"].cpu().numpy(),
+                    preds["pred_points_action"][0].cpu().numpy(),
+                ],
+                axis=0,
+            ),
+            np.concatenate(
+                [
+                    np.zeros((inputs["action_pc"].shape[0],)),
+                    np.ones((inputs["anchor_pc"].shape[0],)),
+                    2 * np.ones((preds["pred_points_action"][0].shape[0],)),
+                ]
+            ).astype(np.int32),
+            labelmap={
+                0: "action",
+                1: "anchor",
+                2: "pred",
+            },
+        )
+
+        return T_gripperfinal_world, {"plot": fig}
 
 
 class RandomPickPlacePredictor(RelativePosePredictor):
@@ -448,9 +474,10 @@ class RandomPickPlacePredictor(RelativePosePredictor):
         T_rand[:3, 3] = t_rand
         return T_rand
 
-    def predict(self, obs, phase) -> np.ndarray:
-        return self._get_random_pose(
-            self.xrange, self.yrange, self.zrange, self.grip_rot
+    def predict(self, obs, phase) -> Tuple[np.ndarray, Dict[str, Any]]:
+        return (
+            self._get_random_pose(self.xrange, self.yrange, self.zrange, self.grip_rot),
+            {},
         )
 
 
@@ -713,19 +740,24 @@ def run_trial(
     except Exception as e:
         env.shutdown()
         print(f"Failed to reset the environment: {e}")
-        return TrialResult(False, pr())
+        success = False
+        return TrialResult(success, pr())
 
     try:
 
         # Loop through the phases, and predict.
+        phase_plots: List[go.Figure] = []
         for phase in phase_order:
             # Try to make a predictions.
             try:
-                T_gripper_world = policy.predict(obs, phase, handlemap)
+                T_gripper_world, extras = policy.predict(obs, phase, handlemap)
+                if "plot" in extras:
+                    phase_plots.append((phase, extras["plot"]))
             except Exception as e:
                 print(e)
                 phase_results[phase] = FailureReason.PREDICTION_FAILURE
-                return TrialResult(False, pr())
+                success = False
+                return TrialResult(success, pr())
 
             # Compute the transform.
             p_gripper_world = T_gripper_world[:3, 3]
@@ -735,10 +767,6 @@ def run_trial(
             else:
                 gripper_state = np.array([0.0])
             action = np.concatenate([p_gripper_world, q_gripper_world, gripper_state])
-
-            # if phase == "place":
-            #     # Add the z offset.
-            #     action[2] += policy_spec.z_offset
 
             # Attempt the action.
             try:
@@ -755,37 +783,63 @@ def run_trial(
                     phase_results[phase] = FailureReason.PREDICTION_OUTSIDE_WORKSPACE
                 else:
                     phase_results[phase] = FailureReason.MOTION_PLANNING_FAILURE
-                return TrialResult(False, pr())
+                success = False
+                return TrialResult(success, pr())
 
             phase_results[phase] = FailureReason.NO_FAILURE
 
             if reward == 1:
-                return TrialResult(True, pr())
+                success = True
+                return TrialResult(success, pr())
 
             if terminate:
                 phase_results[phase] = FailureReason.CAUSED_TERMINATION
-                return TrialResult(False, pr())
+                success = False
+                return TrialResult(success, pr())
 
             # Check if it's the final phase, and if we haven't succeeded...
             if phase == phase_order[-1]:
                 phase_results[phase] = FailureReason.FINAL_PHASE_NO_SUCCESS
-                return TrialResult(False, pr())
+                success = False
+                return TrialResult(success, pr())
 
         print("unknown failure")
         return TrialResult(False, pr())
     except Exception as e:
         print(e)
-        return TrialResult(False, pr())
+        success = False
+        return TrialResult(success, pr())
 
     finally:
         # Close the environment.
         env.shutdown()
 
-        if not os.path.exists("videos"):
-            os.makedirs("videos")
+        # Make a directory for the entire episode.
+        if not os.path.exists("episodes"):
+            os.makedirs("episodes")
 
-        fn = f"videos/{trial_num}.mp4"
+        # Make a directory for the trial.
+        if not os.path.exists(f"episodes/{trial_num}"):
+            os.makedirs(f"episodes/{trial_num}")
+        else:
+            raise ValueError(f"Directory episodes/{trial_num} already exists.")
+
+        # Save phase plots.
+        for phase, fig in phase_plots:
+            fig.write_html(f"episodes/{trial_num}/{phase}.html")
+
+        # Save the episode video.
+        fn = f"episodes/{trial_num}/video.mov"
         recorder.write_video(fn)
+
+        # Save the episode results as a text file.
+        with open(f"episodes/{trial_num}/results.txt", "w") as f:
+
+            # Print overall task success.
+            f.write(f"OVERALL TASK SUCCESS: {success}\n")
+
+            for phase_result in pr():
+                f.write(f"{phase_result.phase}: {phase_result.failure_reason}\n")
 
 
 def run_trials(
