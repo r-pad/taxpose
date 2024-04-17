@@ -13,6 +13,7 @@ import numpy as np
 import open3d as o3d
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.io as pio
 import rpad.visualize_3d.plots as rvp
 import torch
 import tqdm
@@ -38,9 +39,9 @@ from rpad.rlbench_utils.placement_dataset import (
     get_rgb_point_cloud_by_object_names,
     obs_to_rgb_point_cloud,
 )
-from rpad.visualize_3d.html import PlotlyWebsiteBuilder
 from scipy.spatial.transform import Rotation as R
 
+import taxpose.utils.website as tuw
 from taxpose.datasets.rlbench import (
     colorize_symmetry_labels,
     remove_outliers,
@@ -839,19 +840,25 @@ def run_trial(
         else:
             raise ValueError(f"Directory episodes/{trial_num} already exists.")
 
-        website = PlotlyWebsiteBuilder(f"episode_{trial_num}")
+        # website = PlotlyWebsiteBuilder(f"episode_{trial_num}")
+        website_plots = []
+        website_video = None
 
         # Save phase plots.
         for phase, fig in phase_plots:
             # Add a title to the figure:
             fig.update_layout(title_text=f"Phase: {phase}")
             fig.write_html(f"episodes/{trial_num}/{phase}.html")
-            website.add_plot(task_spec.name, f"{task_spec.name}_{trial_num}", fig)
+            # website.add_plot(task_spec.name, f"{task_spec.name}_{trial_num}", fig)
+            website_plots.append(
+                pio.to_html(fig, full_html=False, include_plotlyjs=False)
+            )
 
         # Save the episode video.
         fn = f"episodes/{trial_num}/video"
         recorder.write_video(fn)
-        website.add_video(task_spec.name, f"{task_spec.name}_{trial_num}", f"video.mov")
+        # website.add_video(task_spec.name, f"{task_spec.name}_{trial_num}", f"video.mov")
+        website_video = f"video.mov"
 
         # Save the episode results as a text file.
         with open(f"episodes/{trial_num}/results.txt", "w") as f:
@@ -862,7 +869,16 @@ def run_trial(
             for phase_result in pr():
                 f.write(f"{phase_result.phase}: {phase_result.failure_reason}\n")
 
-        website.write_site(f"episodes/{trial_num}")
+        #
+        html = tuw.render_episode_page(
+            title=f"Episode {trial_num}, {task_spec.name}",
+            phase_plots=website_plots,
+            video=website_video,
+        )
+        with open(f"episodes/{trial_num}/index.html", "w") as f:
+            f.write(html)
+
+        # website.write_site(f"episodes/{trial_num}")
 
 
 def run_trials(
@@ -1021,6 +1037,13 @@ def main(cfg):
             },
             f,
         )
+
+    html = tuw.render_experiment_page(
+        title=f"Experiment {run.id}",
+        episode_nums=range(cfg.num_trials),
+    )
+    with open(results_dir / "index.html", "w") as f:
+        f.write(html)
 
 
 if __name__ == "__main__":
