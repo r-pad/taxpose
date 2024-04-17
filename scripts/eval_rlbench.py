@@ -38,6 +38,7 @@ from rpad.rlbench_utils.placement_dataset import (
     get_rgb_point_cloud_by_object_names,
     obs_to_rgb_point_cloud,
 )
+from rpad.visualize_3d.html import PlotlyWebsiteBuilder
 from scipy.spatial.transform import Rotation as R
 
 from taxpose.datasets.rlbench import (
@@ -134,12 +135,17 @@ class TaskVideoRecorder:
         height, width, _ = self.frames[0].shape
         # fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        out = cv2.VideoWriter(video_path, fourcc, 20.0, (width, height))
+        out = cv2.VideoWriter(f"{video_path}.mp4", fourcc, 20.0, (width, height))
 
         for frame in self.frames:
             out.write(frame)
 
         out.release()
+
+        # ffmpeg -i "$file" -c:v libx264 -c:a aac "${file%.mp4}.mov"
+        os.system(
+            f"/usr/bin/ffmpeg -i {video_path}.mp4 -c:v libx264 -c:a aac {video_path}.mov"
+        )
 
 
 # # HEHEH extremely hacky way to add a method to a class.
@@ -824,13 +830,19 @@ def run_trial(
         else:
             raise ValueError(f"Directory episodes/{trial_num} already exists.")
 
+        website = PlotlyWebsiteBuilder(f"episode_{trial_num}")
+
         # Save phase plots.
         for phase, fig in phase_plots:
+            # Add a title to the figure:
+            fig.update_layout(title_text=f"Phase: {phase}")
             fig.write_html(f"episodes/{trial_num}/{phase}.html")
+            website.add_plot(task_spec.name, f"{task_spec.name}_{trial_num}", fig)
 
         # Save the episode video.
-        fn = f"episodes/{trial_num}/video.mov"
+        fn = f"episodes/{trial_num}/video"
         recorder.write_video(fn)
+        website.add_video(task_spec.name, f"{task_spec.name}_{trial_num}", f"video.mov")
 
         # Save the episode results as a text file.
         with open(f"episodes/{trial_num}/results.txt", "w") as f:
@@ -840,6 +852,8 @@ def run_trial(
 
             for phase_result in pr():
                 f.write(f"{phase_result.phase}: {phase_result.failure_reason}\n")
+
+        website.write_site(f"episodes/{trial_num}")
 
 
 def run_trials(
