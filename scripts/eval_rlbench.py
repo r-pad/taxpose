@@ -349,10 +349,17 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
 
         action_pc = inputs["action_pc"].unsqueeze(0).to(device)
         anchor_pc = inputs["anchor_pc"].unsqueeze(0).to(device)
+        action_rgb = inputs["action_rgb"].unsqueeze(0).to(device)
+        anchor_rgb = inputs["anchor_rgb"].unsqueeze(0).to(device)
 
         K = self.model_cfg.num_points
-        action_pc, _ = sample_farthest_points(action_pc, K=K, random_start_point=True)
-        anchor_pc, _ = sample_farthest_points(anchor_pc, K=K, random_start_point=True)
+        # TODO: modify this code chunk to handle rgb and non-rgb inputs
+        action_pc, action_idx  = sample_farthest_points(action_pc, K=K, random_start_point=True)
+        anchor_pc, anchor_idx = sample_farthest_points(anchor_pc, K=K, random_start_point=True)
+
+        action_rgb = action_rgb[0][action_idx[0]].unsqueeze(0)
+        anchor_rgb = anchor_rgb[0][anchor_idx[0]].unsqueeze(0)
+
 
         if self.model_cfg.break_symmetry:
             raise NotImplementedError()
@@ -398,6 +405,8 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
             action_symmetry_features,
             anchor_symmetry_features,
             phase_onehot,
+            action_rgb,
+            anchor_rgb,
         )
 
         # Get the current pose of the gripper.
