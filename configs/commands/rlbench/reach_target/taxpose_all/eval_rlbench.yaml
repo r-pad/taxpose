@@ -10,3 +10,13 @@ model:
   break_symmetry: false
   num_points: 256
   z_offset: 0.0
+
+checkpoints:
+  single_model_override: 
+
+dm:
+  train_dset:
+    demo_dset:
+      num_points: 256
+      anchor_mode: 
+      action_mode:
