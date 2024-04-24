@@ -1,0 +1,26 @@
+# Requirements file for specific GPU versions.
+
+# General.
+cffi==1.14.2
+wheel==0.40.0
+
+# For pytorch3d
+fvcore==0.1.5.post20221221
+iopath==0.1.10
+
+# Torch.
+--extra-index-url https://download.pytorch.org/whl/cu118
+torch==2.0.1
+torchvision==0.15.2
+torchaudio==2.0.2
+
+# Torch geometric.
+--find-links https://data.pyg.org/whl/torch-2.0.0+cu118.html
+pyg_lib==0.3.1
+torch_scatter==2.1.2
+torch_sparse==0.6.18
+torch_cluster==1.6.3
+torch_spline_conv==1.2.2
+
+--find-links https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py39_cu118_pyt201/download.html
+pytorch3d
