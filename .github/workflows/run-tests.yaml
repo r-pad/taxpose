@@ -18,7 +18,7 @@ jobs:
 
     container:
       # Image tag is "latest" if the branch is main, else it is the branch name.
-      image: ${{ secrets.DOCKERHUB_USERNAME }}/taxpose:${{ inputs.image_tag }}
+      image: beisner/taxpose:${{ inputs.image_tag }}
 
     steps:
       - uses: actions/checkout@v3
