@@ -4,8 +4,10 @@ name: Build Container
 
 on:
   pull_request:
-
     branches: [main]
+
+    # Allows you to run this workflow manually from the Actions tab
+    workflow_dispatch:
 
     paths:
       # This is the entire list of files that will trigger the workflow.
@@ -15,6 +17,9 @@ on:
       - .github/workflows/build-container.yaml
 
 jobs:
+  compute_tag:
+    uses: ./.github/workflows/compute-tag.yaml
+
   docker:
     runs-on: ubuntu-latest
     steps:
@@ -27,25 +32,11 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set tag name (thanks ChatGPT).
-        id: set_tag
-        run: |
-          branch_name="${{ github.head_ref }}"
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "tag=latest" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            sanitized_branch_name="${branch_name//\//-}"
-            echo "tag=${sanitized_branch_name}" >> $GITHUB_OUTPUT
-          else
-            sanitized_branch_name="${GITHUB_REF#refs/heads/}"
-            sanitized_branch_name="${sanitized_branch_name//\//-}"
-            echo "tag=${sanitized_branch_name}" >> $GITHUB_OUTPUT
-          fi
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           push: true
           # This is the name of the image that will be pushed to Docker Hub. If the branch is main, the image will be tagged as latest. Else, it will be tagged as the branch name.
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/taxpose:${{ steps.set_tag.outputs.tag }}
-          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/taxpose:${{ steps.set_tag.outputs.tag }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/taxpose:${{ needs.compute_tag.outputs.image_tag }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/taxpose:${{ needs.compute_tag.outputs.image_tag }}
           cache-to: type=inline

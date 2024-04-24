@@ -8,9 +8,15 @@ on:
   workflow_dispatch:
 
 jobs:
+  compute_tag:
+    uses: ./.github/workflows/compute-tag.yaml
+
   test:
     uses: ./.github/workflows/run-tests.yaml
     with:
       install_string: .[develop]
+
+    needs: compute_tag
+
   build_site:
     uses: ./.github/workflows/build-site.yaml

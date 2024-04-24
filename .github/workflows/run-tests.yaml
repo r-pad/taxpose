@@ -30,9 +30,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    # If the "docker" workflow is run, we need to wait for it to finish before running this one.
-    # needs: docker
-    needs: compute-tag
+    # Needs "docker" and "compute-tag" to complete before running.
+    needs: [compute-tag, docker]
+    if: always()
 
     container:
       # Image tag is "latest" if the branch is main, else it is the branch name.
