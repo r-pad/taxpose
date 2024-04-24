@@ -13,6 +13,8 @@ jobs:
 
   # Consume + echo the tag:
   echo:
+    runs-on: ubuntu-latest
+    needs: compute_tag
     steps:
       - name: Echo the image tag
         run: echo ${{ needs.compute_tag.outputs.image_tag }}
