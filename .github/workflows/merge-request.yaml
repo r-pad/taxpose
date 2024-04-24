@@ -11,10 +11,17 @@ jobs:
   compute_tag:
     uses: ./.github/workflows/compute-tag.yaml
 
+  # Consume + echo the tag:
+  echo:
+    steps:
+      - name: Echo the image tag
+        run: echo ${{ needs.compute_tag.outputs.image_tag }}
+
   test:
     uses: ./.github/workflows/run-tests.yaml
     with:
       install_string: .[develop]
+      # Get the image tag from the compute_tag job.
       image_tag: ${{ needs.compute_tag.outputs.image_tag }}
 
     needs: compute_tag
