@@ -4,62 +4,57 @@ version = "0.1.0"
 description = "TAX-Pose: Task-Specific Cross-Pose Estimation for Robot Manipulation"
 readme = "README.md"
 requires-python = ">=3.6, <3.10" # ndf_robot requires < 3.10 :(
-license = {file = "LICENSE.txt"}
+license = { file = "LICENSE.txt" }
 authors = [
-  {email = "chuerp@andrew.cmu.edu", name = "Chuer Pan"},
-  {email = "bokorn@andrew.cmu.edu", name = "Brian Okorn"},
-  {email = "haolunz@andrew.cmu.edu", name = "Harry Zhang"},
-  {email = "baeisner@andrew.cmu.edu", name = "Ben Eisner"},
-  {email = "dheld@andrew.cmu.edu", name = "David Held"},
+  { email = "chuerp@andrew.cmu.edu", name = "Chuer Pan" },
+  { email = "bokorn@andrew.cmu.edu", name = "Brian Okorn" },
+  { email = "haolunz@andrew.cmu.edu", name = "Harry Zhang" },
+  { email = "baeisner@andrew.cmu.edu", name = "Ben Eisner" },
+  { email = "dheld@andrew.cmu.edu", name = "David Held" },
 ]
 dependencies = [
   # "chamferdist",
-  "dgl ~= 1.0",
-  "dglgo ~= 0.0.2",
+  "dgl",
+  "dglgo",
   "h5py",
   "hydra-core",
   "imageio",
   "jupyterlab",
   "opencv-python",
   "pybullet",
-  "pyg_lib ~= 0.1; sys_platform == 'linux'",
-  "pytorch3d ~= 0.7.2",
-  "pytorch_lightning < 2.0",
+  "pyg_lib",
+  "pytorch3d",
+  "pytorch_lightning",
   "rpad-partnet-mobility-utils @ git+https://github.com/r-pad/partnet_mobility_utils.git",
   "rpad-pyg @ git+https://github.com/r-pad/pyg_libs.git",
   "rpad-visualize-3d @ git+https://github.com/r-pad/visualize_3d.git",
-  "torch ~= 1.11",
-  "torch_cluster ~= 1.6.0",
-  "torch-geometric ~= 2.2.0",
-  "torch_scatter ~= 2.0.9",
-  "torch_sparse ~= 0.6.15",
-  "torch_spline_conv ~= 1.2.1",
+  "torch",
+  "torch_cluster",
+  "torch-geometric",
+  "torch_scatter",
+  "torch_sparse",
+  "torch_spline_conv",
   "wandb",
 ]
 
 [build-system]
-requires = [
-  "setuptools >= 62.3.2",
-  "setuptools-scm",
-  "wheel",
-]
+requires = ["setuptools >= 62.3.2", "setuptools-scm", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
 develop = [
   "autoflake",
-  "black >= 22.3.0",
+  "black == 23.3.0",
   "isort",
   "mypy >= 1.0",
   "pre-commit",
   "pylint",
-  "pytest",
+  "pytest < 8",      # Currently has an issue with pytest-lazy-fixture.
+  "pytest-cov",
+  "pytest-xdist",
   "types-tqdm",
 ]
-build_docs = [
-  "mkdocs-material",
-  "mkdocstrings[python]",
-]
+build_docs = ["mkdocs-material", "mkdocstrings[python]"]
 
 
 # This is required to allow us to have notebooks/ at the top level.
