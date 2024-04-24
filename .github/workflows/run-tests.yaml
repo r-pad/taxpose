@@ -7,36 +7,18 @@ on:
       install_string:
         required: True
         type: string
+      image_tag:
+        required: True
+        type: string
+        default: "latest"
 
 jobs:
-  compute-tag:
-    runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.set_tag.outputs.tag }}
-    steps:
-      - id: set_tag
-        run: |
-          branch_name="${{ github.head_ref }}"
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "tag=latest" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            sanitized_branch_name="${branch_name//\//-}"
-            echo "tag=${sanitized_branch_name}" >> $GITHUB_OUTPUT
-          else
-            sanitized_branch_name="${GITHUB_REF#refs/heads/}"
-            sanitized_branch_name="${sanitized_branch_name//\//-}"
-            echo "tag=${sanitized_branch_name}" >> $GITHUB_OUTPUT
-          fi
   test:
     runs-on: ubuntu-latest
 
-    # Needs "docker" and "compute-tag" to complete before running.
-    needs: [compute-tag, docker]
-    if: always()
-
     container:
       # Image tag is "latest" if the branch is main, else it is the branch name.
-      image: ${{ secrets.DOCKERHUB_USERNAME }}/taxpose:${{ needs.compute-tag.outputs.image_tag }}
+      image: ${{ secrets.DOCKERHUB_USERNAME }}/taxpose:${{ inputs.image_tag }}
 
     steps:
       - uses: actions/checkout@v3

@@ -15,6 +15,7 @@ jobs:
     uses: ./.github/workflows/run-tests.yaml
     with:
       install_string: .[develop]
+      image_tag: ${{ needs.compute_tag.outputs.image_tag }}
 
     needs: compute_tag
 
