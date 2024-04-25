@@ -17,7 +17,7 @@ jobs:
     needs: compute_tag
     steps:
       - name: Echo the image tag
-        run: echo ${{ needs.compute_tag.outputs.image_tag }}
+        run: echo "The image tag is ${{ needs.compute_tag.outputs.image_tag }}"
 
   test:
     uses: ./.github/workflows/run-tests.yaml

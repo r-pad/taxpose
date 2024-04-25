@@ -2,9 +2,13 @@ name: Compute the docker tag for this branch
 
 on:
   workflow_call:
+    outputs:
+      image_tag:
+        description: 'The tag to use for the docker image'
+        value: ${{ jobs.compute_tag.outputs.image_tag }}
 
 jobs:
-  compute-tag:
+  compute_tag:
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.set_tag.outputs.tag }}
@@ -22,3 +26,5 @@ jobs:
             sanitized_branch_name="${sanitized_branch_name//\//-}"
             echo "tag=${sanitized_branch_name}" >> $GITHUB_OUTPUT
           fi
+      - id: echo_tag
+        run: echo ${{ steps.set_tag.outputs.tag }}
