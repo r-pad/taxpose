@@ -19,12 +19,12 @@ jobs:
     container:
       # Image tag is "latest" if the branch is main, else it is the branch name.
       image: beisner/taxpose:${{ inputs.image_tag }}
-      # Mount the code into the container.
 
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: 'true'
+          path: /opt/baeisner/code
       ##############################################
       # Skip caching if using a local runner.
       # - uses: actions/setup-python@v4
