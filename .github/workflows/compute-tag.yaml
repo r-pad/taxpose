@@ -26,5 +26,3 @@ jobs:
             sanitized_branch_name="${sanitized_branch_name//\//-}"
             echo "tag=${sanitized_branch_name}" >> $GITHUB_OUTPUT
           fi
-      - id: echo_tag
-        run: echo ${{ steps.set_tag.outputs.tag }}

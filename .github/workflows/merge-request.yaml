@@ -11,12 +11,6 @@ jobs:
   compute_tag:
     uses: ./.github/workflows/compute-tag.yaml
 
-  echo_tag:
-    runs-on: ubuntu-latest
-    needs: compute_tag
-    steps:
-      - run: echo ${{ needs.compute_tag.outputs.image_tag }}
-
   test:
     uses: ./.github/workflows/run-tests.yaml
     needs: compute_tag
