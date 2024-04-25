@@ -152,7 +152,12 @@ def is_action_pose_valid(block_id, sim: PMRenderEnv, n_valid_points=50) -> bool:
 
 def render_input(block_id, sim: PMRenderEnv, render_floor=False):
     # Post-processing: Render, add mask. First render visible points, then append transformed bottom points to them.
-    rgb, _, _, _, P_world, pc_seg, segmap = sim.render()
+    render = sim.render()
+    rgb = render["rgb"]
+    P_world = render["P_world"]
+    pc_seg = render["pc_seg"]
+    segmap = render["segmap"]
+
     pc_seg_obj = np.ones_like(pc_seg) * -1
     for k, (body, link) in segmap.items():
         if body == sim.obj_id:
@@ -275,7 +280,10 @@ def load_action_obj_with_valid_scale(
 
 
 def render_input_simple(action_id, sim: PMRenderEnv):
-    rgb, _, _, _, P_world, pc_seg, _ = sim.render(link_seg=False)
+    render = sim.render(link_seg=False)
+    rgb = render["rgb"]
+    P_world = render["P_world"]
+    pc_seg = render["pc_seg"]
 
     is_obj = pc_seg != -1
     P_world = P_world[is_obj]

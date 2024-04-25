@@ -262,7 +262,7 @@ def train(
     ]
 
     trainer = pl.Trainer(
-        gpus=1,
+        accelerator="gpu",
         logger=logger,
         callbacks=cbs,
         log_every_n_steps=5,

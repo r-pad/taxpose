@@ -25,7 +25,11 @@ from taxpose.training.pm_baselines.bc_dataset import articulate_specific_joints
 
 def render_input(block_id, sim: PMRenderEnv, render_floor=False):
     # Post-processing: Render, add mask. First render visible points, then append transformed bottom points to them.
-    rgb, _, _, _, P_world, pc_seg, segmap = sim.render()
+    render = sim.render()
+    rgb = render["rgb"]
+    P_world = render["P_world"]
+    pc_seg = render["pc_seg"]
+    segmap = render["segmap"]
     pc_seg_obj = np.ones_like(pc_seg) * -1
     for k, (body, link) in segmap.items():
         if body == sim.obj_id:

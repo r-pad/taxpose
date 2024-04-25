@@ -25,9 +25,15 @@ jobs:
         working-directory: /opt/baeisner/code
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: 'true'
+
+      # Link the code from the default checkout directory to the correct directory.
+      # Use the github workspace variable to get the correct directory.
+      # Can't use the checkout action to checkout to a different directory, so we have to simlink.
+      - name: Move code to correct directory
+        run: rm -rf /opt/baeisner/code && ln -s $GITHUB_WORKSPACE /opt/baeisner/code
 
       - name: Code Quality
         run: python -m black taxpose/ tests/ --check
