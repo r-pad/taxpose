@@ -11,22 +11,19 @@ jobs:
   compute_tag:
     uses: ./.github/workflows/compute-tag.yaml
 
-  # Consume + echo the tag:
-  echo:
+  echo_tag:
     runs-on: ubuntu-latest
     needs: compute_tag
     steps:
-      - name: Echo the image tag
-        run: echo "The image tag is ${{ needs.compute_tag.outputs.image_tag }}"
+      - run: echo ${{ needs.compute_tag.outputs.image_tag }}
 
   test:
     uses: ./.github/workflows/run-tests.yaml
+    needs: compute_tag
     with:
       install_string: .[develop]
       # Get the image tag from the compute_tag job.
       image_tag: ${{ needs.compute_tag.outputs.image_tag }}
-
-    needs: compute_tag
 
   build_site:
     uses: ./.github/workflows/build-site.yaml

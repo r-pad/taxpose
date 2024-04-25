@@ -19,6 +19,7 @@ jobs:
     container:
       # Image tag is "latest" if the branch is main, else it is the branch name.
       image: beisner/taxpose:${{ inputs.image_tag }}
+      # Mount the code into the container.
 
     steps:
       - uses: actions/checkout@v3
@@ -59,6 +60,12 @@ jobs:
 
       # - name: Install ndf_robot
       #   run: pip install -e third_party/ndf_robot
+
+      - name: pwd
+        run: pwd
+
+      - name: ls
+        run: ls -l
 
       - name: Code Quality
         run: python -m black taxpose/ tests/ --check
