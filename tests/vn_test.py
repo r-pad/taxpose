@@ -32,7 +32,7 @@ def test_vn_dgcnn_invariance(seed):
     model = VN_DGCNN(Args, num_part=50, normal_channel=False, gc=False).cuda()
     model.eval()
 
-    preds1, _ = model(pos.cuda())
-    preds2, _ = model(pos_rot.cuda())
+    preds1 = model(pos.cuda())
+    preds2 = model(pos_rot.cuda())
 
     assert torch.isclose(preds1, preds2, atol=1e-5).all()

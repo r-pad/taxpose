@@ -1,9 +1,10 @@
 from typing import Callable, List, Optional
 
 import torch
+import torch.nn as nn
 
 
-class MLP(torch.nn.Sequential):
+class MLP(nn.Sequential):
     """This block implements the multi-layer perceptron (MLP) module.
 
     Args:
@@ -31,13 +32,14 @@ class MLP(torch.nn.Sequential):
         # https://github.com/facebookresearch/multimodal/blob/5dec8a/torchmultimodal/modules/layers/mlp.py
         params = {} if inplace is None else {"inplace": inplace}
 
-        layers = []
+        layers: List[nn.Module] = []
         in_dim = in_channels
         for hidden_dim in hidden_channels[:-1]:
             layers.append(torch.nn.Linear(in_dim, hidden_dim, bias=bias))
             if norm_layer is not None:
                 layers.append(norm_layer(hidden_dim))
-            layers.append(activation_layer(**params))
+            if activation_layer is not None:
+                layers.append(activation_layer(**params))
             layers.append(torch.nn.Dropout(dropout, **params))
             in_dim = hidden_dim
 
