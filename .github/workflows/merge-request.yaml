@@ -10,6 +10,8 @@ on:
 jobs:
   compute_tag:
     uses: ./.github/workflows/compute-tag.yaml
+    with:
+      latest_on_noexist: 'true'
 
   test:
     uses: ./.github/workflows/run-tests.yaml
