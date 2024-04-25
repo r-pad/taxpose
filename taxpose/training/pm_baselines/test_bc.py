@@ -252,7 +252,7 @@ def load_bc_model(method: str, exp_name: str) -> DaggerNet:
     net = DaggerNet.load_from_checkpoint(
         f"{d}/{ckpt}",
     )
-    return net.cuda()
+    return net.cuda()  # type: ignore
 
 
 def predict_next_step_bc(

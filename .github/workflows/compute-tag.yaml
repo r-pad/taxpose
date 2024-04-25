@@ -1,0 +1,45 @@
+name: Compute the docker tag for this branch
+
+on:
+  workflow_call:
+    inputs:
+      # description: 'If true, the tag will be latest if the docker image tag does not exist'
+      latest_on_noexist:
+        required: false
+        type: string
+        default: 'false'
+    outputs:
+      image_tag:
+        description: 'The tag to use for the docker image'
+        value: ${{ jobs.compute_tag.outputs.image_tag }}
+
+
+jobs:
+  compute_tag:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.set_tag.outputs.tag }}
+    steps:
+      - id: set_tag
+        run: |
+          branch_name="${{ github.head_ref }}"
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            sanitized_branch_name="${branch_name//\//-}"
+            # If latest_on_noexist is true, set the tag to latest if the tag does not exist.
+            if [[ "${{ inputs.latest_on_noexist }}" == "true" ]]; then
+              # Check if the tag exists using docker manifest.
+              if ! docker manifest inspect beisner/taxpose:${sanitized_branch_name} > /dev/null 2>&1; then
+                echo "tag=latest" >> $GITHUB_OUTPUT
+              else
+                echo "tag=${sanitized_branch_name}" >> $GITHUB_OUTPUT
+              fi
+            else
+              echo "tag=${sanitized_branch_name}" >> $GITHUB_OUTPUT
+            fi
+          else
+            sanitized_branch_name="${GITHUB_REF#refs/heads/}"
+            sanitized_branch_name="${sanitized_branch_name//\//-}"
+            echo "tag=${sanitized_branch_name}" >> $GITHUB_OUTPUT
+          fi

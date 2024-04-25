@@ -1,3 +1,115 @@
+# Copied + modified from: https://gist.github.com/KernelA/04b4d7691f28e264f72e76cfd724d448
+# Git
+.git
+.gitignore
+.gitattributes
+.gitmodules
+
+
+# CI
+.codeclimate.yml
+.travis.yml
+.taskcluster.yml
+
+# Docker
+docker-compose.yml
+Dockerfile
+.docker
+.dockerignore
+
+# Byte-compiled / optimized / DLL files
+**/__pycache__/
+**/*.py[cod]
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Virtual environment
+.env
+.venv/
+venv/
+
+# PyCharm
+.idea
+
+# Python mode for VIM
+.ropeproject
+**/.ropeproject
+
+# Vim swap files
+**/*.swp
+
+# VS Code
+.vscode/
+
+# Mypy
+**/.mypy_cache/
+
+# Pytest
+**/.pytest_cache/
+
+# Prevent any of these files from being included in the docker image.
+
+artifacts/
+bensnewlogs/
+checkpoints/
+data/
+logs/
+outputs/
+results/
+rollouts/
+trained_models/
+wandb/
+wandb_artifacts/
+
 third_party/ndf_robot/src/ndf_robot/data/
 third_party/ndf_robot/src/ndf_robot/eval_data/
 third_party/ndf_robot/src/ndf_robot/descriptions/
