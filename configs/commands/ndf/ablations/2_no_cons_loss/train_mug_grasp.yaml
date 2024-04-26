@@ -3,4 +3,7 @@
 defaults:
 - /train_mug_residual_ablation
 - override /ablation: 2_no_cons_loss
+- override /task: mug_grasp
 - _self_
+
+mode: train

@@ -3,4 +3,7 @@
 defaults:
 - /train_mug_residual_ablation
 - override /ablation: 8_mlp
+- override /task: mug_place
 - _self_
+
+mode: train
