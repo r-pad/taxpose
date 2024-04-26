@@ -13,7 +13,7 @@ defaults:
   - model: release
   - task: ${object_class}_${relationship}
   - optional mode: train # $mode \in {train, train_val, validation}
-  - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
+  # - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
   - checkpoints/pretraining@checkpoints.pretraining
 
 ### TO BE CHANGED ###
@@ -57,8 +57,11 @@ mlp: False
 
 pretraining:
   mode: nce_loss
-  checkpoint_file_action: ${checkpoints.pretraining.${model.emb_nn}.${pretraining.mode}.${task.action_name}}
-  checkpoint_file_anchor: ${checkpoints.pretraining.${model.emb_nn}.${pretraining.mode}.${task.anchor_name}}
+  # checkpoint_file_action: ${checkpoints.pretraining.${model.emb_nn}.${pretraining.mode}.${task.action_name}}
+  # checkpoint_file_anchor: ${checkpoints.pretraining.${model.emb_nn}.${pretraining.mode}.${task.anchor_name}}
+  checkpoint_file_action: null
+  checkpoint_file_anchor: null
+
 # Loss Settings
 flow_supervision: both
 displace_loss_weight: 1
