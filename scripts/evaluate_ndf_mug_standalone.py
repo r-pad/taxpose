@@ -781,9 +781,9 @@ def create_network(model_cfg):
         center_feature=model_cfg.center_feature,
         inital_sampling_ratio=model_cfg.inital_sampling_ratio,
         residual_on=model_cfg.residual_on,
-        multilaterate=model_cfg.multilaterate,
-        sample=model_cfg.mlat_sample,
-        mlat_nkps=model_cfg.mlat_nkps,
+        # multilaterate=model_cfg.multilaterate,
+        # sample=model_cfg.mlat_sample,
+        # mlat_nkps=model_cfg.mlat_nkps,
     )
     return network
 

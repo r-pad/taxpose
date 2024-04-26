@@ -1,0 +1,9 @@
+# @package _global_
+
+defaults:
+- /train_mug_residual_ablation
+- override /ablation: 4_no_residuals
+- override /task: mug_place
+- _self_
+
+mode: train

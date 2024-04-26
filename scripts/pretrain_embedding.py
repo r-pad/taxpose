@@ -20,12 +20,13 @@ from taxpose.utils.callbacks import SaverCallbackEmbnn
 @hydra.main(config_path="../configs", config_name="pretraining")
 def main(cfg):
     pl.seed_everything(cfg.seed)
-    logger = WandbLogger(project=cfg.job_name)
+    logger = WandbLogger(project="taxpose", job_type=cfg.job_name)
     logger.log_hyperparams(cfg)
     logger.log_hyperparams({"working_dir": os.getcwd()})
     trainer = pl.Trainer(
         logger=logger,
-        gpus=1,
+        accelerator="gpu",
+        devices=[0],
         reload_dataloaders_every_n_epochs=1,
         # val_check_interval=0.2,
         # val_check_interval=10,
@@ -33,14 +34,14 @@ def main(cfg):
         callbacks=[SaverCallbackEmbnn()],
     )
     dm = PretrainingMultiviewDataModule(
-        batch_size=cfg.batch_size,
-        num_workers=cfg.num_workers,
-        cloud_class=cfg.cloud_class,
-        dataset_root=cfg.dataset_root,
-        dataset_index=cfg.dataset_index,
-        cloud_type=cfg.cloud_type,
+        batch_size=cfg.training.loader.batch_size,
+        num_workers=cfg.training.loader.num_workers,
+        cloud_class=cfg.training.dataset.cloud_class,
+        dataset_root=cfg.training.dataset.root,
+        dataset_index=cfg.training.dataset.dataset_index,
+        cloud_type=cfg.training.dataset.cloud_type,
         # overfit=cfg.overfit,
-        pretraining_data_path=cfg.pretraining_data_path,
+        pretraining_data_path=cfg.training.dataset.pretraining_data_path,
     )
 
     dm.setup()

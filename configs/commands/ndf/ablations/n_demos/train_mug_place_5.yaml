@@ -1,0 +1,9 @@
+# @package _global_
+
+defaults:
+- _self_
+- /train_ndf
+- override /task: mug_place
+
+mode: train
+num_demo: 5

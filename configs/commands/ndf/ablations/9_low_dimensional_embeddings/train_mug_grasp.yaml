@@ -1,0 +1,9 @@
+# @package _global_
+
+defaults:
+- /train_mug_residual_ablation
+- override /ablation: 9_low_dim_embedding
+- override /task: mug_grasp
+- _self_
+
+mode: train
