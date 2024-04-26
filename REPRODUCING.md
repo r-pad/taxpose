@@ -10,27 +10,41 @@ All tasks require pretraining.
 
 ### Bottle
 
-TODO: write command.
+```
+python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/bottle training.dataset.pretraining_data_path=/data/ndf_original/data data_root=/data/ndf
+```
 
 ### Bowl
 
-TODO: write command.
+```
+python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/bowl training.dataset.pretraining_data_path=/data/ndf_original/data data_root=/data/ndf
+```
 
 ### Gripper
 
-TODO: write command.
+```
+python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/gripper training.dataset.pretraining_data_path=/data/ndf_original/data data_root=/data/ndf
+```
 
 ### Mug
 
-TODO: write command.
+```
+python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/mug training.dataset.pretraining_data_path=/data/ndf_original/data data_root=/data/ndf
+```
 
 ### Rack
 
-TODO: write command.
+```
+python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/rack training.dataset.pretraining_data_path=/data/ndf_original/data data_root=/data/ndf
+```
 
 ### Slab
 
-TODO: write command.
+Note: this one appears broken.
+
+```
+python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/slab training.dataset.pretraining_data_path=/data/ndf_original/data data_root=/data/ndf
+```
 
 ## Table 1
 
