@@ -29,12 +29,13 @@ def main(cfg):
     # breakpoint()
     # torch.set_float32_matmul_precision("medium")
     pl.seed_everything(cfg.seed)
-    logger = WandbLogger(project=cfg.job_name)
+    logger = WandbLogger(project="taxpose", job_type=cfg.job_name)
     logger.log_hyperparams(cfg)
     logger.log_hyperparams({"working_dir": os.getcwd()})
     trainer = pl.Trainer(
         logger=logger,
-        gpus=1,
+        accelerator="gpu",
+        devices=[0],
         reload_dataloaders_every_n_epochs=1,
         callbacks=[SaverCallbackModel(), SaverCallbackEmbnnActionAnchor()],
         max_epochs=cfg.max_epochs,

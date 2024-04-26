@@ -17,11 +17,13 @@ defaults:
 
   # Machinery to load the correct checkpoints.
   - model: release
-  - checkpoints/ndf@checkpoints.grasp: ${object_class}/${pose_dist}/${model}/grasp
-  - checkpoints/ndf@checkpoints.place: ${object_class}/${pose_dist}/${model}/place
+  - optional checkpoints/ndf@checkpoints.grasp: ${object_class}/${pose_dist}/${model}/grasp
+  - optional checkpoints/ndf@checkpoints.place: ${object_class}/${pose_dist}/${model}/place
 
-checkpoint_file_grasp: ${checkpoints.grasp.ckpt_file}
-checkpoint_file_place: ${checkpoints.place.ckpt_file}
+# checkpoint_file_grasp: ${checkpoints.grasp.ckpt_file}
+# checkpoint_file_place: ${checkpoints.place.ckpt_file}
+checkpoint_file_grasp: ???
+checkpoint_file_place: ???
 log_txt_file: ${hydra:runtime.cwd}/test_results.txt # abs path of file to log results
 
 # log saving dir
