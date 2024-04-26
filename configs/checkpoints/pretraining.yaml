@@ -1,0 +1,8 @@
+dgcnn:
+  nce_loss:
+    bottle: Null
+    bowl: Null
+    gripper: Null
+    mug: Null
+    rack: Null
+    slab: Null
