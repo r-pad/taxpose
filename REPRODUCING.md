@@ -1,7 +1,6 @@
 # Reproducing the paper.
 
 ## High-level TODOS
-[] Create pretraining configs
 [] Create ablation configs
 
 ## Pretraining

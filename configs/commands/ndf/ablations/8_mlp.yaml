@@ -1,0 +1,6 @@
+# @package _global_
+
+defaults:
+- /train_mug_residual_ablation
+- override /ablation: 8_mlp
+- _self_

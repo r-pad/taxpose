@@ -26,9 +26,6 @@ def _get_config_names(bmark):
     return configs
 
 
-HYDRA_CONFIG = {}
-
-
 @pytest.mark.parametrize("config_name", _get_config_names("ndf"))
 def test_ndf_commands_compile(config_name):
     with initialize(version_base=None, config_path="../configs"):

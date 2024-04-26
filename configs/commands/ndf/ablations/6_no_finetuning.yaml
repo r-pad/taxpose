@@ -1,0 +1,6 @@
+# @package _global_
+
+defaults:
+- /train_mug_residual_ablation
+- override /ablation: 6_no_finetuning
+- _self_
