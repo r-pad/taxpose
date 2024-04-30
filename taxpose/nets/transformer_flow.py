@@ -82,6 +82,10 @@ class CorrespondenceFlow_DiffEmbMLP(nn.Module):
             scores=None,
         ).permute(0, 2, 1)
 
+        outputs = {
+            "flow_action": flow_action,
+        }
+
         if self.cycle:
             flow_anchor = self.head_anchor(
                 anchor_embedding_tf,
@@ -90,8 +94,9 @@ class CorrespondenceFlow_DiffEmbMLP(nn.Module):
                 action_points,
                 scores=None,
             ).permute(0, 2, 1)
-            return flow_action, flow_anchor
-        return flow_action
+            outputs["flow_anchor"] = flow_anchor
+
+        return outputs
 
 
 class CorrespondenceMLPHead(nn.Module):

@@ -1,8 +1,0 @@
-# @package _global_
-
-defaults:
-- _self_
-- /train_ndf
-- override /task: bottle_grasp
-
-mode: train

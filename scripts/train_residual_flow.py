@@ -26,6 +26,8 @@ def write_to_file(file_name, string):
 def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
 
+    TESTING = "PYTEST_CURRENT_TEST" in os.environ
+
     # breakpoint()
     # torch.set_float32_matmul_precision("medium")
     pl.seed_everything(cfg.seed)
@@ -33,12 +35,18 @@ def main(cfg):
     logger.log_hyperparams(cfg)
     logger.log_hyperparams({"working_dir": os.getcwd()})
     trainer = pl.Trainer(
-        logger=logger,
+        logger=logger if not TESTING else False,
         accelerator="gpu",
         devices=[0],
         reload_dataloaders_every_n_epochs=1,
-        callbacks=[SaverCallbackModel(), SaverCallbackEmbnnActionAnchor()],
+        callbacks=(
+            [SaverCallbackModel(), SaverCallbackEmbnnActionAnchor()]
+            if not TESTING
+            else []
+        ),
         max_epochs=cfg.max_epochs,
+        # Check if PYTEST is running, and run for 5 steps if it is.
+        fast_dev_run=5 if "PYTEST_CURRENT_TEST" in os.environ else False,
     )
     log_txt_file = cfg.log_txt_file
     if cfg.mode == "train":
