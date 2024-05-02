@@ -21,7 +21,7 @@ defaults:
   - task/ndf@place_task: ${task}/phase/place
 
   # Load the checkpoints appropriately.
-  - checkpoints/ndf@checkpoints: ${task}/${model}
+  # - checkpoints/ndf@checkpoints: ${task}/${model}
   # - checkpoints/ndf@checkpoints: ${object_class}/${model}
 
 
