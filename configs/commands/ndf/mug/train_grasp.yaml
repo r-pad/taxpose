@@ -1,9 +1,10 @@
 # @package _global_
 
 defaults:
-- _self_
-- /train_ndf
-- override /model: taxpose
-- override /task: mug_grasp
+  - /commands/ndf/_train@_here_
+  - override /model: taxpose
+  - override /task: mug
+  - override /phase: grasp
+  - _self_
 
-mode: train
+break_symmetry: False

@@ -1,8 +1,12 @@
 # @package _global_
 
 defaults:
-- /eval_full_mug_standalone
-- override /object_class: mug
-- override /model: taxpose
-- override /pose_dist: arbitrary
-- _self_
+  - /commands/ndf/_eval@_here_
+  - override /model: taxpose
+  - override /task: mug
+  - override /pose_dist: arbitrary
+  - _self_
+
+break_symmetry: False
+model:
+  break_symmetry: False
