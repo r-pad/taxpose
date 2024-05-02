@@ -1,9 +1,10 @@
 # @package _global_
 
 defaults:
-- _self_
 - /train_ndf
-- override /task: mug_grasp
+- override /object_class: mug
+- override /relationship: grasp
+- _self_
 
 mode: train
 num_demo: 5
