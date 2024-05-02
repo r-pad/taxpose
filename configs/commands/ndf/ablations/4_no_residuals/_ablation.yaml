@@ -1,14 +1,15 @@
-# @package ablation
+# @package _global_
 
-name: 4_no_residuals
-residual_on: False
+ablation:
+  name: 4_no_residuals
+  residual_on: False
 
-displace_loss_weight: 1
-direct_correspondence_loss_weight: 1
-consistency_loss_weight: 0.1
-pred_weight: True
-freeze_embnn: False
-checkpoint_file_action: ${hydra:runtime.cwd}/trained_models/pretraining_mug_embnn_weights.ckpt
-checkpoint_file_anchor: ${hydra:runtime.cwd}/trained_models/pretraining_rack_embnn_weights.ckpt
-mlp: False
-emb_dims: 512
+  displace_loss_weight: 1
+  direct_correspondence_loss_weight: 1
+  consistency_loss_weight: 0.1
+  pred_weight: True
+  freeze_embnn: False
+  checkpoint_file_action: ${hydra:runtime.cwd}/trained_models/pretraining_mug_embnn_weights.ckpt
+  checkpoint_file_anchor: ${hydra:runtime.cwd}/trained_models/pretraining_rack_embnn_weights.ckpt
+  mlp: False
+  emb_dims: 512
