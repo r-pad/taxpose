@@ -1,3 +1,5 @@
+# @package ablation
+
 name: 1_no_corr_loss
 displace_loss_weight: 1
 direct_correspondence_loss_weight: 0

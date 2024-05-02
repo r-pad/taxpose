@@ -1,8 +1,8 @@
 # @package _global_
 
 defaults:
+- _ablation
 - /train_mug_residual_ablation
-- override /ablation: 5_unweighted_svd
 - override /task: mug_grasp
 - _self_
 

@@ -1,8 +1,8 @@
 # @package _global_
 
 defaults:
+- _ablation
 - /train_mug_residual_ablation
-- override /ablation: 2_no_cons_loss
 - override /task: mug_grasp
 - _self_
 

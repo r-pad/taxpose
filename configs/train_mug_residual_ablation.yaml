@@ -15,7 +15,7 @@ defaults:
   - optional mode: train # $mode \in {train, train_val, validation}
   # - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
   - checkpoints/pretraining@checkpoints.pretraining
-  - ablation: 0_no_disp_loss
+  - optional ablation: 0_no_disp_loss
 
 # Dataset Settings
 dataset_root: ${hydra:runtime.cwd}/data

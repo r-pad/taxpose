@@ -1,3 +1,5 @@
+# @package ablation
+
 name: 9_low_dim_embedding
 emb_dims: 16
 
