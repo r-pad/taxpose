@@ -16,7 +16,7 @@ from taxpose.datasets.augmentations import (
 )
 from taxpose.datasets.base import PlacementPointCloudData
 from taxpose.datasets.enums import ObjectClass, Phase
-from taxpose.datasets.env_mod_utils import get_random_distractor_demo
+from taxpose.datasets.env_mod_utils import get_random_distractor_demo  # type: ignore
 from taxpose.datasets.symmetry_utils import (
     compute_demo_symmetry_features as new_compute_demo_symmetry_features,
 )
@@ -193,7 +193,7 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
 
         self.filenames = [
             self.dataset_root / f"{idx}_{self.cloud_type}_obj_points.npz"
-            for idx in self.dataset_indices
+            for idx in self.dataset_indices  # type: ignore
             if idx not in self.bad_demo_id
         ]
 
@@ -303,7 +303,7 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
                 rot_sample_method=self.distractor_rot_sample_method,
             )
             points_action = points_action.numpy()
-            points_anchor = torch.cat([points_anchor1, points_anchor2], axis=1).numpy()
+            points_anchor = torch.cat([points_anchor1, points_anchor2], dim=1).numpy()
 
         # Apply occlusions
         if self.occlusion_cfg is not None:
@@ -327,8 +327,8 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
         ) = new_compute_demo_symmetry_features(
             points_action[0],
             points_anchor[0],
-            self.action_class,
-            self.anchor_class,
+            OBJECT_LABELS_TO_CLASS[(self.object_type, self.action_class)],  # type: ignore
+            OBJECT_LABELS_TO_CLASS[(self.object_type, self.anchor_class)],  # type: ignore
         )
 
         assert not isinstance(action_symmetry_features, torch.Tensor)

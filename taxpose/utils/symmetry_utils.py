@@ -157,7 +157,7 @@ def get_sym_label_pca_grasp(
         points_sym = anchor_cloud[0]
         points_nonsym = action_cloud[0]
 
-    non_sym_center = points_nonsym.mean(axis=0)
+    non_sym_center = points_nonsym.mean(dim=0)
     points_sym_np = to_np(points_sym)
 
     pcd = o3d.geometry.PointCloud()
@@ -254,7 +254,7 @@ def get_sym_label_pca_place(
         points_sym = anchor_cloud[0]
         points_nonsym = action_cloud[0]
 
-    non_sym_center = points_nonsym.mean(axis=0)
+    non_sym_center = points_nonsym.mean(dim=0)
     points_sym_np = to_np(points_sym)
 
     pcd = o3d.geometry.PointCloud()

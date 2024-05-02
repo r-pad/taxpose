@@ -51,18 +51,8 @@ def make_dataset(
         import taxpose.datasets.ndf as ndf
 
         return ndf.NDFPointCloudDataset(cast(ndf.NDFPointCloudDatasetConfig, cfg))
-    elif cfg.dataset_type == "rlbench":
-        import taxpose.datasets.rlbench as rlbench
-
-        return rlbench.RLBenchPointCloudDataset(
-            cast(rlbench.RLBenchPointCloudDatasetConfig, cfg)
-        )
-    elif cfg.dataset_type == "real_world_mug":
-        import taxpose.datasets.real_world_mug as real_world_mug
-
-        return real_world_mug.RealWorldMugPointCloudDataset(
-            cast(real_world_mug.RealWorldMugPointCloudDatasetConfig, cfg)
-        )
+    else:
+        raise NotImplementedError(f"Unknown dataset type: {cfg.dataset_type}")
 
 
 class PointCloudDataset(Dataset):
@@ -84,8 +74,6 @@ class PointCloudDataset(Dataset):
         self.overfit = cfg.overfit
         self.gripper_lr_label = cfg.gripper_lr_label
         self.num_overfit_transforms = cfg.num_overfit_transforms
-        self.T0_list = []
-        self.T1_list = []
         self.synthetic_occlusion = cfg.synthetic_occlusion
         self.ball_radius = cfg.ball_radius
         self.plane_standoff = cfg.plane_standoff

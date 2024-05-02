@@ -87,7 +87,9 @@ module = [
   "display.*",
   "dgl.*",
   "h5py.*",
+  "joblib.*",
   "matplotlib.*",
+  "open3d.*",
   "pandas.*",
   "plotly.*",
   "pybullet.*",
@@ -101,7 +103,8 @@ module = [
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-addopts = "--ignore=third_party/ -m 'not long'"
+addopts = "--ignore=third_party/ -m 'not training and not pretraining and not ablations'"
+testpaths = "tests"
 
 [tool.pylint]
 disable = [

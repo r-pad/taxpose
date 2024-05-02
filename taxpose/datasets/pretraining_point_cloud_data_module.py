@@ -1,28 +1,40 @@
 from dataclasses import dataclass
+from typing import Optional, cast
 
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 
-from taxpose.datasets.base import PretrainingPointCloudDatasetConfig
-from taxpose.datasets.ndf_pretraining import NDFPretrainingPointCloudDataset
-from taxpose.datasets.shapenet_pretraining import ShapeNetPretrainingPointCloudDataset
+from taxpose.datasets.base import (
+    PretrainingPointCloudDataset,
+    PretrainingPointCloudDatasetConfig,
+)
+from taxpose.datasets.ndf_pretraining import (
+    NDFPretrainingPointCloudDataset,
+    NDFPretrainingPointCloudDatasetConfig,
+)
+from taxpose.datasets.shapenet_pretraining import (
+    ShapeNetPretrainingPointCloudDataset,
+    ShapeNetPretrainingPointCloudDatasetConfig,
+)
 
 
 def make_dataset(cfg: PretrainingPointCloudDatasetConfig):
     dataset_type = cfg.dataset_type
     if dataset_type == "ndf_pretraining":
-        return NDFPretrainingPointCloudDataset(cfg)
+        ndf_cfg = cast(NDFPretrainingPointCloudDatasetConfig, cfg)
+        return NDFPretrainingPointCloudDataset(ndf_cfg)
     elif dataset_type == "shapenet_pretraining":
-        return ShapeNetPretrainingPointCloudDataset(cfg)
+        shapenet_cfg = cast(ShapeNetPretrainingPointCloudDatasetConfig, cfg)
+        return ShapeNetPretrainingPointCloudDataset(shapenet_cfg)
     else:
         raise ValueError(f"Unknown dataset type: {dataset_type}")
 
 
 @dataclass
 class PretrainingMultiviewDMConfig:
-    train_config: PretrainingPointCloudDatasetConfig
-    val_config: PretrainingPointCloudDatasetConfig
-    test_config: PretrainingPointCloudDatasetConfig
+    train_dset: PretrainingPointCloudDatasetConfig
+    val_dset: PretrainingPointCloudDatasetConfig
+    test_dset: PretrainingPointCloudDatasetConfig
 
 
 class PretrainingMultiviewDataModule(pl.LightningDataModule):
@@ -31,117 +43,23 @@ class PretrainingMultiviewDataModule(pl.LightningDataModule):
         cfg: PretrainingMultiviewDMConfig,
         batch_size=8,
         num_workers=8,
-        # cloud_class=0,
-        # batch_size=8,
-        # num_workers=8,
-        # cloud_type="final",
-        # dataset_index=None,
-        # dataset_root=None,
-        # obj_class="mug",
-        # pretraining_data_path=None,
     ):
         super().__init__()
 
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.cfg = cfg
-        # self.cloud_class = cloud_class
-        # self.cloud_type = cloud_type
-        # self.dataset_indices = dataset_index
-        # self.dataset_root = dataset_root
-        # self.pretraining_data_path = pretraining_data_path
-        # self.obj_class = obj_class
-
-        # 0 for mug, 1 for rack, 2 for gripper
-        # if self.cloud_class == 0:
-        #     self.obj_class = obj_class
-        # else:
-        #     self.obj_class = "non_mug"
-
-    # def pass_loss(self, loss):
-    #     self.loss = loss.to(self.device)
-
-    # def prepare_data(self):
-    #     """called only once and on 1 GPU"""
-
-    # def update_dataset(self):
-    #     if self.obj_class != "non_mug":
-    #         self.train_dataset = ShapeNetPretrainingPointCloudDataset(
-    #             ShapeNetPretrainingPointCloudDatasetConfig(
-    #                 ndf_data_path=self.pretraining_data_path,
-    #                 obj_class=[self.obj_class],
-    #                 phase="train",
-    #             )
-    #         )
-    #     else:
-    #         self.train_dataset = NDFPretrainingPointCloudDataset(
-    #             NDFPretrainingPointCloudDatasetConfig(
-    #                 dataset_root=self.dataset_root,
-    #                 dataset_indices=self.dataset_indices,
-    #                 cloud_type=self.cloud_type,
-    #                 action_class=self.cloud_class,
-    #             )
-    #         )
+        self.train_dataset: Optional[PretrainingPointCloudDataset] = None
+        self.val_dataset: Optional[PretrainingPointCloudDataset] = None
+        self.test_dataset: Optional[PretrainingPointCloudDataset] = None
 
     def setup(self, stage: str):
         if stage == "fit":
-            print("TRAIN Dataset")
             self.train_dataset = make_dataset(self.cfg.train_dset)
-            # if self.obj_class != "non_mug":
-            #     self.train_dataset = ShapeNetPretrainingPointCloudDataset(
-            #         ShapeNetPretrainingPointCloudDatasetConfig(
-            #             ndf_data_path=self.pretraining_data_path,
-            #             obj_class=[self.obj_class],
-            #             phase="train",
-            #         )
-            #     )
-            # else:
-            #     self.train_dataset = NDFPretrainingPointCloudDataset(
-            #         NDFPretrainingPointCloudDatasetConfig(
-            #             dataset_root=self.dataset_root,
-            #             dataset_indices=self.dataset_indices,
-            #             cloud_type=self.cloud_type,
-            #             action_class=self.cloud_class,
-            #         )
-            #     )
-            print("VAL Dataset")
             self.val_dataset = make_dataset(self.cfg.val_dset)
-            # if self.obj_class != "non_mug":
-            #     self.val_dataset = ShapeNetPretrainingPointCloudDataset(
-            #         ShapeNetPretrainingPointCloudDatasetConfig(
-            #             ndf_data_path=self.pretraining_data_path,
-            #             obj_class=[self.obj_class],
-            #             phase="val",
-            #         )
-            #     )
-            # else:
-            #     self.val_dataset = NDFPretrainingPointCloudDataset(
-            #         NDFPretrainingPointCloudDatasetConfig(
-            #             dataset_root=self.dataset_root,
-            #             dataset_indices=self.dataset_indices,
-            #             cloud_type=self.cloud_type,
-            #             action_class=self.cloud_class,
-            #         )
-            #     )
+
         if stage == "test":
-            print("TEST Dataset")
             self.test_dataset = make_dataset(self.cfg.test_dset)
-            # if self.obj_class != "non_mug":
-            #     self.test_dataset = ShapeNetPretrainingPointCloudDataset(
-            #         ShapeNetPretrainingPointCloudDatasetConfig(
-            #             ndf_data_path=self.pretraining_data_path,
-            #             obj_class=[self.obj_class],
-            #         )
-            #     )
-            # else:
-            #     self.test_dataset = NDFPretrainingPointCloudDataset(
-            #         NDFPretrainingPointCloudDatasetConfig(
-            #             dataset_root=self.dataset_root,
-            #             dataset_indices=self.dataset_indices,
-            #             cloud_type=self.cloud_type,
-            #             action_class=self.cloud_class,
-            #         )
-            #     )
 
     def train_dataloader(self):
         return DataLoader(

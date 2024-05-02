@@ -46,6 +46,9 @@ class ShapeNetPretrainingPointCloudDataset(Dataset):
         obj_class = cfg.obj_class
         train_num = cfg.train_num
 
+        if ndf_data_path is None:
+            raise ValueError("ndf_data_path must be provided.")
+
         self.ndf_data_path = Path(ndf_data_path)
         # Path setup (change to folder where your training data is kept)
         # these are the names of the full dataset folders
@@ -85,7 +88,7 @@ class ShapeNetPretrainingPointCloudDataset(Dataset):
             files = list(sorted(glob.glob(path + "/*.npz")))
             n = len(files)
 
-            if train_num == None:
+            if train_num is None:
                 idx = int(0.9 * n)
             else:
                 idx = train_num

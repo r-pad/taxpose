@@ -1,3 +1,7 @@
+# type: ignore
+
+from typing import Dict, Tuple
+
 import numpy as np
 import torch
 from pytorch3d.ops import sample_farthest_points
@@ -146,7 +150,7 @@ def get_random_distractor_demo(
     transform_base=True,
     return_debug=False,
     rot_sample_method="axis_angle",
-):
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, Dict]:
     debug = {}
     if transform_base:
         N = points_anchor_base.shape[0]

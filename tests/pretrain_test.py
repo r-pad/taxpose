@@ -40,6 +40,7 @@ def _get_pretraining_config_names():
 DEFAULT_NDF_PATH = "/data"
 
 
+@pytest.mark.pretraining
 @pytest.mark.skipif(
     ("NDF_DATASET_ROOT" not in os.environ or not os.path.exists(DEFAULT_NDF_PATH))
     and not torch.cuda.is_available(),
