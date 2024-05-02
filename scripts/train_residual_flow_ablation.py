@@ -30,7 +30,7 @@ def main(cfg):
 
     TESTING = "PYTEST_CURRENT_TEST" in os.environ
 
-    logger = WandbLogger(project=cfg.experiment)
+    logger = WandbLogger(project="taxpose", job_type=cfg.job_name)
     logger.log_hyperparams(cfg)
     logger.log_hyperparams({"working_dir": os.getcwd()})
     trainer = pl.Trainer(
