@@ -1,7 +1,0 @@
-# @package task
-
-action_class: gripper
-anchor_class: umbrella_visual
-name: pregasp
-softmax_temperature: 0.1
-weight_normalize: softmax

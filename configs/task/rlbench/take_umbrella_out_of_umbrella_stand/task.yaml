@@ -1,5 +1,0 @@
-defaults:
-- phase@phases.pregasp: pregasp
-- phase@phases.grasp: grasp
-- phase@phases.lift: lift
-name: take_umbrella_out_of_umbrella_stand

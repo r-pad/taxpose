@@ -1,7 +1,0 @@
-# @package task
-
-action_class: toilet_roll_visual
-anchor_class: holder_visual
-name: place
-softmax_temperature: 0.1
-weight_normalize: softmax

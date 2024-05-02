@@ -14,14 +14,12 @@ authors = [
 ]
 dependencies = [
   # "chamferdist",
-  "dill",
   "dgl",
   "dglgo",
   "h5py",
   "hydra-core",
   "imageio",
   "jupyterlab",
-  "open3d",
   "opencv-python",
   "pybullet",
   "pyg_lib",
@@ -55,9 +53,6 @@ develop = [
   "pytest-cov",
   "pytest-xdist",
   "types-tqdm",
-]
-rlbench = [
-  "rpad-rlbench-utils @ git+https://github.com/r-pad/rlbench_utils.git",
 ]
 build_docs = ["mkdocs-material", "mkdocstrings[python]"]
 
@@ -106,8 +101,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-addopts = "--ignore=third_party/ -m 'not long' -n auto"
-testpaths = "tests"
+addopts = "--ignore=third_party/ -m 'not long'"
 
 [tool.pylint]
 disable = [

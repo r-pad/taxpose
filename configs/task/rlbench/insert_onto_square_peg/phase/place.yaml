@@ -1,7 +1,0 @@
-# @package task
-
-action_class: square_ring
-anchor_class: square_base
-name: place
-softmax_temperature: 0.1
-weight_normalize: softmax

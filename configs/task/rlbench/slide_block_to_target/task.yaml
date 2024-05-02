@@ -1,4 +1,0 @@
-defaults:
-- phase@phases.preslide: preslide
-- phase@phases.postslide: postslide
-name: slide_block_to_target

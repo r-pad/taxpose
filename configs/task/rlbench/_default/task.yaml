@@ -1,4 +1,0 @@
-name: DEFAULT
-
-defaults:
-  - phase@phases.DEFAULT: DEFAULT

@@ -57,9 +57,7 @@ For our experiments, we installed torch 1.11 with cuda 11.3:
 
 ```
 # pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
-# pip install torch==1.13.0+cu116 torchvision==0.14.0+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
-pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
-
+pip install torch==1.13.0+cu116 torchvision==0.14.0+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
 ```
 
 ### `pytorch-geometric`
@@ -70,8 +68,7 @@ For our experiments, we installed with the following command:
 
 ```
 # pip install torch-scatter==2.0.9 torch-sparse==0.6.15 torch-cluster==1.6.0 torch-spline-conv==1.2.1 pyg_lib==0.1.0 -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
-# pip install torch-scatter==2.0.9 torch-sparse==0.6.15 torch-cluster==1.6.0 torch-spline-conv==1.2.1 pyg_lib==0.1.0 -f https://data.pyg.org/whl/torch-1.13.0+cu116.html
-pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.1.0+cu121.html
+pip install torch-scatter==2.0.9 torch-sparse==0.6.15 torch-cluster==1.6.0 torch-spline-conv==1.2.1 pyg_lib==0.1.0 -f https://data.pyg.org/whl/torch-1.13.0+cu116.html
 ```
 
 ### `pytorch3d`
@@ -83,9 +80,7 @@ We ran the following:
 ```
 pip install fvcore iopath
 # pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py39_cu113_pyt1110/download.html
-# pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py39_cu116_pyt1130/download.html
-# pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py39_cu118_pyt201/download.html
-
+pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py39_cu116_pyt1130/download.html
 ```
 
 ### `dgl`
@@ -97,9 +92,6 @@ For our experiments, we ran:
 pip install --pre dgl -f https://data.dgl.ai/wheels/cu113/repo.html
 pip install --pre dglgo -f https://data.dgl.ai/wheels-test/repo.html
 ```
-
-# NOTE
-Cursed vglrun requires us to pipe in our own custom LD_LIBRARY_PATH. This is a hacky way to do it, but it works for now.
 
 ## Install `taxpose`.
 
@@ -151,9 +143,6 @@ sudo apt-get install python-dev
 cd third_party/ndf_robot/pybullet-planning/pybullet_tools/ikfast/franka_panda
 python setup.py
 ```
-
-
-
 
 
 # Code Structure
@@ -659,40 +648,3 @@ These are real-world experiments we ran, and so can't be reproduced purely from 
 ## Supplement Tables 11-14: Expanded results
 
 These are granular results of the experiments in Table 1.
-
-
-## Docker
-
-### Build a Docker container.
-
-```
-docker build -t beisner/taxpose .
-```
-
-### This command works for RLBench eval. Hard-fought.
-```
-docker run --gpus "device=1" -it --rm -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json -v /home/beisner/datasets/:/data -v ./artifacts:/opt/artifacts beisner/taxpose python scripts/eval_rlbench.py --config-name commands/rlbench/reach_target/taxpose_all/eval_rlbench.yaml num_trials=100 resources.num_workers=20 wandb.artifact_dir=/opt/artifacts wandb.group=rlbench_push_button headless=True task.action_mode=gripper_and_object task.anchor_mode=background_robot_removed model.num_points=512
-```
-
-### Run training.
-
-```
-WANDB_API_KEY=<API_KEY>
-USERNAME=<USERNAME>
-# Optional: mount current directory to run / test new code.
-# Mount data directory to access data.
-docker run \
-    --shm-size=256m\
-    -v /data/ndf:/opt/baeisner/data \
-    -v $(pwd)/trained_models:/opt/baeisner/code/trained_models \
-    -v $(pwd)/logs:/opt/baeisner/logs \
-    --gpus all \
-    -e WANDB_API_KEY=$WANDB_API_KEY \
-    -e WANDB_DOCKER_IMAGE=beisner/taxpose \
-    beisner/taxpose python scripts/train_residual_flow.py \
-        task=mug_grasp \
-        model=taxpose \
-        +mode=train \
-        benchmark.dataset_root=/opt/baeisner/data \
-        log_dir=/opt/baeisner/logs
-```

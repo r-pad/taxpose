@@ -1,7 +1,0 @@
-# @package task
-
-action_class: pick_and_lift_target
-anchor_class: success_visual
-name: final
-softmax_temperature: 0.1
-weight_normalize: softmax

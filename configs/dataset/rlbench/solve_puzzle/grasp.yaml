@@ -1,3 +1,0 @@
-defaults:
-- rlbench/solve_puzzle/_default@_here_
-- _self_

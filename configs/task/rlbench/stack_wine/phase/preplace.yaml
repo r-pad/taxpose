@@ -1,7 +1,0 @@
-# @package task
-
-action_class: wine_bottle
-anchor_class: rack_top_visual
-name: preplace
-softmax_temperature: 0.1
-weight_normalize: softmax
