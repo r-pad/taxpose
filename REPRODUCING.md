@@ -9,31 +9,31 @@ All tasks require pretraining.
 ### Bottle
 
 ```
-python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/bottle training.dataset.pretraining_data_path=/data/ndf_original/data data_root=/data/ndf
+python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/bottle data_root=/data
 ```
 
 ### Bowl
 
 ```
-python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/bowl training.dataset.pretraining_data_path=/data/ndf_original/data data_root=/data/ndf
+python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/bowl data_root=/data
 ```
 
 ### Gripper
 
 ```
-python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/gripper training.dataset.pretraining_data_path=/data/ndf_original/data data_root=/data/ndf
+python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/gripper data_root=/data
 ```
 
 ### Mug
 
 ```
-python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/mug training.dataset.pretraining_data_path=/data/ndf_original/data data_root=/data/ndf
+python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/mug data_root=/data
 ```
 
 ### Rack
 
 ```
-python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/rack training.dataset.pretraining_data_path=/data/ndf_original/data data_root=/data/ndf
+python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/rack data_root=/data
 ```
 
 ### Slab
@@ -41,7 +41,7 @@ python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/rack
 Note: this one appears broken.
 
 ```
-python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/slab training.dataset.pretraining_data_path=/data/ndf_original/data data_root=/data/ndf
+python scripts/pretrain_embedding.py --config-name commands/ndf/pretraining/slab data_root=/data
 ```
 
 ## Table 1
