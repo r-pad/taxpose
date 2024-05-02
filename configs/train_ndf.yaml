@@ -22,8 +22,8 @@ defaults:
 
   # Task information for setting up the datamodule.
   - datamodule  # This datamodule will be used in evaluation, so factor it out.
-  - benchmark: rlbench  # {ndf, rlbench}
-  - optional task: stack_wine
+  - benchmark: ndf  # {ndf, rlbench}
+  - optional task: mug
   - optional phase: place
   - task/${benchmark}/${task}/task@task
   - task/${benchmark}/${task}/phase/${phase}@task.phase
