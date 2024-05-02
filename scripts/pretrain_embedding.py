@@ -1,4 +1,5 @@
 import json
+import os
 
 import hydra
 import omegaconf
@@ -18,7 +19,7 @@ from taxpose.training.equivariant_feature_pretraining_module import (
 # chuerp conda env: pytorch3d_38
 
 
-@hydra.main(config_path="../configs", config_name="pretraining_new")
+@hydra.main(version_base="1.1", config_path="../configs", config_name="pretraining")
 def main(cfg):
     print(
         json.dumps(
@@ -42,6 +43,8 @@ def main(cfg):
 
     pl.seed_everything(cfg.seed)
 
+    TRAINING = "PYTEST_CURRENT_TEST" not in os.environ
+
     logger = WandbLogger(
         entity=cfg.wandb.entity,
         project=cfg.wandb.project,
@@ -50,13 +53,11 @@ def main(cfg):
         job_type=cfg.job_type,
         save_code=True,
         log_model=True,
-        config=omegaconf.OmegaConf.to_container(
-            cfg, resolve=True, throw_on_missing=True
-        ),
+        config=omegaconf.OmegaConf.to_container(cfg, resolve=True),
     )
 
     trainer = pl.Trainer(
-        logger=logger,
+        logger=logger if TRAINING else None,
         accelerator="gpu",
         devices=[0],
         # reload_dataloaders_every_n_epochs=1,
@@ -67,27 +68,32 @@ def main(cfg):
         # limit_train_batches=10,
         max_epochs=cfg.training.epochs,
         # callbacks=[SaverCallbackEmbnn()],
-        callbacks=[
-            # This checkpoint callback saves the latest model during training, i.e. so we can resume if it crashes.
-            # It saves everything, and you can load by referencing last.ckpt.
-            ModelCheckpoint(
-                dirpath=cfg.lightning.checkpoint_dir,
-                filename="{epoch}-{step}",
-                monitor="step",
-                mode="max",
-                save_weights_only=False,
-                save_last=True,
-                every_n_epochs=1,
-            ),
-            # This checkpoint will get saved to WandB. The Callback mechanism in lightning is poorly designed, so we have to put it last.
-            ModelCheckpoint(
-                dirpath=cfg.lightning.checkpoint_dir,
-                filename="{epoch}-{step}-{train_loss:.2f}-weights-only",
-                monitor="train_loss",
-                mode="min",
-                save_weights_only=True,
-            ),
-        ],
+        callbacks=(
+            [
+                # This checkpoint callback saves the latest model during training, i.e. so we can resume if it crashes.
+                # It saves everything, and you can load by referencing last.ckpt.
+                ModelCheckpoint(
+                    dirpath=cfg.lightning.checkpoint_dir,
+                    filename="{epoch}-{step}",
+                    monitor="step",
+                    mode="max",
+                    save_weights_only=False,
+                    save_last=True,
+                    every_n_epochs=1,
+                ),
+                # This checkpoint will get saved to WandB. The Callback mechanism in lightning is poorly designed, so we have to put it last.
+                ModelCheckpoint(
+                    dirpath=cfg.lightning.checkpoint_dir,
+                    filename="{epoch}-{step}-{train_loss:.2f}-weights-only",
+                    monitor="train_loss",
+                    mode="min",
+                    save_weights_only=True,
+                ),
+            ]
+            if TRAINING
+            else []
+        ),
+        fast_dev_run=5 if "PYTEST_CURRENT_TEST" in os.environ else False,
     )
 
     dm = PretrainingMultiviewDataModule(

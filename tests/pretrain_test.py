@@ -12,28 +12,20 @@ from hydra.core.hydra_config import HydraConfig
 THIS_DIR = Path(__file__).resolve().parent
 sys.path.append(str(THIS_DIR.parent))
 
-from scripts.train_residual_flow import main
+from scripts.pretrain_embedding import main
 
 
-def _get_training_config_names(bmark, ablation=False):
+def _get_pretraining_config_names():
     # Get config paths from the configs/commands directory, relative to the commands directory.
-    configs = [path for path in Path(f"configs/commands/{bmark}").rglob("*.yaml")]
+    configs = [
+        path for path in Path(f"configs/commands/ndf/pretraining/").rglob("*.yaml")
+    ]
 
     # Strip the "configs/" prefix.
     configs = [str(path)[8:] for path in configs]
 
     # Filter out paths with basenames that have a leading underscore.
     configs = [config for config in configs if not Path(config).name.startswith("_")]
-
-    # Filter out paths that don't include the word "train" in the path.
-    configs = [config for config in configs if "train_" in config]
-
-    if ablation:
-        # Filter out paths that don't include the word "ablation" in the path except for
-        configs = [config for config in configs if "ablation" in config]
-    else:
-        # Filter out paths that include the word "ablation" in the path.
-        configs = [config for config in configs if "ablation" not in config]
 
     # Filter out paths with any folder that have a leading underscore.
     configs = [
@@ -48,7 +40,13 @@ def _get_training_config_names(bmark, ablation=False):
 DEFAULT_NDF_PATH = "/data"
 
 
-def _test_commands_run(config_name):
+@pytest.mark.skipif(
+    ("NDF_DATASET_ROOT" not in os.environ or not os.path.exists(DEFAULT_NDF_PATH))
+    and not torch.cuda.is_available(),
+    reason="NDF_DATASET_ROOT environment variable is not set or the path does not exist.",
+)
+@pytest.mark.parametrize("config_name", _get_pretraining_config_names())
+def test_pretraining(config_name):
     dataset_root = (
         os.environ["NDF_DATASET_ROOT"]
         if "NDF_DATASET_ROOT" in os.environ
@@ -65,7 +63,7 @@ def _test_commands_run(config_name):
                 "hydra.runtime.output_dir=.",
                 "seed=1234",
                 f"data_root={dataset_root}",
-                "batch_size=2",
+                "training.batch_size=2",
             ],
             return_hydra_config=True,
         )
@@ -76,29 +74,3 @@ def _test_commands_run(config_name):
         os.environ["WANDB_MODE"] = "disabled"
         # Run the training script.
         main(cfg)
-
-
-# Skip this if the environment variable is not set or the path does not exist.
-@pytest.mark.training
-@pytest.mark.skipif(
-    ("NDF_DATASET_ROOT" not in os.environ or not os.path.exists(DEFAULT_NDF_PATH))
-    and not torch.cuda.is_available(),
-    reason="NDF_DATASET_ROOT environment variable is not set or the path does not exist.",
-)
-@pytest.mark.parametrize("config_name", _get_training_config_names("ndf"))
-def test_training_commands_run(config_name):
-    _test_commands_run(config_name)
-
-
-# Do the same for the ablation configs.
-@pytest.mark.ablations
-@pytest.mark.skipif(
-    ("NDF_DATASET_ROOT" not in os.environ or not os.path.exists(DEFAULT_NDF_PATH))
-    and not torch.cuda.is_available(),
-    reason="NDF_DATASET_ROOT environment variable is not set or the path does not exist.",
-)
-@pytest.mark.parametrize(
-    "config_name", _get_training_config_names("ndf", ablation=True)
-)
-def test_training_ablation_commands_run(config_name):
-    _test_commands_run(config_name)

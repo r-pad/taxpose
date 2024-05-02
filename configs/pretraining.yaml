@@ -1,38 +1,31 @@
-# Logging Settings
 job_type: pretraining_${benchmark.name}_${object_class.name}
-image_logging_period: 1000
+
+data_root: ${oc.env:HOME}/datasets
 
 defaults:
-  - benchmark: ndf
-  - object_class: mug
+  - benchmark: ndf # {ndf, rlbench}
+  - object_class: mug # {mug, bottle, bowl}
+  - dataset: ndf_pretraining/${object_class}
   - _logging
   - _self_
 
 seed: 0
 
-
 training:
-  dataset:
-    root: ${hydra:runtime.cwd}/data/mug_place/train_data/renders
-    pretraining_data_path: /home/beisner/code/multi_project/taxpose/third_party/ndf_robot/src/ndf_robot/data
-    num_points: 1024
-    dataset_index: None
-    cloud_class: 0 # 0 for mug, 1 for rack, 2 for gripper
-    cloud_type: init
-    overfit: false
-    obj_class: ${object_class.name}
-
-  batch_size: 8
+  batch_size: 32
   epochs: 100
+  check_val_every_n_epoch: 1
+  log_every_n_steps: 50
 
 resources:
-  num_workers: 4
+  num_workers: 16
   gpus:
     - 0
 
 wandb:
   group: Null
 
+image_logging_period: 1000
 
 # Network Settings
 emb_dims: 512

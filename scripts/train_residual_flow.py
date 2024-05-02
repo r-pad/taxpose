@@ -72,9 +72,7 @@ def main(cfg):
         job_type=cfg.job_type,
         save_code=True,
         log_model=True,
-        config=omegaconf.OmegaConf.to_container(
-            cfg, resolve=True, throw_on_missing=True
-        ),
+        config=omegaconf.OmegaConf.to_container(cfg, resolve=True),
     )
     # logger.log_hyperparams(cfg)
     # logger.log_hyperparams({"working_dir": os.getcwd()})

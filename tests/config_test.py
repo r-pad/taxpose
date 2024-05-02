@@ -28,7 +28,7 @@ def _get_config_names(bmark):
 
 @pytest.mark.parametrize("config_name", _get_config_names("ndf"))
 def test_ndf_commands_compile(config_name):
-    with initialize(version_base=None, config_path="../configs"):
+    with initialize(version_base="1.1", config_path="../configs"):
         cfg = compose(
             config_name=config_name,
             overrides=[
@@ -39,7 +39,6 @@ def test_ndf_commands_compile(config_name):
             ],
             return_hydra_config=True,
         )
-        breakpoint()
         # Resolve the config
         HydraConfig.instance().set_config(cfg)
 
