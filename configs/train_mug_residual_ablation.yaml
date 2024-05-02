@@ -15,7 +15,8 @@ defaults:
   - optional mode: train # $mode \in {train, train_val, validation}
   # - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
   - checkpoints/pretraining@checkpoints.pretraining
-  - optional ablation: 0_no_disp_loss
+
+### TO BE CHANGED ###
 
 # Dataset Settings
 dataset_root: ${hydra:runtime.cwd}/data
@@ -45,14 +46,14 @@ center_feature: ${model.center_feature}
 diff_emb: True
 diff_transformer: True
 emb_nn: ${model.emb_nn}
-emb_dims: ${ablation.emb_dims}
+emb_dims: ${model.emb_dims}
 inital_sampling_ratio: ${model.inital_sampling_ratio}
 flow_compute_type: 0
-residual_on: ${ablation.residual_on}
-pred_weight: ${ablation.pred_weight}
+residual_on: ${model.residual_on}
+pred_weight: ${model.pred_weight}
 sigmoid_on: True
 return_flow_component: ${model.return_flow_component}
-mlp: ${ablation.mlp}
+mlp: False
 
 pretraining:
   mode: nce_loss
@@ -63,20 +64,14 @@ pretraining:
 
 # Loss Settings
 flow_supervision: both
-displace_loss_weight: ${ablation.displace_loss_weight}
-direct_correspondence_loss_weight: ${ablation.direct_correspondence_loss_weight}
-consistency_loss_weight: ${ablation.consistency_loss_weight}
+displace_loss_weight: 1
+direct_correspondence_loss_weight: 1
+consistency_loss_weight: 0.1
 
 # Training Settings
 load_from_checkpoint: False
 # checkpoint_file: ${checkpoints.ckpt_file}
 checkpoint_file: null
-freeze_embnn: ${ablation.freeze_embnn}
+freeze_embnn: False
 lr: 1e-4
 max_epochs: 1000
-# checkpoint_file_action: ${hydra:runtime.cwd}/trained_models/pretraining_mug_embnn_weights.ckpt
-# checkpoint_file_anchor: ${hydra:runtime.cwd}/trained_models/pretraining_rack_embnn_weights.ckpt
-checkpoint_file_action: null
-checkpoint_file_anchor: null
-
-ablation_name: ${ablation.name}

@@ -2,14 +2,5 @@
 
 ablation:
   name: 6_no_finetuning
-  freeze_embnn: True
 
-  residual_on: True
-  displace_loss_weight: 1
-  direct_correspondence_loss_weight: 1
-  consistency_loss_weight: 0.1
-  pred_weight: True
-  checkpoint_file_action: ${hydra:runtime.cwd}/trained_models/pretraining_mug_embnn_weights.ckpt
-  checkpoint_file_anchor: ${hydra:runtime.cwd}/trained_models/pretraining_rack_embnn_weights.ckpt
-  mlp: False
-  emb_dims: 512
+freeze_embnn: True

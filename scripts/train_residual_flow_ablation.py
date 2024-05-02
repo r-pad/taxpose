@@ -24,7 +24,7 @@ def write_to_file(file_name, string):
     f.close()
 
 
-@hydra.main(config_path="../configs", config_name="train_mug_residual_ablation")
+@hydra.main(config_path="../configs", config_name="train_ndf")
 def main(cfg):
     pl.seed_everything(cfg.seed)
 
@@ -49,15 +49,7 @@ def main(cfg):
     )
     log_txt_file = cfg.log_txt_file
 
-    if cfg.ablation_name == "7_no_pretraining":
-        cfg.checkpoint_file_action = None
-        cfg.checkpoint_file_anchor = None
-    else:
-        cfg.checkpoint_file_action = cfg.task.checkpoint_file_action
-        cfg.checkpoint_file_anchor = cfg.task.checkpoint_file_anchor
-
     write_to_file(log_txt_file, "working_dir: {}".format(os.getcwd()))
-    write_to_file(log_txt_file, "ablation: {}".format(cfg.ablation_name))
     write_to_file(
         log_txt_file,
         "consistency_loss_weight: {}".format(cfg.consistency_loss_weight),
@@ -76,10 +68,14 @@ def main(cfg):
     write_to_file(log_txt_file, "pred_weight: {}".format(cfg.pred_weight))
     write_to_file(log_txt_file, "freeze_embnn: {}".format(cfg.freeze_embnn))
     write_to_file(
-        log_txt_file, "checkpoint_file_action: {}".format(cfg.checkpoint_file_action)
+        log_txt_file,
+        "pretraining.checkpoint_file_action: {}".format(
+            cfg.pretraining.checkpoint_file_action
+        ),
     )
     write_to_file(
-        log_txt_file, "checkpoint_file_anchor: {}".format(cfg.checkpoint_file_anchor)
+        log_txt_file,
+        "checkpoint_file_anchor: {}".format(cfg.pretraining.checkpoint_file_anchor),
     )
     write_to_file(log_txt_file, "mlp: {}".format(cfg.mlp))
 
@@ -149,29 +145,33 @@ def main(cfg):
         )
 
     else:
-        if cfg.checkpoint_file_action is not None:
+        if cfg.pretraining.checkpoint_file_action is not None:
             model.model.emb_nn_action.load_state_dict(
-                torch.load(hydra.utils.to_absolute_path(cfg.checkpoint_file_action))[
-                    "embnn_state_dict"
-                ]
+                torch.load(
+                    hydra.utils.to_absolute_path(cfg.pretraining.checkpoint_file_action)
+                )["embnn_state_dict"]
             )
             print(
                 "-----------------------Pretrained EmbNN Action Model Loaded!-----------------------"
             )
             print(
-                "Loaded Pretrained EmbNN Action: {}".format(cfg.checkpoint_file_action)
+                "Loaded Pretrained EmbNN Action: {}".format(
+                    cfg.pretraining.checkpoint_file_action
+                )
             )
-        if cfg.checkpoint_file_anchor is not None:
+        if cfg.pretraining.checkpoint_file_anchor is not None:
             model.model.emb_nn_anchor.load_state_dict(
-                torch.load(hydra.utils.to_absolute_path(cfg.checkpoint_file_anchor))[
-                    "embnn_state_dict"
-                ]
+                torch.load(
+                    hydra.utils.to_absolute_path(cfg.pretraining.checkpoint_file_anchor)
+                )["embnn_state_dict"]
             )
             print(
                 "-----------------------Pretrained EmbNN Anchor Model Loaded!-----------------------"
             )
             print(
-                "Loaded Pretrained EmbNN Anchor: {}".format(cfg.checkpoint_file_anchor)
+                "Loaded Pretrained EmbNN Anchor: {}".format(
+                    cfg.pretraining.checkpoint_file_anchor
+                )
             )
 
     trainer.fit(model, dm)

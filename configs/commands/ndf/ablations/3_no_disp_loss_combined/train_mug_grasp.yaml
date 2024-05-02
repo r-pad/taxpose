@@ -1,8 +1,8 @@
 # @package _global_
 
 defaults:
+- /train_ndf
 - _ablation
-- /train_mug_residual_ablation
 - override /task: mug_grasp
 - _self_
 
