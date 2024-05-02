@@ -9,8 +9,11 @@ residual_on: True
 num_points: 1024
 
 defaults:
-  - optional pretraining_mode: nce_loss
   - encoder: dgcnn
   - _self_
 
-pretraining: null
+pretraining:
+  action:
+    ckpt_path: null
+  anchor:
+    ckpt_path: null

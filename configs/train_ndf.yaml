@@ -28,11 +28,6 @@ defaults:
   - task/${benchmark}/${task}/task@task
   - task/${benchmark}/${task}/phase/${phase}@task.phase
 
-  # Set the pretraining checkpoint.
-  - /checkpoints/${benchmark}/${task}/pretraining/${phase}@model.pretraining
-
-  # - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
-
 
 model:
 
