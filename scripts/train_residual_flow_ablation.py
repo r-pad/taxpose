@@ -49,39 +49,39 @@ def main(cfg):
     )
     log_txt_file = cfg.log_txt_file
 
-    if cfg.ablation.name == "7_no_pretraining":
-        cfg.checkpoint_file_action = cfg.ablation.checkpoint_file_action
-        cfg.checkpoint_file_anchor = cfg.ablation.checkpoint_file_anchor
+    if cfg.ablation_name == "7_no_pretraining":
+        cfg.checkpoint_file_action = None
+        cfg.checkpoint_file_anchor = None
     else:
         cfg.checkpoint_file_action = cfg.task.checkpoint_file_action
         cfg.checkpoint_file_anchor = cfg.task.checkpoint_file_anchor
 
     write_to_file(log_txt_file, "working_dir: {}".format(os.getcwd()))
-    write_to_file(log_txt_file, "ablation: {}".format(cfg.ablation.name))
+    write_to_file(log_txt_file, "ablation: {}".format(cfg.ablation_name))
     write_to_file(
         log_txt_file,
-        "consistency_loss_weight: {}".format(cfg.ablation.consistency_loss_weight),
+        "consistency_loss_weight: {}".format(cfg.consistency_loss_weight),
     )
     write_to_file(
         log_txt_file,
         "direct_correspondence_loss_weight: {}".format(
-            cfg.ablation.direct_correspondence_loss_weight
+            cfg.direct_correspondence_loss_weight
         ),
     )
     write_to_file(
         log_txt_file,
-        "displace_loss_weight: {}".format(cfg.ablation.displace_loss_weight),
+        "displace_loss_weight: {}".format(cfg.displace_loss_weight),
     )
-    write_to_file(log_txt_file, "residual_on: {}".format(cfg.ablation.residual_on))
-    write_to_file(log_txt_file, "pred_weight: {}".format(cfg.ablation.pred_weight))
-    write_to_file(log_txt_file, "freeze_embnn: {}".format(cfg.ablation.freeze_embnn))
+    write_to_file(log_txt_file, "residual_on: {}".format(cfg.residual_on))
+    write_to_file(log_txt_file, "pred_weight: {}".format(cfg.pred_weight))
+    write_to_file(log_txt_file, "freeze_embnn: {}".format(cfg.freeze_embnn))
     write_to_file(
         log_txt_file, "checkpoint_file_action: {}".format(cfg.checkpoint_file_action)
     )
     write_to_file(
         log_txt_file, "checkpoint_file_anchor: {}".format(cfg.checkpoint_file_anchor)
     )
-    write_to_file(log_txt_file, "mlp: {}".format(cfg.ablation.mlp))
+    write_to_file(log_txt_file, "mlp: {}".format(cfg.mlp))
 
     write_to_file(log_txt_file, "")
     dm = MultiviewDataModule(
@@ -109,30 +109,30 @@ def main(cfg):
 
     dm.setup()
 
-    if cfg.ablation.mlp:
+    if cfg.mlp:
         network = CorrespondenceFlow_DiffEmbMLP(
-            emb_dims=cfg.ablation.emb_dims,
+            emb_dims=cfg.emb_dims,
             emb_nn=cfg.emb_nn,
             center_feature=cfg.center_feature,
         )
     else:
         network = ResidualFlow_DiffEmbTransformer(
-            emb_dims=cfg.ablation.emb_dims,
+            emb_dims=cfg.emb_dims,
             emb_nn=cfg.emb_nn,
             return_flow_component=cfg.return_flow_component,
             center_feature=cfg.center_feature,
-            pred_weight=cfg.ablation.pred_weight,
-            residual_on=cfg.ablation.residual_on,
-            freeze_embnn=cfg.ablation.freeze_embnn,
+            pred_weight=cfg.pred_weight,
+            residual_on=cfg.residual_on,
+            freeze_embnn=cfg.freeze_embnn,
         )
 
     model = EquivarianceTrainingModule(
         network,
         lr=cfg.lr,
         image_log_period=cfg.image_logging_period,
-        displace_loss_weight=cfg.ablation.displace_loss_weight,
-        consistency_loss_weight=cfg.ablation.consistency_loss_weight,
-        direct_correspondence_loss_weight=cfg.ablation.direct_correspondence_loss_weight,
+        displace_loss_weight=cfg.displace_loss_weight,
+        consistency_loss_weight=cfg.consistency_loss_weight,
+        direct_correspondence_loss_weight=cfg.direct_correspondence_loss_weight,
         weight_normalize=cfg.task.weight_normalize,
         sigmoid_on=cfg.sigmoid_on,
         softmax_temperature=cfg.task.softmax_temperature,
