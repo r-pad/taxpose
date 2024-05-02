@@ -1,9 +1,10 @@
 # @package _global_
 
 defaults:
-- /train_mug_residual_ablation
-- override /ablation: 3_no_disp_loss_combined
-- override /task: mug_place
+- /train_ndf
+- _ablation
+- override /object_class: mug
+- override /relationship: place
 - _self_
 
 mode: train

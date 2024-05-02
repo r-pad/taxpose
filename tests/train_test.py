@@ -13,7 +13,6 @@ THIS_DIR = Path(__file__).resolve().parent
 sys.path.append(str(THIS_DIR.parent))
 
 from scripts.train_residual_flow import main
-from scripts.train_residual_flow_ablation import main as main_ablation
 
 
 def _get_training_config_names(bmark, ablation=False):
@@ -57,21 +56,12 @@ def _get_training_config_names(bmark, ablation=False):
 DEFAULT_NDF_PATH = "/data/ndf"
 
 
-# Skip this if the environment variable is not set or the path does not exist.
-@pytest.mark.training
-@pytest.mark.skipif(
-    ("NDF_DATASET_ROOT" not in os.environ or not os.path.exists(DEFAULT_NDF_PATH))
-    and not torch.cuda.is_available(),
-    reason="NDF_DATASET_ROOT environment variable is not set or the path does not exist.",
-)
-@pytest.mark.parametrize("config_name", _get_training_config_names("ndf"))
-def test_training_commands_run(config_name):
+def _test_commands_run(config_name):
     dataset_root = (
         os.environ["NDF_DATASET_ROOT"]
         if "NDF_DATASET_ROOT" in os.environ
         else DEFAULT_NDF_PATH
     )
-
     torch.multiprocessing.set_sharing_strategy("file_system")
 
     with initialize(version_base=None, config_path="../configs"):
@@ -96,6 +86,18 @@ def test_training_commands_run(config_name):
         main(cfg)
 
 
+# Skip this if the environment variable is not set or the path does not exist.
+@pytest.mark.training
+@pytest.mark.skipif(
+    ("NDF_DATASET_ROOT" not in os.environ or not os.path.exists(DEFAULT_NDF_PATH))
+    and not torch.cuda.is_available(),
+    reason="NDF_DATASET_ROOT environment variable is not set or the path does not exist.",
+)
+@pytest.mark.parametrize("config_name", _get_training_config_names("ndf"))
+def test_training_commands_run(config_name):
+    _test_commands_run(config_name)
+
+
 # Do the same for the ablation configs.
 @pytest.mark.ablations
 @pytest.mark.skipif(
@@ -107,31 +109,4 @@ def test_training_commands_run(config_name):
     "config_name", _get_training_config_names("ndf", ablation=True)
 )
 def test_training_ablation_commands_run(config_name):
-    dataset_root = (
-        os.environ["NDF_DATASET_ROOT"]
-        if "NDF_DATASET_ROOT" in os.environ
-        else DEFAULT_NDF_PATH
-    )
-
-    torch.multiprocessing.set_sharing_strategy("file_system")
-
-    with initialize(version_base=None, config_path="../configs"):
-        cfg = compose(
-            config_name=config_name,
-            overrides=[
-                "hydra.verbose=true",
-                "hydra.job.num=1",
-                "hydra.runtime.output_dir=.",
-                "seed=1234",
-                f"dataset_root={dataset_root}",
-                "batch_size=2",
-            ],
-            return_hydra_config=True,
-        )
-        # Resolve the config
-        HydraConfig.instance().set_config(cfg)
-
-        # Just for this function call, set the environment variable to WANDB_MODE=disabled
-        os.environ["WANDB_MODE"] = "disabled"
-        # Run the training script.
-        main_ablation(cfg)
+    _test_commands_run(config_name)

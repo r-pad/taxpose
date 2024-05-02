@@ -37,7 +37,7 @@ log_every_trial: False # True - log success rate at every trial; False - log onl
 flow_compute_type: 0
 emb_nn: dgcnn
 num_points: 1024
-emb_dims: 512
+emb_dims: ${model.emb_dims}
 
 # Dataset Settings
 dataset_index: None
@@ -64,11 +64,11 @@ sigmoid_on: True
 rotation_weight: 0
 consistency_weight: 1
 smoothness_weight: 0.1
-pred_weight: True
+pred_weight: ${model.pred_weight}
 softmax_temperature: 1
 weight_normalize_grasp: softmax
 softmax_temperature_grasp: 0.1
-residual_on: True
+residual_on: ${model.residual_on}
 #### TO BE CHANGED ####
 
 mlp: False

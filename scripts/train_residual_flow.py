@@ -8,7 +8,10 @@ from omegaconf import OmegaConf
 from pytorch_lightning.loggers import WandbLogger
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
-from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
+from taxpose.nets.transformer_flow import (
+    CorrespondenceFlow_DiffEmbMLP,
+    ResidualFlow_DiffEmbTransformer,
+)
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
@@ -28,8 +31,6 @@ def main(cfg):
 
     TESTING = "PYTEST_CURRENT_TEST" in os.environ
 
-    # breakpoint()
-    # torch.set_float32_matmul_precision("medium")
     pl.seed_everything(cfg.seed)
     logger = WandbLogger(project="taxpose", job_type=cfg.job_name)
     logger.log_hyperparams(cfg)
@@ -49,12 +50,6 @@ def main(cfg):
         fast_dev_run=5 if "PYTEST_CURRENT_TEST" in os.environ else False,
     )
     log_txt_file = cfg.log_txt_file
-    if cfg.mode == "train":
-        write_to_file(log_txt_file, "-----------------------")
-        write_to_file(log_txt_file, "Project: {}".format(logger._project))
-        write_to_file(log_txt_file, "Experiment: {}".format(logger.experiment.name))
-        write_to_file(log_txt_file, "working_dir: {}".format(os.getcwd()))
-        write_to_file(log_txt_file, "")
     dm = MultiviewDataModule(
         dataset_root=hydra.utils.to_absolute_path(cfg.train_data_dir),
         test_dataset_root=hydra.utils.to_absolute_path(cfg.test_data_dir),
@@ -80,13 +75,22 @@ def main(cfg):
 
     dm.setup()
 
-    network = ResidualFlow_DiffEmbTransformer(
-        emb_dims=cfg.emb_dims,
-        emb_nn=cfg.emb_nn,
-        return_flow_component=cfg.return_flow_component,
-        center_feature=cfg.center_feature,
-        pred_weight=cfg.pred_weight,
-    )
+    if cfg.mlp:
+        network = CorrespondenceFlow_DiffEmbMLP(
+            emb_dims=cfg.emb_dims,
+            emb_nn=cfg.emb_nn,
+            center_feature=cfg.center_feature,
+        )
+    else:
+        network = ResidualFlow_DiffEmbTransformer(
+            emb_dims=cfg.emb_dims,
+            emb_nn=cfg.emb_nn,
+            return_flow_component=cfg.return_flow_component,
+            center_feature=cfg.center_feature,
+            pred_weight=cfg.pred_weight,
+            residual_on=cfg.residual_on,
+            freeze_embnn=cfg.freeze_embnn,
+        )
 
     model = EquivarianceTrainingModule(
         network,

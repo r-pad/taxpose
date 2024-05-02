@@ -1,0 +1,7 @@
+# @package _global_
+
+ablation:
+  name: 0_no_disp_loss
+
+
+displace_loss_weight: 0

@@ -1,0 +1,7 @@
+# @package _global_
+
+ablation:
+  name: 3_no_disp_loss_combined
+
+displace_loss_weight: 0
+consistency_loss_weight: 0.1

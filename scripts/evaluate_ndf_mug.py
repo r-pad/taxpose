@@ -47,7 +47,10 @@ from ndf_robot.utils.franka_ik import FrankaIK
 from ndf_robot.utils.util import np2img
 from pytorch3d.ops import sample_farthest_points
 
-from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
+from taxpose.nets.transformer_flow import (
+    CorrespondenceFlow_DiffEmbMLP,
+    ResidualFlow_DiffEmbTransformer,
+)
 from taxpose.training.flow_equivariance_training_module_nocentering_eval_init import (
     EquivarianceTestingModule,
 )
@@ -480,16 +483,23 @@ def main(hydra_cfg):
 
     pl.seed_everything(hydra_cfg.seed)
 
-    place_network = ResidualFlow_DiffEmbTransformer(
-        emb_dims=hydra_cfg.emb_dims,
-        emb_nn=hydra_cfg.emb_nn,
-        center_feature=hydra_cfg.center_feature,
-        pred_weight=hydra_cfg.pred_weight,
-        residual_on=hydra_cfg.residual_on,
-        return_flow_component=hydra_cfg.return_flow_component,
-        freeze_embnn=hydra_cfg.freeze_embnn,
-        return_attn=hydra_cfg.return_attn,
-    )
+    if hydra_cfg.mlp:
+        place_network = CorrespondenceFlow_DiffEmbMLP(
+            emb_dims=hydra_cfg.emb_dims,
+            emb_nn=hydra_cfg.emb_nn,
+            center_feature=hydra_cfg.center_feature,
+        )
+    else:
+        place_network = ResidualFlow_DiffEmbTransformer(
+            emb_dims=hydra_cfg.emb_dims,
+            emb_nn=hydra_cfg.emb_nn,
+            center_feature=hydra_cfg.center_feature,
+            pred_weight=hydra_cfg.pred_weight,
+            residual_on=hydra_cfg.residual_on,
+            return_flow_component=hydra_cfg.return_flow_component,
+            freeze_embnn=hydra_cfg.freeze_embnn,
+            return_attn=hydra_cfg.return_attn,
+        )
 
     place_model = EquivarianceTestingModule(
         place_network,
@@ -507,16 +517,23 @@ def main(hydra_cfg):
         )
         log_info("Model Loaded from " + str(hydra_cfg.checkpoint_file_place))
 
-    grasp_network = ResidualFlow_DiffEmbTransformer(
-        emb_dims=hydra_cfg.emb_dims,
-        emb_nn=hydra_cfg.emb_nn,
-        center_feature=hydra_cfg.center_feature,
-        pred_weight=hydra_cfg.pred_weight,
-        residual_on=hydra_cfg.residual_on,
-        return_flow_component=hydra_cfg.return_flow_component,
-        freeze_embnn=hydra_cfg.freeze_embnn,
-        return_attn=hydra_cfg.return_attn,
-    )
+    if hydra_cfg.mlp:
+        grasp_network = CorrespondenceFlow_DiffEmbMLP(
+            emb_dims=hydra_cfg.emb_dims,
+            emb_nn=hydra_cfg.emb_nn,
+            center_feature=hydra_cfg.center_feature,
+        )
+    else:
+        grasp_network = ResidualFlow_DiffEmbTransformer(
+            emb_dims=hydra_cfg.emb_dims,
+            emb_nn=hydra_cfg.emb_nn,
+            center_feature=hydra_cfg.center_feature,
+            pred_weight=hydra_cfg.pred_weight,
+            residual_on=hydra_cfg.residual_on,
+            return_flow_component=hydra_cfg.return_flow_component,
+            freeze_embnn=hydra_cfg.freeze_embnn,
+            return_attn=hydra_cfg.return_attn,
+        )
 
     grasp_model = EquivarianceTestingModule(
         grasp_network,
