@@ -22,12 +22,19 @@ defaults:
 
   # Load the checkpoints appropriately.
   - checkpoints/ndf@checkpoints: ${task}/${model}
+  # - checkpoints/ndf@checkpoints: ${object_class}/${model}
 
 
-checkpoint_file_grasp: ${checkpoints.${pose_dist.name}.grasp}
-checkpoint_file_place: ${checkpoints.${pose_dist.name}.place}
-checkpoint_file_place_refinement: ${checkpoints.${pose_dist.name}.place_refinement}
-checkpoint_file_grasp_refinement: ${checkpoints.${pose_dist.name}.grasp_refinement}
+# checkpoint_file_grasp: ${checkpoints.${pose_dist.name}.grasp}
+# checkpoint_file_place: ${checkpoints.${pose_dist.name}.place}
+# checkpoint_file_place_refinement: ${checkpoints.${pose_dist.name}.place_refinement}
+# checkpoint_file_grasp_refinement: ${checkpoints.${pose_dist.name}.grasp_refinement}
+checkpoint_file_grasp: null
+checkpoint_file_place: null
+checkpoint_file_place_refinement: null
+checkpoint_file_grasp_refinement: null
+
+
 
 # Extra random irrelevant model settings, legacy.
 loop: 1

@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+- /eval_full_mug_standalone
+- override /object_class: mug
+- override /model: taxpose
+- override /pose_dist: arbitrary
+- _self_

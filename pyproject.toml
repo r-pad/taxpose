@@ -106,7 +106,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-addopts = "--ignore=third_party/ -n auto"
+addopts = "--ignore=third_party/ -m 'not long' -n auto"
 testpaths = "tests"
 
 [tool.pylint]

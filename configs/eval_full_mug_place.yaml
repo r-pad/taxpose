@@ -17,11 +17,13 @@ defaults:
 
   # Machinery to load the correct checkpoints.
   - model: release
-  - checkpoints/ndf@checkpoints.grasp: ${object_class}/${pose_dist}/${model}/grasp
-  - checkpoints/ndf@checkpoints.place: ${object_class}/${pose_dist}/${model}/place
+  - optional checkpoints/ndf@checkpoints.grasp: ${object_class}/${pose_dist}/${model}/grasp
+  - optional checkpoints/ndf@checkpoints.place: ${object_class}/${pose_dist}/${model}/place
 
-checkpoint_file_grasp: ${checkpoints.grasp.ckpt_file}
-checkpoint_file_place: ${checkpoints.place.ckpt_file}
+# checkpoint_file_grasp: ${checkpoints.grasp.ckpt_file}
+# checkpoint_file_place: ${checkpoints.place.ckpt_file}
+checkpoint_file_grasp: ???
+checkpoint_file_place: ???
 log_txt_file: ${hydra:runtime.cwd}/test_results.txt # abs path of file to log results
 
 # log saving dir
@@ -35,7 +37,7 @@ log_every_trial: False # True - log success rate at every trial; False - log onl
 # flow_compute_type: 0
 emb_nn: dgcnn
 num_points: 1024
-emb_dims: 512
+emb_dims: ${model.emb_dims}
 multilaterate: False
 
 # Dataset Settings
@@ -63,11 +65,11 @@ sigmoid_on: True
 rotation_weight: 0
 consistency_weight: 1
 smoothness_weight: 0.1
-pred_weight: True
+pred_weight: ${model.pred_weight}
 softmax_temperature: 1
 weight_normalize_grasp: softmax
 softmax_temperature_grasp: 0.1
-residual_on: True
+residual_on: ${model.residual_on}
 #### TO BE CHANGED ####
 
 mlp: False

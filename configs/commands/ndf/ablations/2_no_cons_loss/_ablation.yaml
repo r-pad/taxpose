@@ -1,0 +1,6 @@
+# @package _global_
+
+ablation:
+  name: 2_no_cons_loss
+
+consistency_loss_weight: 0

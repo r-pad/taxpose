@@ -1,0 +1,8 @@
+# @package _global_
+
+ablation:
+  name: 7_no_pretraining
+
+pretraining:
+  checkpoint_file_action: Null
+  checkpoint_file_anchor: Null

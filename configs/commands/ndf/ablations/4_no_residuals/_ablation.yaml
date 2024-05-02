@@ -1,0 +1,7 @@
+# @package _global_
+
+ablation:
+  name: 4_no_residuals
+
+model:
+  residual_on: False

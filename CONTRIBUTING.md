@@ -35,3 +35,18 @@ Run act
 ```
 act -j develop
 ```
+
+
+## Testing
+
+To run the tests:
+
+```
+pytest
+```
+
+To run all the tests, including long ones
+
+```
+pytest -m "long"
+```

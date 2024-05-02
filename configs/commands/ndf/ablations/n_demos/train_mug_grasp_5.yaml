@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+- /train_ndf
+- override /object_class: mug
+- override /relationship: grasp
+- _self_
+
+mode: train
+num_demo: 5

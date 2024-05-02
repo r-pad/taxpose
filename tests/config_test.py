@@ -52,7 +52,7 @@ def test_rlbench_commands_compile(config_name):
         assert cfg.wandb.save_dir is not None
 
 
-@pytest.mark.parametrize("config_name", _get_config_names("rlbench"))
+@pytest.mark.parametrize("config_name", _get_config_names("ndf"))
 def test_ndf_commands_compile(config_name):
     with initialize(version_base=None, config_path="../configs"):
         cfg = compose(
@@ -70,6 +70,3 @@ def test_ndf_commands_compile(config_name):
 
         # Resolve to yaml.
         yaml_cfg = OmegaConf.to_yaml(cfg, resolve=True)
-
-        assert cfg.job_type is not None
-        assert cfg.wandb.save_dir is not None

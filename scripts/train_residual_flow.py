@@ -10,7 +10,10 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
-from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
+from taxpose.nets.transformer_flow import (
+    CorrespondenceFlow_DiffEmbMLP,
+    ResidualFlow_DiffEmbTransformer,
+)
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
@@ -58,6 +61,8 @@ def main(cfg):
     print(OmegaConf.to_yaml(cfg, resolve=True))
 
     # torch.set_float32_matmul_precision("medium")
+    TESTING = "PYTEST_CURRENT_TEST" in os.environ
+
     pl.seed_everything(cfg.seed)
     logger = WandbLogger(
         entity=cfg.wandb.entity,
@@ -74,35 +79,40 @@ def main(cfg):
     # logger.log_hyperparams(cfg)
     # logger.log_hyperparams({"working_dir": os.getcwd()})
     trainer = pl.Trainer(
-        logger=logger,
+        logger=logger if not TESTING else False,
         accelerator="gpu",
         devices=[0],
         log_every_n_steps=cfg.training.log_every_n_steps,
         check_val_every_n_epoch=cfg.training.check_val_every_n_epoch,
         # reload_dataloaders_every_n_epochs=1,
         # callbacks=[SaverCallbackModel(), SaverCallbackEmbnnActionAnchor()],
-        callbacks=[
-            # This checkpoint callback saves the latest model during training, i.e. so we can resume if it crashes.
-            # It saves everything, and you can load by referencing last.ckpt.
-            ModelCheckpoint(
-                dirpath=cfg.lightning.checkpoint_dir,
-                filename="{epoch}-{step}",
-                monitor="step",
-                mode="max",
-                save_weights_only=False,
-                save_last=True,
-                every_n_epochs=1,
-            ),
-            # This checkpoint will get saved to WandB. The Callback mechanism in lightning is poorly designed, so we have to put it last.
-            ModelCheckpoint(
-                dirpath=cfg.lightning.checkpoint_dir,
-                filename="{epoch}-{step}-{train_loss:.2f}-weights-only",
-                monitor="val_loss",
-                mode="min",
-                save_weights_only=True,
-            ),
-        ],
+        callbacks=(
+            [
+                # This checkpoint callback saves the latest model during training, i.e. so we can resume if it crashes.
+                # It saves everything, and you can load by referencing last.ckpt.
+                ModelCheckpoint(
+                    dirpath=cfg.lightning.checkpoint_dir,
+                    filename="{epoch}-{step}",
+                    monitor="step",
+                    mode="max",
+                    save_weights_only=False,
+                    save_last=True,
+                    every_n_epochs=1,
+                ),
+                # This checkpoint will get saved to WandB. The Callback mechanism in lightning is poorly designed, so we have to put it last.
+                ModelCheckpoint(
+                    dirpath=cfg.lightning.checkpoint_dir,
+                    filename="{epoch}-{step}-{train_loss:.2f}-weights-only",
+                    monitor="val_loss",
+                    mode="min",
+                    save_weights_only=True,
+                ),
+            ]
+            if not TESTING
+            else []
+        ),
         max_epochs=cfg.training.max_epochs,
+        fast_dev_run=5 if "PYTEST_CURRENT_TEST" in os.environ else False,
     )
 
     dm = MultiviewDataModule(
@@ -113,18 +123,25 @@ def main(cfg):
 
     dm.setup()
 
-    network = ResidualFlow_DiffEmbTransformer(
-        emb_dims=cfg.model.emb_dims,
-        emb_nn=cfg.model.emb_nn,
-        return_flow_component=cfg.model.return_flow_component,
-        center_feature=cfg.model.center_feature,
-        pred_weight=cfg.model.pred_weight,
-        multilaterate=cfg.model.multilaterate,
-        sample=cfg.model.mlat_sample,
-        mlat_nkps=cfg.model.mlat_nkps,
-        break_symmetry=cfg.break_symmetry,
-        conditional=cfg.model.conditional if "conditional" in cfg.model else False,
-    )
+    if cfg.mlp:
+        network = CorrespondenceFlow_DiffEmbMLP(
+            emb_dims=cfg.emb_dims,
+            emb_nn=cfg.emb_nn,
+            center_feature=cfg.center_feature,
+        )
+    else:
+        network = ResidualFlow_DiffEmbTransformer(
+            emb_dims=cfg.model.emb_dims,
+            emb_nn=cfg.model.emb_nn,
+            return_flow_component=cfg.model.return_flow_component,
+            center_feature=cfg.model.center_feature,
+            pred_weight=cfg.model.pred_weight,
+            multilaterate=cfg.model.multilaterate,
+            sample=cfg.model.mlat_sample,
+            mlat_nkps=cfg.model.mlat_nkps,
+            break_symmetry=cfg.break_symmetry,
+            conditional=cfg.model.conditional if "conditional" in cfg.model else False,
+        )
 
     model = EquivarianceTrainingModule(
         network,

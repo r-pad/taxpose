@@ -1,0 +1,6 @@
+# @package _global_
+
+ablation:
+  name: 8_mlp
+
+mlp: True

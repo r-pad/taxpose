@@ -1,0 +1,12 @@
+# @package _global_
+
+defaults:
+- /pretraining
+- _self_
+
+data_root: ${hydra:runtime.cwd}/data/
+
+training:
+  dataset:
+    root: ${data_root}/bottle_place/train_data/renders
+    cloud_class: 0

@@ -1,0 +1,6 @@
+# @package _global_
+
+ablation:
+  name: 1_no_corr_loss
+
+direct_correspondence_loss_weight: 0
