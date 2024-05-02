@@ -16,7 +16,7 @@ defaults:
   - object_class: mug #{mug, bottle, bowl}
 
   # Machinery to load the correct checkpoints.
-  - model: release
+  - model: taxpose
   - optional checkpoints/ndf@checkpoints.grasp: ${object_class}/${pose_dist}/${model}/grasp
   - optional checkpoints/ndf@checkpoints.place: ${object_class}/${pose_dist}/${model}/place
 
