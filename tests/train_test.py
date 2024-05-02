@@ -72,7 +72,7 @@ def _test_commands_run(config_name):
                 "hydra.job.num=1",
                 "hydra.runtime.output_dir=.",
                 "seed=1234",
-                f"dataset_root={dataset_root}",
+                f"data_root={dataset_root}",
                 "batch_size=2",
             ],
             return_hydra_config=True,

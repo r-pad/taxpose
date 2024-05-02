@@ -39,6 +39,7 @@ def test_ndf_commands_compile(config_name):
             ],
             return_hydra_config=True,
         )
+        breakpoint()
         # Resolve the config
         HydraConfig.instance().set_config(cfg)
 

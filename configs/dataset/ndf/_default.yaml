@@ -11,7 +11,7 @@ test_folder: test_data
 train_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
-    dataset_root: ${benchmark.dataset_root}/${task.name}/${...train_folder}/renders
+    dataset_root: ${benchmark.dataset_root}/${task.phase.name}/${...train_folder}/renders
     dataset_indices: ???
     num_demo: ???
     min_num_points: 1024
@@ -32,7 +32,7 @@ train_dset:
 val_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
-    dataset_root: ${benchmark.dataset_root}/${task.name}/${...test_folder}/renders
+    dataset_root: ${benchmark.dataset_root}/${task.phase.name}/${...test_folder}/renders
     dataset_indices: ???
     num_demo: ???
     min_num_points: ${...train_dset.demo_dset.min_num_points}
@@ -53,7 +53,7 @@ val_dset:
 test_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
-    dataset_root: ${benchmark.dataset_root}/${task.name}/${...test_folder}/renders
+    dataset_root: ${benchmark.dataset_root}/${task.phase.name}/${...test_folder}/renders
     dataset_indices: ???
     num_demo: ???
     min_num_points: ${...train_dset.demo_dset.min_num_points}

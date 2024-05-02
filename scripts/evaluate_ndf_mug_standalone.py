@@ -66,7 +66,6 @@ from taxpose.datasets.symmetry_utils import (
 
 # from taxpose.datasets.ndf import compute_demo_symmetry_features
 from taxpose.nets.transformer_flow import CustomTransformer as Transformer
-from taxpose.nets.transformer_flow import MultilaterationHead
 from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer as RF_DET
 from taxpose.nets.transformer_flow import ResidualMLPHead
 from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
@@ -147,9 +146,6 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         freeze_embnn=False,
         return_attn=True,
         input_dims=3,
-        multilaterate=False,
-        sample: bool = False,
-        mlat_nkps: int = 100,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.emb_dims = emb_dims
@@ -181,30 +177,16 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.transformer_anchor = Transformer(
             emb_dims=emb_dims, return_attn=self.return_attn, bidirectional=False
         )
-        if multilaterate:
-            self.head_action = MultilaterationHead(
-                emb_dims=emb_dims,
-                pred_weight=self.pred_weight,
-                sample=sample,
-                n_kps=mlat_nkps,
-            )
-            self.head_anchor = MultilaterationHead(
-                emb_dims=emb_dims,
-                pred_weight=self.pred_weight,
-                sample=sample,
-                n_kps=mlat_nkps,
-            )
-        else:
-            self.head_action = ResidualMLPHead(
-                emb_dims=emb_dims,
-                pred_weight=self.pred_weight,
-                residual_on=self.residual_on,
-            )
-            self.head_anchor = ResidualMLPHead(
-                emb_dims=emb_dims,
-                pred_weight=self.pred_weight,
-                residual_on=self.residual_on,
-            )
+        self.head_action = ResidualMLPHead(
+            emb_dims=emb_dims,
+            pred_weight=self.pred_weight,
+            residual_on=self.residual_on,
+        )
+        self.head_anchor = ResidualMLPHead(
+            emb_dims=emb_dims,
+            pred_weight=self.pred_weight,
+            residual_on=self.residual_on,
+        )
 
     def forward(self, *input):
         assert input[0].shape[2] in [
@@ -676,18 +658,6 @@ MAX_TIME = 5.0
 
 
 def create_network(model_cfg):
-    # network = ResidualFlow_DiffEmbTransformer(
-    #     pred_weight=model_cfg.pred_weight,
-    #     emb_nn=model_cfg.emb_nn,
-    #     emb_dims=model_cfg.emb_dims,
-    #     return_flow_component=model_cfg.return_flow_component,
-    #     center_feature=model_cfg.center_feature,
-    #     inital_sampling_ratio=model_cfg.inital_sampling_ratio,
-    #     residual_on=model_cfg.residual_on,
-    #     multilaterate=model_cfg.multilaterate,
-    #     sample=model_cfg.mlat_sample,
-    #     mlat_nkps=model_cfg.mlat_nkps,
-    # )
     network = RF_DET(
         pred_weight=model_cfg.pred_weight,
         emb_nn=model_cfg.emb_nn,
@@ -696,10 +666,6 @@ def create_network(model_cfg):
         center_feature=model_cfg.center_feature,
         # inital_sampling_ratio=model_cfg.inital_sampling_ratio,
         residual_on=model_cfg.residual_on,
-        multilaterate=model_cfg.multilaterate,
-        sample=model_cfg.mlat_sample,
-        mlat_nkps=model_cfg.mlat_nkps,
-        break_symmetry=model_cfg.break_symmetry,
     )
     return network
 

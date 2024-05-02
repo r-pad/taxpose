@@ -6,11 +6,7 @@ return_flow_component: False
 center_feature: True
 inital_sampling_ratio: 1
 residual_on: True
-multilaterate: False
-mlat_sample: null
-mlat_nkps: null
 num_points: 1024
-break_symmetry: True
 
 defaults:
   - optional pretraining_mode: nce_loss

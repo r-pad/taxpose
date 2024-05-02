@@ -66,11 +66,6 @@ def main(cfg):
         return_flow_component=cfg.model.return_flow_component,
         center_feature=cfg.model.center_feature,
         pred_weight=cfg.model.pred_weight,
-        multilaterate=cfg.model.multilaterate,
-        sample=cfg.model.mlat_sample,
-        mlat_nkps=cfg.model.mlat_nkps,
-        break_symmetry=cfg.model.break_symmetry,
-        conditional=cfg.model.conditional if "conditional" in cfg.model else False,
     )
 
     model = EquivarianceTrainingModule(

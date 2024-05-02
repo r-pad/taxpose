@@ -38,7 +38,6 @@ log_every_trial: False # True - log success rate at every trial; False - log onl
 emb_nn: dgcnn
 num_points: 1024
 emb_dims: ${model.emb_dims}
-multilaterate: False
 
 # Dataset Settings
 dataset_index: None
