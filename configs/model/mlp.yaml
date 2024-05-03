@@ -1,7 +1,9 @@
 name: mlp
 model_type: correspondence_flow_diff_emb_mlp
 
+defaults:
+  - encoder: dgcnn
+  - _self_
+
 center_feature: True
-emb_nn: "dgcnn"
-emb_dims: 512
 cycle: True

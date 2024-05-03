@@ -659,7 +659,7 @@ MAX_TIME = 5.0
 def create_network(model_cfg):
     network = RF_DET(
         pred_weight=model_cfg.pred_weight,
-        emb_nn_cfg=model_cfg.emb_nn_cfg,
+        encoder_cfg=model_cfg.emb_nn,
         center_feature=model_cfg.center_feature,
         # inital_sampling_ratio=model_cfg.inital_sampling_ratio,
         residual_on=model_cfg.residual_on,

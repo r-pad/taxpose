@@ -491,7 +491,7 @@ def main(hydra_cfg):
         )
     else:
         place_network = ResidualFlow_DiffEmbTransformer(
-            emb_nn_cfg=hydra_cfg.emb_nn_cfg,
+            encoder_cfg=hydra_cfg.encoder,
             center_feature=hydra_cfg.center_feature,
             pred_weight=hydra_cfg.pred_weight,
             residual_on=hydra_cfg.residual_on,
@@ -523,7 +523,7 @@ def main(hydra_cfg):
         )
     else:
         grasp_network = ResidualFlow_DiffEmbTransformer(
-            emb_nn_cfg=hydra_cfg.emb_nn_cfg,
+            encoder_cfg=hydra_cfg.encoder,
             center_feature=hydra_cfg.center_feature,
             pred_weight=hydra_cfg.pred_weight,
             residual_on=hydra_cfg.residual_on,

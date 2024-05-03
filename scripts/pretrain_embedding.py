@@ -94,17 +94,15 @@ def main(cfg):
         num_workers=cfg.resources.num_workers,
     )
 
-    network = EquivariantFeatureEmbeddingNetwork(
-        emb_dims=cfg.emb_dims, emb_nn=cfg.emb_nn
-    )
+    network = EquivariantFeatureEmbeddingNetwork(encoder_cfg=cfg.encoder)
     model = EquivariancePreTrainingModule(
         network,
-        lr=cfg.lr,
-        image_log_period=cfg.image_logging_period,
-        l2_reg_weight=cfg.l2_reg_weight,
-        normalize_features=cfg.normalize_features,
-        temperature=cfg.temperature,
-        con_weighting=cfg.con_weighting,
+        lr=cfg.training.lr,
+        image_log_period=cfg.training.image_logging_period,
+        l2_reg_weight=cfg.training.l2_reg_weight,
+        normalize_features=cfg.training.normalize_features,
+        temperature=cfg.training.temperature,
+        con_weighting=cfg.training.con_weighting,
     )
 
     trainer.fit(model, dm)

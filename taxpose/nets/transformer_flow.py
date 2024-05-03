@@ -17,16 +17,9 @@ from third_party.dcp.model import DGCNN
 
 
 class EquivariantFeatureEmbeddingNetwork(nn.Module):
-    def __init__(self, emb_dims=512, emb_nn="dgcnn"):
+    def __init__(self, encoder_cfg):
         super(EquivariantFeatureEmbeddingNetwork, self).__init__()
-        self.emb_dims = emb_dims
-        self.emb_nn_name = emb_nn
-        if emb_nn == "dgcnn":
-            self.emb_nn = DGCNN(emb_dims=self.emb_dims)
-        elif emb_nn == "vn_dgcnn":
-            self.emb_nn = VN_DGCNN(VNArgs(), num_part=self.emb_dims, gc=False)
-        else:
-            raise Exception("Not implemented")
+        self.emb_nn = create_embedding_network(encoder_cfg)
 
     def forward(self, *input):
         points = input[0]  # B, 3, num_points
@@ -38,16 +31,13 @@ class EquivariantFeatureEmbeddingNetwork(nn.Module):
 
 
 class CorrespondenceFlow_DiffEmbMLP(nn.Module):
-    def __init__(self, emb_dims=512, cycle=True, emb_nn="dgcnn", center_feature=True):
+    def __init__(self, encoder_cfg, cycle=True, center_feature=True):
         super(CorrespondenceFlow_DiffEmbMLP, self).__init__()
-        self.emb_dims = emb_dims
         self.cycle = cycle
 
-        if emb_nn == "dgcnn":
-            self.emb_nn_action = DGCNN(emb_dims=self.emb_dims)
-            self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims)
-        else:
-            raise Exception("Not implemented")
+        self.emb_nn_action = create_embedding_network(encoder_cfg)
+        self.emb_nn_anchor = create_embedding_network(encoder_cfg)
+        emb_dims = emb_nn.encoder
 
         self.center_feature = center_feature
 
@@ -297,7 +287,7 @@ def create_embedding_network(cfg) -> nn.Module:
 class ResidualFlow_DiffEmbTransformer(nn.Module):
     def __init__(
         self,
-        emb_nn_cfg,
+        encoder_cfg,
         cycle=True,
         center_feature=False,
         pred_weight=True,
@@ -308,9 +298,9 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.cycle = cycle
 
-        self.emb_nn_action = create_embedding_network(emb_nn_cfg)
-        self.emb_nn_anchor = create_embedding_network(emb_nn_cfg)
-        emb_dims = emb_nn_cfg.emb_dims
+        self.emb_nn_action = create_embedding_network(encoder_cfg)
+        self.emb_nn_anchor = create_embedding_network(encoder_cfg)
+        emb_dims = encoder_cfg.emb_dims
 
         self.center_feature = center_feature
         self.pred_weight = pred_weight
@@ -429,7 +419,7 @@ class ModelConfig(Protocol):
 class ResidualFlowDiffEmbTransformerConfig:
     model_type: ClassVar[str] = "residual_flow_diff_emb_transformer"
 
-    emb_nn_cfg: Any
+    encoder: Any
 
     cycle: bool
     center_feature: bool
@@ -443,9 +433,9 @@ class ResidualFlowDiffEmbTransformerConfig:
 class CorrespondenceFlowDiffEmbMLPConfig:
     model_type: ClassVar[str] = "correspondence_flow_diff_emb_mlp"
 
-    emb_dims: int
+    encoder: Any
+
     cycle: bool
-    emb_nn: str
     center_feature: bool
 
 
@@ -454,7 +444,7 @@ def create_network(cfg: ModelConfig) -> nn.Module:
     if cfg.model_type == "residual_flow_diff_emb_transformer":
         r_cfg = cast(ResidualFlowDiffEmbTransformerConfig, cfg)
         network: nn.Module = ResidualFlow_DiffEmbTransformer(
-            emb_nn_cfg=r_cfg.emb_nn_cfg,
+            encoder_cfg=r_cfg.encoder,
             cycle=r_cfg.cycle,
             center_feature=r_cfg.center_feature,
             pred_weight=r_cfg.pred_weight,
@@ -465,9 +455,8 @@ def create_network(cfg: ModelConfig) -> nn.Module:
     elif cfg.model_type == "correspondence_flow_diff_emb_mlp":
         c_cfg = cast(CorrespondenceFlowDiffEmbMLPConfig, cfg)
         network = CorrespondenceFlow_DiffEmbMLP(
-            emb_dims=c_cfg.emb_dims,
+            encoder_cfg=c_cfg.encoder,
             cycle=c_cfg.cycle,
-            emb_nn=c_cfg.emb_nn,
             center_feature=c_cfg.center_feature,
         )
     else:
