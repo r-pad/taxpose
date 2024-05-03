@@ -43,7 +43,7 @@ class PointCloudTrainingModule(pl.LightningModule):
                         key,
                         images=[val],  # self.global_step
                     )
-        self.log("train_loss", loss)
+        self.log("train_loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):

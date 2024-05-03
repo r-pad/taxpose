@@ -1,0 +1,24 @@
+
+# This is the general structure of the datamodule for NDF tasks.
+
+root: /data/ndf
+task: ???  # This is one of the 6 tasks - depends on the action class.
+action_class: 0  # This is the action class for the task.
+train_folder: train_data
+test_folder: test_data
+
+train_dset:
+  dataset_type: ndf_pretraining
+  dataset_root: ${..root}/${..task}/${..train_folder}/renders
+  dataset_indices: null
+  cloud_type: teleport
+  action_class: ${..action_class}
+  num_points: 1024
+
+val_dset:
+  dataset_type: ${..train_dset.dataset_type}
+  dataset_root: ${..root}/${..task}/${..test_folder}/renders
+  dataset_indices: ${..train_dset.dataset_indices}
+  cloud_type: ${..train_dset.cloud_type}
+  action_class: ${..train_dset.action_class}
+  num_points: ${..train_dset.num_points}

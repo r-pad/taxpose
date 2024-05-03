@@ -1,0 +1,8 @@
+defaults:
+  - ndf_pretraining/_ndf_default@_here_
+  - _self_
+
+task: "mug_grasp"
+action_class: 2
+train_dset:
+  cloud_type: init

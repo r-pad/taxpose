@@ -43,23 +43,23 @@ WORKDIR $CODING_ROOT/code
 # Copy in the requirements.
 COPY requirements-gpu.txt .
 
-RUN pip install --upgrade pip && pip install wheel==0.40.0
+RUN pip install --upgrade --no-cache-dir pip && pip install --no-cache-dir wheel==0.40.0
 
 # Install the requirements.
-RUN pip install -r requirements-gpu.txt
+RUN pip install --no-cache-dir -r requirements-gpu.txt
 
 # Copy in the third-party directory.
 COPY third_party third_party
 
 # Install the third-party libraries.
-RUN pip install -e third_party/ndf_robot
+RUN pip install --no-cache-dir -e third_party/ndf_robot
 
 # Copy in pyproject.toml.
 COPY pyproject.toml .
 RUN mkdir taxpose
 RUN touch taxpose/py.typed
 
-RUN pip install -e ".[develop]"
+RUN pip install --no-cache-dir -e ".[develop]"
 
 # Copy in the code.
 COPY . .

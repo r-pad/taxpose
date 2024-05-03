@@ -7,6 +7,8 @@ import hydra
 import matplotlib.pyplot as plt
 import ndf_robot.model.vnn_occupancy_net_pointnet_dgcnn as vnn_occupancy_network
 import numpy as np
+import numpy.typing as npt
+import omegaconf
 import PIL
 import pybullet as p
 import pytorch_lightning as pl
@@ -47,23 +49,35 @@ from ndf_robot.utils.franka_ik import FrankaIK
 from ndf_robot.utils.util import np2img
 from omegaconf import OmegaConf
 from pytorch3d.ops import sample_farthest_points
-from pytorch3d.transforms import Rotate, Transform3d
+from pytorch3d.transforms import Rotate
+from rpad.visualize_3d.plots import pointcloud_fig, segmentation_fig
 from torch import nn
 from torch.nn import functional as F
 from torchvision.transforms import ToTensor
 
+from taxpose.datasets.enums import ObjectClass
+from taxpose.datasets.ndf import OBJECT_LABELS_TO_CLASS
+from taxpose.datasets.symmetry_utils import (
+    gripper_symmetry_labels,
+    nonsymmetric_labels,
+    rotational_symmetry_labels,
+    scalars_to_rgb,
+)
+
+# from taxpose.datasets.ndf import compute_demo_symmetry_features
 from taxpose.nets.transformer_flow import CustomTransformer as Transformer
+from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer as RF_DET
 from taxpose.nets.transformer_flow import ResidualMLPHead
 from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
-from taxpose.training.point_cloud_training_module import PointCloudTrainingModule
-from taxpose.utils.color_utils import get_color
-from taxpose.utils.ndf_sim_utils import get_clouds, get_object_clouds
-from taxpose.utils.se3 import (
-    get_degree_angle,
-    get_translation,
-    pure_translation_se3,
-    symmetric_orthogonalization,
+from taxpose.training.flow_equivariance_training_module_nocentering import (
+    EquivarianceTrainingModule,
 )
+
+# from taxpose.training.equivariance_testing_model2 import EquivarianceTestingModule
+from taxpose.utils.compile_result import get_result_df
+from taxpose.utils.load_model import get_weights_path
+from taxpose.utils.ndf_sim_utils import get_clouds, get_object_clouds
+from taxpose.utils.se3 import pure_translation_se3, symmetric_orthogonalization
 from third_party.dcp.model import get_graph_feature
 
 # Commented out... so I don't have to bring them in.
@@ -124,7 +138,6 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         emb_dims=512,
         cycle=True,
         emb_nn="dgcnn",
-        return_flow_component=False,
         center_feature=False,
         inital_sampling_ratio=0.2,
         pred_weight=True,
@@ -163,7 +176,6 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.transformer_anchor = Transformer(
             emb_dims=emb_dims, return_attn=self.return_attn, bidirectional=False
         )
-
         self.head_action = ResidualMLPHead(
             emb_dims=emb_dims,
             pred_weight=self.pred_weight,
@@ -255,6 +267,11 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             "corr_points_action": corr_points_action,
         }
 
+        if "P_A" in head_action_output:
+            original_points_action = head_action_output["P_A"].permute(0, 2, 1)
+            outputs["original_points_action"] = original_points_action
+            outputs["sampled_ixs_action"] = head_action_output["A_ixs"]
+
         if self.cycle:
             if anchor_attn is not None:
                 anchor_attn = anchor_attn.mean(dim=1)
@@ -278,6 +295,11 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 "corr_flow_anchor": corr_flow_anchor,
                 "corr_points_anchor": corr_points_anchor,
             }
+
+            if "P_A" in head_anchor_output:
+                original_points_anchor = head_anchor_output["P_A"].permute(0, 2, 1)
+                outputs["original_points_anchor"] = original_points_anchor
+                outputs["sampled_ixs_anchor"] = head_anchor_output["A_ixs"]
 
         return outputs
 
@@ -377,276 +399,6 @@ mse_criterion = nn.MSELoss(reduction="sum")
 to_tensor = ToTensor()
 
 
-class EquivarianceTestingModule(PointCloudTrainingModule):
-    """DIFF: adding some return flow..."""
-
-    def __init__(
-        self,
-        model=None,
-        lr=1e-3,
-        image_log_period=500,
-        action_weight=1,
-        anchor_weight=1,
-        smoothness_weight=0.1,
-        rotation_weight=0,
-        chamfer_weight=10000,
-        point_loss_type=0,
-        return_flow_component=False,
-        weight_normalize="l1",
-        softmax_temperature=1,
-        loop=3,
-    ):
-        super().__init__(
-            model=model,
-            lr=lr,
-            image_log_period=image_log_period,
-        )
-        self.model = model
-        self.lr = lr
-        self.image_log_period = image_log_period
-        self.action_weight = action_weight
-        self.anchor_weight = anchor_weight
-        self.smoothness_weight = smoothness_weight
-        self.rotation_weight = rotation_weight
-        self.chamfer_weight = chamfer_weight
-        self.display_action = True
-        self.display_anchor = True
-        self.weight_normalize = weight_normalize
-        # 0 for mse loss, 1 for chamfer distance, 2 for mse loss + chamfer distance
-        self.point_loss_type = point_loss_type
-        self.return_flow_component = return_flow_component
-        self.loop = loop
-        self.softmax_temperature = softmax_temperature
-
-    def action_centered(self, points_action, points_anchor):
-        """
-        @param points_action, (1,num_points,3)
-        @param points_anchor, (1,num_points,3)
-        """
-        points_action_mean = points_action.clone().mean(axis=1)
-        points_action_mean_centered = points_action - points_action_mean
-        points_anchor_mean_centered = points_anchor - points_action_mean
-
-        return (
-            points_action_mean_centered,
-            points_anchor_mean_centered,
-            points_action_mean,
-        )
-
-    def get_transform(self, points_trans_action, points_trans_anchor):
-        for i in range(self.loop):
-            model_output = self.model(points_trans_action, points_trans_anchor)
-            x_action = model_output["flow_action"]
-            x_anchor = model_output["flow_anchor"]
-
-            points_trans_action = points_trans_action[:, :, :3]
-            points_trans_anchor = points_trans_anchor[:, :, :3]
-            ans_dict = self.predict(
-                x_action=x_action,
-                x_anchor=x_anchor,
-                points_trans_action=points_trans_action,
-                points_trans_anchor=points_trans_anchor,
-            )
-            if i == 0:
-                pred_T_action = ans_dict["pred_T_action"]
-
-                if self.loop == 1:
-                    return ans_dict
-            else:
-                pred_T_action = pred_T_action.compose(
-                    T_trans.inverse()
-                    .compose(ans_dict["pred_T_action"])
-                    .compose(T_trans)
-                )
-                ans_dict["pred_T_action"] = pred_T_action
-            pred_points_action = ans_dict["pred_points_action"]
-            (
-                points_trans_action,
-                points_trans_anchor,
-                points_action_mean,
-            ) = self.action_centered(pred_points_action, points_trans_anchor)
-            T_trans = pure_translation_se3(
-                1, points_action_mean.squeeze(), device=points_trans_action.device
-            )
-
-        return ans_dict
-
-    def predict(self, x_action, x_anchor, points_trans_action, points_trans_anchor):
-        pred_flow_action, pred_w_action = self.extract_flow_and_weight(x_action)
-        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(x_anchor)
-
-        pred_T_action = dualflow2pose(
-            xyz_src=points_trans_action,
-            xyz_tgt=points_trans_anchor,
-            flow_src=pred_flow_action,
-            flow_tgt=pred_flow_anchor,
-            weights_src=pred_w_action,
-            weights_tgt=pred_w_anchor,
-            return_transform3d=True,
-            normalization_scehme=self.weight_normalize,
-            temperature=self.softmax_temperature,
-        )
-        pred_points_action = pred_T_action.transform_points(points_trans_action)
-
-        return {
-            "pred_T_action": pred_T_action,
-            "pred_points_action": pred_points_action,
-        }
-
-    def compute_loss(
-        self,
-        x_action,
-        x_anchor,
-        batch,
-        log_values={},
-        loss_prefix="",
-        pred_points_action=None,
-    ):
-        if "T0" in batch.keys():
-            T0 = Transform3d(matrix=batch["T0"])
-        if "T1" in batch.keys():
-            T1 = Transform3d(matrix=batch["T1"])
-
-        if pred_points_action == None:
-            points_trans_action = batch["points_action_trans"]
-        else:
-            points_trans_action = pred_points_action
-        points_trans_anchor = batch["points_anchor_trans"]
-
-        pred_flow_action, pred_w_action = self.extract_flow_and_weight(x_action)
-        pred_flow_anchor, pred_w_anchor = self.extract_flow_and_weight(x_anchor)
-
-        pred_T_action = dualflow2pose(
-            xyz_src=points_trans_action,
-            xyz_tgt=points_trans_anchor,
-            flow_src=pred_flow_action,
-            flow_tgt=pred_flow_anchor,
-            weights_src=pred_w_action,
-            weights_tgt=pred_w_anchor,
-            return_transform3d=True,
-            normalization_scehme=self.weight_normalize,
-            temperature=self.softmax_temperature,
-        )
-        pred_R_max, pred_R_min, pred_R_mean = get_degree_angle(pred_T_action)
-        pred_t_max, pred_t_min, pred_t_mean = get_translation(pred_T_action)
-        induced_flow_action = (
-            pred_T_action.transform_points(points_trans_action) - points_trans_action
-        ).detach()
-        pred_points_action = pred_T_action.transform_points(points_trans_action)
-
-        if "T0" in batch.keys():
-            R0_max, R0_min, R0_mean = get_degree_angle(T0)
-            t0_max, t0_min, t0_mean = get_translation(T0)
-            log_values[loss_prefix + "R0_mean"] = R0_mean
-            log_values[loss_prefix + "R0_max"] = R0_max
-            log_values[loss_prefix + "R0_min"] = R0_min
-            log_values[loss_prefix + "t0_mean"] = t0_mean
-            log_values[loss_prefix + "t0_max"] = t0_max
-            log_values[loss_prefix + "t0_min"] = t0_min
-        if "T1" in batch.keys():
-            R1_max, R1_min, R1_mean = get_degree_angle(T1)
-            t1_max, t1_min, t1_mean = get_translation(T1)
-
-            log_values[loss_prefix + "R1_mean"] = R1_mean
-            log_values[loss_prefix + "R1_max"] = R1_max
-            log_values[loss_prefix + "R1_min"] = R1_min
-
-            log_values[loss_prefix + "t1_mean"] = t1_mean
-            log_values[loss_prefix + "t1_max"] = t1_max
-            log_values[loss_prefix + "t1_min"] = t1_min
-
-        log_values[loss_prefix + "pred_R_max"] = pred_R_max
-        log_values[loss_prefix + "pred_R_min"] = pred_R_min
-        log_values[loss_prefix + "pred_R_mean"] = pred_R_mean
-
-        log_values[loss_prefix + "pred_t_max"] = pred_t_max
-        log_values[loss_prefix + "pred_t_min"] = pred_t_min
-        log_values[loss_prefix + "pred_t_mean"] = pred_t_mean
-        loss = 0
-
-        return loss, log_values, pred_points_action
-
-    def extract_flow_and_weight(self, x):
-        # x: Batch, num_points, 4
-        pred_flow = x[:, :, :3]
-        if x.shape[2] > 3:
-            pred_w = torch.sigmoid(x[:, :, 3])
-        else:
-            pred_w = None
-        return pred_flow, pred_w
-
-    def module_step(self, batch, batch_idx):
-        points_trans_action = batch["points_action_trans"]
-        points_trans_anchor = batch["points_anchor_trans"]
-
-        log_values = {}
-        pred_points_action = points_trans_action
-        for i in range(self.loop):
-            x_action, x_anchor = self.model(pred_points_action, points_trans_anchor)
-            loss, log_values, pred_points_action = self.compute_loss(
-                x_action.detach(),
-                x_anchor.detach(),
-                batch,
-                log_values=log_values,
-                loss_prefix=str(i),
-                pred_points_action=pred_points_action,
-            )
-        return 0, log_values
-
-    def visualize_results(self, batch, batch_idx):
-        points_trans_action = batch["points_action_trans"]
-        points_trans_anchor = batch["points_anchor_trans"]
-        self.predicted_action_list = []
-        res_images = {}
-
-        pred_points_action = points_trans_action
-        for i in range(self.loop):
-            x_action, x_anchor = self.model(pred_points_action, points_trans_anchor)
-
-            ans_dict = self.predict(
-                x_action=x_action,
-                x_anchor=x_anchor,
-                points_trans_action=pred_points_action,
-                points_trans_anchor=points_trans_anchor,
-            )
-
-            demo_points_apply_action_transform = get_color(
-                tensor_list=[
-                    pred_points_action[0],
-                    ans_dict["pred_points_action"][0],
-                    points_trans_anchor[0],
-                ],
-                color_list=["blue", "green", "red"],
-            )
-            res_images["demo_points_apply_action_transform_" + str(i)] = wandb.Object3D(
-                demo_points_apply_action_transform
-            )
-            pred_points_action = ans_dict["pred_points_action"]
-            self.predicted_action_list.append(pred_points_action)
-
-        transformed_input_points = get_color(
-            tensor_list=[points_trans_action[0], points_trans_anchor[0]],
-            color_list=["blue", "red"],
-        )
-        res_images["input_points"] = wandb.Object3D(transformed_input_points)
-
-        demo_points_apply_action_transform = get_color(
-            tensor_list=[self.predicted_action_list[-1][0], points_trans_anchor[0]],
-            color_list=["blue", "red"],
-        )
-        res_images["demo_points_apply_action_transform"] = wandb.Object3D(
-            demo_points_apply_action_transform
-        )
-
-        # for i in range(len(self.predicted_action_list)):
-        #     demo_points_apply_action_transform = get_color(
-        #         tensor_list=[self.predicted_action_list[i][0], points_trans_anchor[0]], color_list=['blue', 'red'])
-        #     res_images['demo_points_apply_action_transform_'+str(i)] = wandb.Object3D(
-        #         demo_points_apply_action_transform)
-
-        return res_images
-
-
 def get_world_transform(pred_T_action_mat, obj_start_pose, point_cloud, invert=False):
     """
     pred_T_action_mat: normal SE(3) [R|t]
@@ -679,7 +431,67 @@ def get_world_transform(pred_T_action_mat, obj_start_pose, point_cloud, invert=F
     return final_pose
 
 
-def load_data(num_points, clouds, classes, action_class, anchor_class):
+def compute_inference_symmetry_features(
+    points_action: npt.NDArray[np.float32],
+    points_anchor: npt.NDArray[np.float32],
+    action_class: ObjectClass,
+    anchor_class: ObjectClass,
+):
+    """The only difference between this and compute_demo_symmetry_features is that
+    this function RANDOMLY breaks symmetries. This allows the computation
+    of the two objects to be independent."""
+    assert len(points_action.shape) == 2
+    assert len(points_anchor.shape) == 2
+    assert points_action.shape[1] == 3
+    assert points_anchor.shape[1] == 3
+
+    if anchor_class == ObjectClass.GRIPPER:
+        raise ValueError("Anchor class cannot be the gripper.")
+
+    if anchor_class == ObjectClass.MUG or action_class == ObjectClass.MUG:
+        # No symmetry.
+        action_sym_feats, _ = nonsymmetric_labels(points_action)
+        anchor_sym_feats, _ = nonsymmetric_labels(points_anchor)
+        anchor_sym_rgb = scalars_to_rgb(anchor_sym_feats[..., 0])
+        action_sym_rgb = scalars_to_rgb(action_sym_feats[..., 0])
+        return (
+            action_sym_feats,
+            anchor_sym_feats,
+            action_sym_rgb,
+            anchor_sym_rgb,
+        )
+
+    if action_class == ObjectClass.GRIPPER:
+        action_sym_feats, _, _ = gripper_symmetry_labels(points_action)
+    elif action_class in {ObjectClass.BOTTLE, ObjectClass.BOWL}:
+        # Change here! Notice no input.
+        action_sym_feats, _, _, _ = rotational_symmetry_labels(
+            points_action, action_class, look_at=None
+        )
+    else:
+        action_sym_feats, _ = nonsymmetric_labels(points_action)
+
+    if anchor_class in {ObjectClass.BOTTLE, ObjectClass.BOWL}:
+        anchor_sym_feats, _, _, _ = rotational_symmetry_labels(
+            points_anchor, anchor_class, look_at=None
+        )
+    else:
+        anchor_sym_feats, _ = nonsymmetric_labels(points_anchor)
+
+    anchor_sym_rgb = scalars_to_rgb(anchor_sym_feats[..., 0])
+    action_sym_rgb = scalars_to_rgb(action_sym_feats[..., 0])
+
+    return (
+        action_sym_feats,
+        anchor_sym_feats,
+        action_sym_rgb,
+        anchor_sym_rgb,
+    )
+
+
+def load_data(
+    num_points, clouds, classes, action_class, anchor_class, object_type, action
+):
     points_raw_np = clouds
     classes_raw_np = classes
 
@@ -691,15 +503,85 @@ def load_data(num_points, clouds, classes, action_class, anchor_class):
     points_anchor_np = points_anchor_np - points_action_mean_np
     points_anchor_mean_np = points_anchor_np.mean(axis=0)
 
+    # np.savez(
+    #     f"/home/beisner/code/rpad/taxpose/notebooks/data/ndfeval_{action}_data.npz",
+    #     points_action_np=points_action_np,
+    #     points_anchor_np=points_anchor_np,
+    #     action_symmetry_features=action_symmetry_features,
+    #     anchor_symmetry_features=anchor_symmetry_features,
+    #     action_symmetry_rgb=action_symmetry_rgb,
+    # )
+
     points_action = torch.from_numpy(points_action_np).float().unsqueeze(0)
     points_anchor = torch.from_numpy(points_anchor_np).float().unsqueeze(0)
 
     # rng_state = torch.get_rng_state()
     # torch.manual_seed(123456)
-    points_action, points_anchor = subsample(num_points, points_action, points_anchor)
+    points_action, points_anchor, ixs_action, ixs_anchor = subsample(
+        num_points, points_action, points_anchor
+    )
+
+    (
+        action_symmetry_features,
+        anchor_symmetry_features,
+        action_symmetry_rgb,
+        anchor_symmetry_rgb,
+    ) = compute_inference_symmetry_features(
+        points_action[0].numpy(),
+        points_anchor[0].numpy(),
+        action_class=OBJECT_LABELS_TO_CLASS[(object_type, action_class)],
+        anchor_class=OBJECT_LABELS_TO_CLASS[(object_type, anchor_class)],
+    )
+
+    # Visualize the symmetry features
+    # fig = pointcloud_fig(
+    #     points_action_np,
+    #     downsample=1,
+    #     colors=action_symmetry_rgb,
+    # )
+    # fig.show()
+
+    # fig = pointcloud_fig(
+    #     points_anchor_np,
+    #     downsample=1,
+    #     colors=anchor_symmetry_rgb,
+    # )
+    # fig.show()
+
+    action_symmetry_features = (
+        torch.from_numpy(action_symmetry_features).float().unsqueeze(0)
+    )
+    anchor_symmetry_features = (
+        torch.from_numpy(anchor_symmetry_features).float().unsqueeze(0)
+    )
+    action_symmetry_rgb = torch.from_numpy(action_symmetry_rgb).float().unsqueeze(0)
+    anchor_symmetry_rgb = torch.from_numpy(anchor_symmetry_rgb).float().unsqueeze(0)
+
+    # assert ixs_action is not None
+    # action_symmetry_features = torch.take_along_dim(
+    #     action_symmetry_features, ixs_action[..., None], dim=1
+    # )
+    # anchor_symmetry_features = torch.take_along_dim(
+    #     anchor_symmetry_features, ixs_anchor[..., None], dim=1
+    # )
+
+    # action_symmetry_rgb = torch.take_along_dim(
+    #     action_symmetry_rgb, ixs_action[..., None], dim=1
+    # )
+    # anchor_symmetry_rgb = torch.take_along_dim(
+    #     anchor_symmetry_rgb, ixs_anchor[..., None], dim=1
+    # )
+
     # torch.set_rng_state(rng_state)
 
-    return points_action.cuda(), points_anchor.cuda()
+    return (
+        points_action.cuda(),
+        points_anchor.cuda(),
+        action_symmetry_features.cuda(),
+        anchor_symmetry_features.cuda(),
+        action_symmetry_rgb.cuda(),
+        anchor_symmetry_rgb.cuda(),
+    )
 
 
 def load_data_raw(num_points, clouds, classes, action_class, anchor_class):
@@ -715,7 +597,9 @@ def load_data_raw(num_points, clouds, classes, action_class, anchor_class):
 
     # rng_state = torch.get_rng_state()
     # torch.manual_seed(123456)
-    points_action, points_anchor = subsample(num_points, points_action, points_anchor)
+    points_action, points_anchor, ixs_action, ixs_anchor = subsample(
+        num_points, points_action, points_anchor
+    )
     # torch.set_rng_state(rng_state)
     if points_action is None:
         return None, None
@@ -725,30 +609,30 @@ def load_data_raw(num_points, clouds, classes, action_class, anchor_class):
 
 def subsample(num_points, points_action, points_anchor):
     if points_action.shape[1] > num_points:
-        points_action, _ = sample_farthest_points(
+        points_action, ixs_action = sample_farthest_points(
             points_action, K=num_points, random_start_point=True
         )
     elif points_action.shape[1] < num_points:
         log_info(
             f"Action point cloud is smaller than cloud size ({points_action.shape[1]} < {num_points})"
         )
-        return None, None
+        return None, None, None, None
         # raise NotImplementedError(
         #     f'Action point cloud is smaller than cloud size ({points_action.shape[1]} < {num_points})')
 
     if points_anchor.shape[1] > num_points:
-        points_anchor, _ = sample_farthest_points(
+        points_anchor, ixs_anchor = sample_farthest_points(
             points_anchor, K=num_points, random_start_point=True
         )
     elif points_anchor.shape[1] < num_points:
         log_info(
             f"Anchor point cloud is smaller than cloud size ({points_anchor.shape[1]} < {num_points})"
         )
-        return None, None
+        return None, None, None, None
         # raise NotImplementedError(
         #     f'Anchor point cloud is smaller than cloud size ({points_anchor.shape[1]} < {num_points})')
 
-    return points_action, points_anchor
+    return points_action, points_anchor, ixs_action, ixs_anchor
 
 
 def step_for_time(robot, duration, frequency=240):
@@ -773,17 +657,12 @@ MAX_TIME = 5.0
 
 
 def create_network(model_cfg):
-    network = ResidualFlow_DiffEmbTransformer(
+    network = RF_DET(
         pred_weight=model_cfg.pred_weight,
-        emb_nn=model_cfg.emb_nn,
-        emb_dims=model_cfg.emb_dims,
-        return_flow_component=model_cfg.return_flow_component,
+        encoder_cfg=model_cfg.emb_nn,
         center_feature=model_cfg.center_feature,
-        inital_sampling_ratio=model_cfg.inital_sampling_ratio,
+        # inital_sampling_ratio=model_cfg.inital_sampling_ratio,
         residual_on=model_cfg.residual_on,
-        # multilaterate=model_cfg.multilaterate,
-        # sample=model_cfg.mlat_sample,
-        # mlat_nkps=model_cfg.mlat_nkps,
     )
     return network
 
@@ -858,6 +737,27 @@ def make_grid_fig(eval_dir, grid_img_fn, num_iterations=100):
     plt.savefig(grid_img_fn)
 
 
+def load_network_weights(checkpoint_reference, wandb_cfg=None, run=None):
+    if checkpoint_reference.startswith(wandb_cfg.entity):
+        artifact_dir = os.path.join(wandb_cfg.artifact_dir, checkpoint_reference)
+        artifact = run.use_artifact(checkpoint_reference)
+        try:
+            checkpoint_path = artifact.get_path("model.ckpt").download(
+                root=artifact_dir
+            )
+        except KeyError:
+            # I re-uploaded a few failed runs...
+            checkpoint_path = artifact.get_path("last.ckpt").download(root=artifact_dir)
+
+        weights = torch.load(checkpoint_path)["state_dict"]
+        # breakpoint()
+        # remove "model.emb_nn" prefix from keys
+        # weights = {k.replace("model.emb_nn.", ""): v for k, v in weights.items()}
+        return weights
+    else:
+        return torch.load(checkpoint_reference)["state_dict"]
+
+
 @hydra.main(
     config_path="../configs/",
     config_name="eval_full_mug_standalone",
@@ -866,6 +766,18 @@ def make_grid_fig(eval_dir, grid_img_fn, num_iterations=100):
 def main(hydra_cfg):
     print(OmegaConf.to_yaml(hydra_cfg, resolve=True))
     set_log_level("debug" if hydra_cfg.debug else "info")
+
+    run = wandb.init(
+        project=hydra_cfg.wandb.project,
+        entity=hydra_cfg.wandb.entity,
+        group=hydra_cfg.wandb.group,
+        config=omegaconf.OmegaConf.to_container(
+            hydra_cfg, resolve=True, throw_on_missing=True
+        ),
+        dir=hydra_cfg.wandb.save_dir,
+        job_type=hydra_cfg.job_type,
+        save_code=True,
+    )
 
     # Configure the output directories.
     eval_save_dir = hydra_cfg.eval_save_dir
@@ -910,6 +822,8 @@ def main(hydra_cfg):
 
     # general experiment + environment setup/scene generation configs
     cfg = get_eval_cfg_defaults()
+    if obj_class != "mug":
+        cfg.DEMOS.PLACEMENT_SURFACE = "shelf"
     config_fname = osp.join(
         path_util.get_ndf_config(), "eval_cfgs", hydra_cfg.config + ".yaml"
     )
@@ -1155,27 +1069,64 @@ def main(hydra_cfg):
 
     network = create_network(hydra_cfg.model)
 
-    place_model = EquivarianceTestingModule(
-        network,
-        lr=hydra_cfg.lr,
-        image_log_period=hydra_cfg.image_logging_period,
+    # place_reasoning_module = TAXPoseReasoning(
+    #     network,
+    #     TAXPoseReasoningConfig(
+    #         loop=1,
+    #         weight_normalize=hydra_cfg.place_task.weight_normalize,
+    #         softmax_temperature=hydra_cfg.place_task.softmax_temperature,
+    #     ),
+    # )
+
+    # place_model = TAXPoseInferenceModule(place_reasoning_module, symmetry_cfg=None)
+
+    place_model = EquivarianceTrainingModule(
+        model=network,
         weight_normalize=hydra_cfg.place_task.weight_normalize,
         softmax_temperature=hydra_cfg.place_task.softmax_temperature,
-        loop=hydra_cfg.loop,
+        sigmoid_on=True,
+        flow_supervision="both",
     )
 
+    # place_model = EquivarianceTestingModule(
+    #     network,
+    #     lr=hydra_cfg.lr,
+    #     image_log_period=hydra_cfg.image_logging_period,
+    #     weight_normalize=hydra_cfg.place_task.weight_normalize,
+    #     softmax_temperature=hydra_cfg.place_task.softmax_temperature,
+    #     loop=hydra_cfg.loop,
+    #     action="place",
+    #     object_type=obj_class,
+    #     action_class=hydra_cfg.place_task.action_class,
+    #     anchor_class=hydra_cfg.place_task.anchor_class,
+    #     normalize_dist=True,
+    # )
+
     place_model.cuda()
+
+    if hydra_cfg.checkpoint_file_place is not None:
+        # weights = load_network_weights(
+        #     hydra_cfg.checkpoint_file_place, wandb_cfg=hydra_cfg.wandb, run=run
+        # )
+        # place_model.load_state_dict(weights)
+        ckpt_file = get_weights_path(
+            hydra_cfg.checkpoint_file_place, hydra_cfg.wandb, run
+        )
+        try:
+            weights = torch.load(ckpt_file)["state_dict"]
+            place_model.load_state_dict(weights)
+        except RuntimeError:
+            # This is an "older" style model, so we need to load the weights
+            # manually.
+            place_model.model.load_state_dict(weights)
+
+        log_info("Model Loaded from " + str(hydra_cfg.checkpoint_file_place))
 
     if hydra_cfg.model_eval_on:
         place_model.eval()
 
-    if hydra_cfg.checkpoint_file_place is not None:
-        place_model.load_state_dict(
-            torch.load(hydra_cfg.checkpoint_file_place)["state_dict"]
-        )
-        log_info("Model Loaded from " + str(hydra_cfg.checkpoint_file_place))
-
     if hydra_cfg.checkpoint_file_place_refinement is not None:
+        assert False
         network = create_network(hydra_cfg.model)
 
         place_model_refinement = EquivarianceTestingModule(
@@ -1198,25 +1149,61 @@ def main(hydra_cfg):
         )
 
     network = create_network(hydra_cfg.model)
-    grasp_model = EquivarianceTestingModule(
-        network,
-        lr=hydra_cfg.lr,
-        image_log_period=hydra_cfg.image_logging_period,
+    # grasp_reasoning_module = TAXPoseReasoning(
+    #     network,
+    #     TAXPoseReasoningConfig(
+    #         loop=1,
+    #         weight_normalize=hydra_cfg.grasp_task.weight_normalize,
+    #         softmax_temperature=hydra_cfg.grasp_task.softmax_temperature,
+    #     ),
+    # )
+
+    grasp_model = EquivarianceTrainingModule(
+        model=network,
         weight_normalize=hydra_cfg.grasp_task.weight_normalize,
         softmax_temperature=hydra_cfg.grasp_task.softmax_temperature,
-        loop=hydra_cfg.loop,
+        sigmoid_on=True,
+        flow_supervision="both",
     )
+
+    # grasp_model = TAXPoseInferenceModule(grasp_reasoning_module, symmetry_cfg=None)
+    # grasp_model = EquivarianceTestingModule(
+    #     network,
+    #     lr=hydra_cfg.lr,
+    #     image_log_period=hydra_cfg.image_logging_period,
+    #     weight_normalize=hydra_cfg.grasp_task.weight_normalize,
+    #     softmax_temperature=hydra_cfg.grasp_task.softmax_temperature,
+    #     loop=hydra_cfg.loop,
+    #     action="grasp",
+    #     object_type=obj_class,
+    #     action_class=hydra_cfg.grasp_task.action_class,
+    #     anchor_class=hydra_cfg.grasp_task.anchor_class,
+    #     normalize_dist=True,
+    # )
 
     grasp_model.cuda()
     if hydra_cfg.model_eval_on:
         grasp_model.eval()
 
     if hydra_cfg.checkpoint_file_grasp is not None:
-        grasp_model.load_state_dict(
-            torch.load(hydra_cfg.checkpoint_file_grasp)["state_dict"]
+        # weights = load_network_weights(
+        #     hydra_cfg.checkpoint_file_grasp, wandb_cfg=hydra_cfg.wandb, run=run
+        # )
+        # grasp_model.load_state_dict(weights)
+        ckpt_file = get_weights_path(
+            hydra_cfg.checkpoint_file_grasp, hydra_cfg.wandb, run
         )
+        try:
+            weights = torch.load(ckpt_file)["state_dict"]
+            grasp_model.load_state_dict(weights)
+        except RuntimeError:
+            # This is an "older" style model, so we need to load the weights
+            # manually.
+            grasp_model.model.load_state_dict(weights)
+
         log_info("Model Loaded from " + str(hydra_cfg.checkpoint_file_grasp))
     if hydra_cfg.checkpoint_file_grasp_refinement is not None:
+        assert False
         network = create_network(hydra_cfg.model)
 
         grasp_model_refinement = EquivarianceTestingModule(
@@ -1226,6 +1213,7 @@ def main(hydra_cfg):
             weight_normalize=hydra_cfg.grasp_task.weight_normalize,
             softmax_temperature=hydra_cfg.grasp_task.softmax_temperature,
             loop=hydra_cfg.loop,
+            action="grasp",
         )
 
         grasp_model_refinement.cuda()
@@ -1406,6 +1394,10 @@ def main(hydra_cfg):
         # time.sleep(1.5)
         step_for_time(robot, 1.5)
 
+        # Open gripper.
+        robot.arm.eetool.open()
+        step_for_time(robot, 2.0)
+
         teleport_rgb = robot.cam.get_images(get_rgb=True)[0]
         teleport_img_fname = osp.join(eval_teleport_imgs_dir, "%d_init.png" % iteration)
         np2img(teleport_rgb.astype(np.uint8), teleport_img_fname)
@@ -1428,15 +1420,74 @@ def main(hydra_cfg):
             action_class=2,
             anchor_class=0,
         )
-        points_mug, points_rack = load_data(
+        (
+            points_mug,
+            points_rack,
+            features_mug,
+            features_rack,
+            sym_rgb_mug,
+            sym_rgb_rack,
+        ) = load_data(
             num_points=hydra_cfg.num_points,
             clouds=obj_points,
             classes=obj_classes,
             action_class=0,
             anchor_class=1,
+            object_type=obj_class,
+            action="place",
         )
 
-        ans = place_model.get_transform(points_mug, points_rack)  # 1, 4, 4
+        ans = place_model(
+            points_mug, points_rack, features_mug, features_rack
+        )  # 1, 4, 4
+
+        if hydra_cfg.pybullet_viz:
+            # Create a plotly figure.
+            fig = segmentation_fig(
+                torch.cat(
+                    [
+                        points_mug.squeeze(0),
+                        points_rack.squeeze(0),
+                        ans["pred_points_action"].squeeze(0),
+                    ],
+                    dim=0,
+                )
+                .cpu()
+                .numpy(),
+                torch.cat(
+                    [
+                        torch.ones(points_mug.shape[1]),
+                        2 * torch.ones(points_rack.shape[1]),
+                        3 * torch.ones(ans["pred_points_action"].shape[1]),
+                    ],
+                    dim=0,
+                )
+                .int()
+                .cpu()
+                .numpy(),
+                labelmap={1: "mug", 2: "rack", 3: "pred"},
+            )
+            fig.show()
+
+            # Both on the same plot.
+            fig = pointcloud_fig(
+                torch.cat(
+                    [
+                        points_mug[0].cpu(),
+                        points_rack[0].cpu(),
+                        ans["pred_points_action"][0].cpu(),
+                    ],
+                ),
+                downsample=1,
+                colors=torch.cat(
+                    [
+                        sym_rgb_mug[0].cpu(),
+                        sym_rgb_rack[0].cpu(),
+                        sym_rgb_mug[0].cpu(),
+                    ],
+                ),
+            )
+            fig.show()
 
         if hydra_cfg.checkpoint_file_place_refinement is not None:
             assert False
@@ -1480,14 +1531,25 @@ def main(hydra_cfg):
             list(pose_tuple[0]) + list(pose_tuple[1])
         )
         # Get Grasp Pose
-        points_gripper, points_mug = load_data(
+        (
+            points_gripper,
+            points_mug,
+            features_gripper,
+            features_mug,
+            sym_rgb_gripper,
+            sym_rgb_mug,
+        ) = load_data(
             num_points=hydra_cfg.num_points,
             clouds=obj_points,
             classes=obj_classes,
             action_class=2,
             anchor_class=0,
+            object_type=obj_class,
+            action="grasp",
         )
-        ans_grasp = grasp_model.get_transform(points_gripper, points_mug)  # 1, 4, 4
+        ans_grasp = grasp_model(
+            points_gripper, points_mug, features_gripper, features_mug
+        )  # 1, 4, 4
         pred_T_action_init_gripper2mug = ans_grasp["pred_T_action"]
         pred_T_action_mat_gripper2mug = (
             pred_T_action_init_gripper2mug.get_matrix()[0].T.detach().cpu().numpy()
@@ -1498,6 +1560,60 @@ def main(hydra_cfg):
             pred_T_action_mat_gripper2mug, ee_pose_world, points_gripper_raw
         )  # transform from gripper to mug in world frame
         pre_grasp_ee_pose = util.pose_stamped2list(gripper_relative_pose)
+
+        # Create a plotly figure.
+        if hydra_cfg.pybullet_viz:
+            fig = segmentation_fig(
+                torch.cat(
+                    [
+                        points_mug.squeeze(0),
+                        points_gripper.squeeze(0),
+                        ans_grasp["pred_points_action"].squeeze(0),
+                    ],
+                    dim=0,
+                )
+                .cpu()
+                .numpy(),
+                torch.cat(
+                    [
+                        torch.ones(points_mug.shape[1]),
+                        2 * torch.ones(points_gripper.shape[1]),
+                        3 * torch.ones(ans_grasp["pred_points_action"].shape[1]),
+                    ],
+                    dim=0,
+                )
+                .int()
+                .cpu()
+                .numpy(),
+                labelmap={1: "mug", 2: "gripper", 3: "pred"},
+            )
+            fig.show()
+
+            # Both on the same plot.
+            fig = pointcloud_fig(
+                torch.cat(
+                    [
+                        points_mug[0].cpu(),
+                        points_gripper[0].cpu(),
+                        ans_grasp["pred_points_action"][0].cpu(),
+                    ],
+                ),
+                downsample=1,
+                colors=torch.cat(
+                    [
+                        sym_rgb_mug[0].cpu(),
+                        sym_rgb_gripper[0].cpu(),
+                        sym_rgb_gripper[0].cpu(),
+                    ],
+                ),
+            )
+            fig.show()
+
+            breakpoint()
+
+        # breakpoint()
+
+        # breakpoint()
 
         # np.savez(
         #     f"{eval_pointclouds_dir}/{iteration}_init_all_points.npz",
@@ -1616,7 +1732,12 @@ def main(hydra_cfg):
         )
         np2img(teleport_rgb.astype(np.uint8), teleport_img_fname)
 
-        obj_surf_contacts = p.getContactPoints(obj_id, table_id, -1, placement_link_id)
+        try:
+            obj_surf_contacts = p.getContactPoints(
+                obj_id, table_id, -1, placement_link_id
+            )
+        except:
+            breakpoint()
         touching_surf = len(obj_surf_contacts) > 0
         include_penetration = hydra_cfg.include_penetration
         if include_penetration:
@@ -2081,6 +2202,11 @@ def main(hydra_cfg):
         )
 
         robot.pb_client.remove_body(obj_id)
+
+    # Create a wandb table with the results. We want the following columns:
+    final_name = sample_fname
+    df = get_result_df(sample_fname, seed=str(hydra_cfg.seed))
+    wandb.log({"eval_results": wandb.Table(dataframe=df)})
 
     make_grid_fig(eval_save_dir, "place_results_fig.png", hydra_cfg.num_iterations)
 

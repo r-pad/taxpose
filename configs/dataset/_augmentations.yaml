@@ -1,0 +1,6 @@
+plane_occlusion: True
+plane_standoff: 0.04
+ball_occlusion: True
+ball_radius: 0.1
+occlusion_class: 0
+occlusion_prob: 0.5

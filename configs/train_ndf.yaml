@@ -1,77 +1,61 @@
 
 
-job_name: residual_flow_occlusion
-image_logging_period: 100
+job_type: train_${task.name}_${task.phase.name}
 
-log_txt_file:  ${hydra:runtime.cwd}/recent_training_paths.txt # absolute path for text file for logging
+# This has to happen before the benchmark stuff.
+# This sets the data root for all data in the config.
+# Something like autobot will override it.
+data_root: /data
+
+
+# TODO: Fix all the training scripts.
+
 defaults:
   - _self_
-  - hydra_logging
-  - object_class: mug # {mug, bottle, bowl}
-  - pose_dist: upright # {upright, arbitrary}
-  - relationship: place # {place, grasp}
-  - model: release
-  - task: ${object_class}_${relationship}
-  - optional mode: train # $mode \in {train, train_val, validation}
-  # - optional checkpoints/ndf@checkpoints: ${object_class}/${model}
-  - checkpoints/pretraining@checkpoints.pretraining
 
-### TO BE CHANGED ###
+  # Normal logging stuff.
+  - _logging
 
-# Dataset Settings
-dataset_root: ${hydra:runtime.cwd}/data
-train_data_dir: ${dataset_root}/${task.name}/train_data/renders
-test_data_dir: ${dataset_root}/${task.name}/test_data/renders
-num_workers: 52
-batch_size: 8
-num_points: ${model.num_points}
-num_demo: 10
-dataset_index: None
-object_type: mug
-dataset_size: 1000
-rotation_variance: 180
-translation_variance: 0.5
-synthetic_occlusion: True
-plane_occlusion: True
-plane_standoff: 0.04
-ball_occlusion: True
-ball_radius: 0.1
-gripper_lr_label: False
-occlusion_class: 0
-overfit: False
+  # Set up the model and checkpointing. Happens before dataset because order
+  # matters for interpolation.
+  - model: taxpose  # {taxpose, mlat_s256_vnn}
+
+  # Task information for setting up the datamodule.
+  - datamodule  # This datamodule will be used in evaluation, so factor it out.
+  - benchmark: ndf  # {ndf, rlbench}
+  - optional task: mug
+  - optional phase: place
+  - task/${benchmark}/${task}/task@task
+  - task/${benchmark}/${task}/phase/${phase}@task.phase
+
+training:
+  batch_size: 8
+  max_epochs: 500
+
+  sigmoid_on: True
+
+  # Optimizer Settings
+  lr: 1e-4
+
+  # Loss Settings
+  flow_supervision: both
+  displace_loss_weight: 1
+  direct_correspondence_loss_weight: 1
+  consistency_loss_weight: 0.1
+
+  # Checkpoint Settings
+  load_from_checkpoint: False
+  checkpoint_file: null
+
+  # Visualization Settings
+  image_logging_period: 100
+  log_every_n_steps: 100
+  check_val_every_n_epoch: 5
+
 seed: 0
 
-# Network Settings
-center_feature: ${model.center_feature}
-diff_emb: True
-diff_transformer: True
-emb_nn: ${model.emb_nn}
-emb_dims: ${model.emb_dims}
-inital_sampling_ratio: ${model.inital_sampling_ratio}
-flow_compute_type: 0
-residual_on: ${model.residual_on}
-pred_weight: ${model.pred_weight}
-sigmoid_on: True
-return_flow_component: ${model.return_flow_component}
-mlp: False
+resources:
+  num_workers: 8
 
-pretraining:
-  mode: nce_loss
-  # checkpoint_file_action: ${checkpoints.pretraining.${model.emb_nn}.${pretraining.mode}.${task.action_name}}
-  # checkpoint_file_anchor: ${checkpoints.pretraining.${model.emb_nn}.${pretraining.mode}.${task.anchor_name}}
-  checkpoint_file_action: null
-  checkpoint_file_anchor: null
-
-# Loss Settings
-flow_supervision: both
-displace_loss_weight: 1
-direct_correspondence_loss_weight: 1
-consistency_loss_weight: 0.1
-
-# Training Settings
-load_from_checkpoint: False
-# checkpoint_file: ${checkpoints.ckpt_file}
-checkpoint_file: null
-freeze_embnn: False
-lr: 1e-4
-max_epochs: 1000
+wandb:
+  group: Null

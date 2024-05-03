@@ -2,8 +2,8 @@
 
 defaults:
 - /train_ndf
-- override /object_class: mug
-- override /relationship: grasp
+- override /task: mug
+- override /phase: grasp
 - _self_
 
 mode: train

@@ -1,0 +1,12 @@
+# @package _global_
+
+defaults:
+  - /eval_full_mug_standalone@_here_
+  - _self_
+
+pybullet_viz: False
+num_iterations: 100
+
+model_eval_on: True
+
+seed: ???

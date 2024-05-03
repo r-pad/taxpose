@@ -1,9 +1,20 @@
 name: ???
+model_type: residual_flow_diff_emb_transformer
+
+defaults:
+  - encoder: dgcnn
+  - _self_
+
 pred_weight: True
-emb_nn: "dgcnn"
-emb_dims: 512
-return_flow_component: False
 center_feature: True
 inital_sampling_ratio: 1
 residual_on: True
-num_points: 1024
+cycle: True
+freeze_embnn: False
+return_attn: True
+
+pretraining:
+  action:
+    ckpt_path: null
+  anchor:
+    ckpt_path: null

@@ -16,7 +16,7 @@ defaults:
   - object_class: mug #{mug, bottle, bowl}
 
   # Machinery to load the correct checkpoints.
-  - model: release
+  - model: taxpose
   - optional checkpoints/ndf@checkpoints.grasp: ${object_class}/${pose_dist}/${model}/grasp
   - optional checkpoints/ndf@checkpoints.place: ${object_class}/${pose_dist}/${model}/place
 
@@ -27,24 +27,22 @@ checkpoint_file_place: ???
 log_txt_file: ${hydra:runtime.cwd}/test_results.txt # abs path of file to log results
 
 # log saving dir
-log_dir: ./results/ndf/${object_class.name}/${pose_dist.name}
+log_dir: ./results/ndf/${task.name}/${pose_dist.name}
 num_iterations: 100 # number of trails
 data_dir: ./predictions # directory name for data saved
 log_every_trial: False # True - log success rate at every trial; False - log only at the end of the # of trials
 #### TO BE CHANGED ####
 
 # Model Settings
-flow_compute_type: 0
-emb_nn: dgcnn
-num_points: 1024
-emb_dims: ${model.emb_dims}
+# flow_compute_type: 0
+emb_dims: ${model.encoder.emb_dims}
 
 # Dataset Settings
 dataset_index: None
 action_class: 0
 anchor_class: 1
 dataset_size: 300
-rotation_variance: 180
+action_rotation_variance: 180
 translation_variance: 0.5
 batch_size: 1
 num_workers: 4

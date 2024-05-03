@@ -30,18 +30,10 @@ def _get_training_config_names(bmark, ablation=False):
 
     if ablation:
         # Filter out paths that don't include the word "ablation" in the path except for
-        configs = [
-            config
-            for config in configs
-            if "ablation" in config and "n_demo" not in config
-        ]
+        configs = [config for config in configs if "ablation" in config]
     else:
         # Filter out paths that include the word "ablation" in the path.
-        configs = [
-            config
-            for config in configs
-            if "ablation" not in config or "n_demo" in config
-        ]
+        configs = [config for config in configs if "ablation" not in config]
 
     # Filter out paths with any folder that have a leading underscore.
     configs = [
@@ -53,7 +45,7 @@ def _get_training_config_names(bmark, ablation=False):
     return configs
 
 
-DEFAULT_NDF_PATH = "/data/ndf"
+DEFAULT_NDF_PATH = "/data"
 
 
 def _test_commands_run(config_name):
@@ -72,8 +64,8 @@ def _test_commands_run(config_name):
                 "hydra.job.num=1",
                 "hydra.runtime.output_dir=.",
                 "seed=1234",
-                f"dataset_root={dataset_root}",
-                "batch_size=2",
+                f"data_root={dataset_root}",
+                "training.batch_size=2",
             ],
             return_hydra_config=True,
         )

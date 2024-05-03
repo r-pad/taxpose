@@ -1,20 +1,26 @@
+job_type: eval_${task.name}_${pose_dist.name}_${seed}
 
+data_root: ${oc.env:HOME}/datasets
 
 defaults:
+  - _logging
   - _self_
 
-  - object_class: mug #{mug, bottle, bowl}
-  - pose_dist: upright # {upright, arbitrary}
-
-  # Machinery to load the correct model architecture.
   # The model config can be found in configs/model.
   - model: ???
 
+  - optional task: mug #{mug, bottle, bowl}
+  - pose_dist: upright # {upright, arbitrary}
+  - optional benchmark: ndf # {ndf}
+
+
   # Task-specific settings.
-  - task@grasp_task: ${object_class}_grasp
-  - task@place_task: ${object_class}_place
+  - task/ndf/${task}/task@task
+  - task/ndf@grasp_task: ${task}/phase/grasp
+  - task/ndf@place_task: ${task}/phase/place
 
   # Load the checkpoints appropriately.
+  # - checkpoints/ndf@checkpoints: ${task}/${model}
   # - checkpoints/ndf@checkpoints: ${object_class}/${model}
 
 
@@ -43,7 +49,7 @@ model_path: multi_category_weights
 
 # Eval Settings
 seed: ???  # Seeds we use: 10, 123456, 54321, 123152, 19501
-num_points: ${model.num_points}
+num_points: 1024
 include_penetration: False
 num_samples: 100
 model_eval_on: False
@@ -57,18 +63,10 @@ single_instance: False
 start_iteration: 0
 
 # Logging Settings
-log_dir: logs/ndf_evals
-eval_name: ${object_class.name}_${pose_dist.name}_${model.name}
+eval_name: ${task.name}_${pose_dist.name}_${model.name}
 eval_save_dir: ./  # Dump directly inside the eval directory.
 results_file_name: results.txt
 
 pybullet_viz: True
 image_logging_period: 100
 debug: False
-
-hydra:
-  run:
-    dir: ${log_dir}/${eval_name}/${now:%Y-%m-%d_%H%M%S}/${seed}
-  sweep:
-    dir: ${log_dir}/${eval_name}/sweep/${now:%Y-%m-%d_%H%M%S}
-    subdir: ${hydra.job.num}

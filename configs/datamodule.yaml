@@ -1,0 +1,23 @@
+defaults:
+  # hydra default which removes ndf from the tree
+  - _self_
+  - dataset@dm: ${benchmark}/${task}/${phase}
+
+dm:
+  train_dset:
+    demo_dset: ???
+    action_rotation_variance: 3.141592653589793
+    anchor_rotation_variance: 1e-5
+    translation_variance: 0.5
+    action_rot_sample_method: "axis_angle"
+    anchor_rot_sample_method: "axis_angle_uniform_z"
+    dataset_size: 1000
+
+  val_dset:
+    demo_dset: ???
+    action_rotation_variance: ${..train_dset.action_rotation_variance}
+    anchor_rotation_variance: ${..train_dset.anchor_rotation_variance}
+    translation_variance: ${..train_dset.translation_variance}
+    action_rot_sample_method: ${..train_dset.action_rot_sample_method}
+    anchor_rot_sample_method: ${..train_dset.anchor_rot_sample_method}
+    dataset_size: ${..train_dset.dataset_size}
