@@ -3,4 +3,5 @@
 ablation:
   name: 6_no_finetuning
 
-freeze_embnn: True
+model:
+  freeze_embnn: True

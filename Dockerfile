@@ -189,4 +189,3 @@ ENTRYPOINT ["/opt/baeisner/entrypoint.sh"]
 
 # Set up the entry point
 CMD ["python", "-c", "import torch; print(torch.cuda.is_available())"]
-

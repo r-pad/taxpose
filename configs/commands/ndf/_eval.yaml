@@ -9,7 +9,4 @@ num_iterations: 100
 
 model_eval_on: True
 
-model:
-  break_symmetry: True
-
 seed: ???

@@ -20,15 +20,7 @@ class NDFPretrainingPointCloudDatasetConfig:
 
 
 class NDFPretrainingPointCloudDataset(Dataset):
-    def __init__(
-        self,
-        config: NDFPretrainingPointCloudDatasetConfig,
-        # dataset_root,
-        # dataset_indices=[10],
-        # cloud_type="final",
-        # action_class=0,
-        # num_points=1000,
-    ):
+    def __init__(self, config: NDFPretrainingPointCloudDatasetConfig):
         dataset_root = config.dataset_root
         dataset_indices = config.dataset_indices
         cloud_type = config.cloud_type
@@ -102,11 +94,6 @@ class NDFPretrainingPointCloudDataset(Dataset):
                 action_class=self.action_class,
             )
 
-            # if points_action.shape[1] > self.num_points:
-            #     points_action, action_ids = sample_farthest_points(
-            #         points_action, K=self.num_points, random_start_point=True
-            #     )
-
             if points_action.shape[1] < self.num_points:
                 bad_demo_id.append(i)
         return bad_demo_id
@@ -116,9 +103,7 @@ class NDFPretrainingPointCloudDataset(Dataset):
         points_action = self.load_data(filename, action_class=self.action_class)
 
         if points_action.shape[1] > self.num_points:
-            # points_action, action_ids = sample_farthest_points(
-            #     points_action, K=self.num_points, random_start_point=True
-            # )
+            # TODO: Decide why we're not doing fps?
             # Sample random points
             ixs = torch.randperm(points_action.shape[1])[: self.num_points]
             points_action = points_action[:, ixs, :]

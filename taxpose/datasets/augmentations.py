@@ -24,11 +24,12 @@ def maybe_downsample(
 
         # raise ValueError("Cannot downsample to more points than exist in the cloud.")
 
-    points, ids = sample_farthest_points(
+    points_pt, ids = sample_farthest_points(
         torch.from_numpy(points), K=num_points, random_start_point=True
     )
 
-    return points.numpy()
+    points = points_pt.numpy()
+    return points
 
 
 @dataclass
@@ -70,6 +71,6 @@ def occlusion_fn(
                     # Ignore the occlusion if it's going to mess us up later...
                     if points_new.shape[0] > min_num_points:
                         points = points_new.unsqueeze(0)
-        return points if isinstance(points, np.ndarray) else points.numpy()
+        return points if isinstance(points, np.ndarray) else points.numpy()  # type: ignore
 
     return occlusion

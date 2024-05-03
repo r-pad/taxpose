@@ -385,3 +385,4 @@ recent_training_paths.txt
 configs/checkpoints/**/*.yaml
 !configs/checkpoints/**/release.yaml
 !configs/checkpoints/**/pretraining.yaml
+!configs/checkpoints/**/pretraining/**/*.yaml

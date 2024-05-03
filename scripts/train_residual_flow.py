@@ -10,20 +10,10 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
-from taxpose.nets.transformer_flow import (
-    CorrespondenceFlow_DiffEmbMLP,
-    ResidualFlow_DiffEmbTransformer,
-)
+from taxpose.nets.transformer_flow import create_network
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
-
-
-def write_to_file(file_name, string):
-    with open(file_name, "a") as f:
-        f.writelines(string)
-        f.write("\n")
-    f.close()
 
 
 def load_emb_weights(checkpoint_reference, wandb_cfg=None, run=None):
@@ -72,9 +62,7 @@ def main(cfg):
         job_type=cfg.job_type,
         save_code=True,
         log_model=True,
-        config=omegaconf.OmegaConf.to_container(
-            cfg, resolve=True, throw_on_missing=True
-        ),
+        config=omegaconf.OmegaConf.to_container(cfg, resolve=True),
     )
     # logger.log_hyperparams(cfg)
     # logger.log_hyperparams({"working_dir": os.getcwd()})
@@ -123,25 +111,7 @@ def main(cfg):
 
     dm.setup()
 
-    if cfg.mlp:
-        network = CorrespondenceFlow_DiffEmbMLP(
-            emb_dims=cfg.emb_dims,
-            emb_nn=cfg.emb_nn,
-            center_feature=cfg.center_feature,
-        )
-    else:
-        network = ResidualFlow_DiffEmbTransformer(
-            emb_dims=cfg.model.emb_dims,
-            emb_nn=cfg.model.emb_nn,
-            return_flow_component=cfg.model.return_flow_component,
-            center_feature=cfg.model.center_feature,
-            pred_weight=cfg.model.pred_weight,
-            multilaterate=cfg.model.multilaterate,
-            sample=cfg.model.mlat_sample,
-            mlat_nkps=cfg.model.mlat_nkps,
-            break_symmetry=cfg.break_symmetry,
-            conditional=cfg.model.conditional if "conditional" in cfg.model else False,
-        )
+    network = create_network(cfg.model)
 
     model = EquivarianceTrainingModule(
         network,
@@ -171,12 +141,12 @@ def main(cfg):
         # Might be empty and not have those keys defined.
         # TODO: move this pretraining into the model itself.
         # TODO: figure out if we can get rid of the dictionary and make it null.
-        if cfg.model.pretraining:
-            if cfg.model.pretraining.checkpoint_file_action is not None:
+        if "pretraining" in cfg.model:
+            if cfg.model.pretraining.action.ckpt_path is not None:
                 # # Check to see if it's a wandb checkpoint.
                 # TODO: need to retrain a few things... checkpoint didn't stick...
                 emb_nn_action_state_dict = load_emb_weights(
-                    cfg.pretraining.checkpoint_file_action, cfg.wandb, logger.experiment
+                    cfg.model.pretraining.action.ckpt_path, cfg.wandb, logger.experiment
                 )
                 # checkpoint_file_fn = maybe_load_from_wandb(
                 #     cfg.pretraining.checkpoint_file_action, cfg.wandb, logger.experiment.run
@@ -188,12 +158,12 @@ def main(cfg):
                 )
                 print(
                     "Loaded Pretrained EmbNN Action: {}".format(
-                        cfg.pretraining.checkpoint_file_action
+                        cfg.model.pretraining.action.ckpt_path
                     )
                 )
-            if cfg.pretraining.checkpoint_file_anchor is not None:
+            if cfg.model.pretraining.anchor.ckpt_path is not None:
                 emb_nn_anchor_state_dict = load_emb_weights(
-                    cfg.pretraining.checkpoint_file_anchor, cfg.wandb, logger.experiment
+                    cfg.model.pretraining.anchor.ckpt_path, cfg.wandb, logger.experiment
                 )
                 model.model.emb_nn_anchor.load_state_dict(emb_nn_anchor_state_dict)
                 print(
@@ -201,7 +171,7 @@ def main(cfg):
                 )
                 print(
                     "Loaded Pretrained EmbNN Anchor: {}".format(
-                        cfg.pretraining.checkpoint_file_anchor
+                        cfg.model.pretraining.anchor.ckpt_path
                     )
                 )
     trainer.fit(model, dm)

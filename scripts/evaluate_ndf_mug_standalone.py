@@ -139,7 +139,6 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         emb_dims=512,
         cycle=True,
         emb_nn="dgcnn",
-        return_flow_component=False,
         center_feature=False,
         inital_sampling_ratio=0.2,
         pred_weight=True,
@@ -676,23 +675,9 @@ MAX_TIME = 5.0
 
 
 def create_network(model_cfg):
-    # network = ResidualFlow_DiffEmbTransformer(
-    #     pred_weight=model_cfg.pred_weight,
-    #     emb_nn=model_cfg.emb_nn,
-    #     emb_dims=model_cfg.emb_dims,
-    #     return_flow_component=model_cfg.return_flow_component,
-    #     center_feature=model_cfg.center_feature,
-    #     inital_sampling_ratio=model_cfg.inital_sampling_ratio,
-    #     residual_on=model_cfg.residual_on,
-    #     multilaterate=model_cfg.multilaterate,
-    #     sample=model_cfg.mlat_sample,
-    #     mlat_nkps=model_cfg.mlat_nkps,
-    # )
     network = RF_DET(
         pred_weight=model_cfg.pred_weight,
-        emb_nn=model_cfg.emb_nn,
-        emb_dims=model_cfg.emb_dims,
-        return_flow_component=model_cfg.return_flow_component,
+        encoder_cfg=model_cfg.emb_nn,
         center_feature=model_cfg.center_feature,
         # inital_sampling_ratio=model_cfg.inital_sampling_ratio,
         residual_on=model_cfg.residual_on,

@@ -54,7 +54,7 @@ def test_rlbench_commands_compile(config_name):
 
 @pytest.mark.parametrize("config_name", _get_config_names("ndf"))
 def test_ndf_commands_compile(config_name):
-    with initialize(version_base=None, config_path="../configs"):
+    with initialize(version_base="1.1", config_path="../configs"):
         cfg = compose(
             config_name=config_name,
             overrides=[

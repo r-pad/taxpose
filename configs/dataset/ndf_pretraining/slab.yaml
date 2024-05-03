@@ -4,7 +4,9 @@ defaults:
 
 task: "bottle_place"
 action_class: 1
-train_folder: bottle_train_data_ndf_cons_3
-test_folder: bottle_test_new_3
+# train_folder: bottle_train_data_ndf_cons_3
+# test_folder: bottle_test_new_3
+train_folder: train_data
+test_folder: test_data
 train_dset:
   cloud_type: teleport

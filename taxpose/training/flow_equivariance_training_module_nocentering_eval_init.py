@@ -29,7 +29,6 @@ class EquivarianceTestingModule(PointCloudTrainingModule):
         rotation_weight=0,
         chamfer_weight=10000,
         point_loss_type=0,
-        return_flow_component=False,
         weight_normalize="l1",
         softmax_temperature=1,
         loop=3,
@@ -52,7 +51,6 @@ class EquivarianceTestingModule(PointCloudTrainingModule):
         self.weight_normalize = weight_normalize
         # 0 for mse loss, 1 for chamfer distance, 2 for mse loss + chamfer distance
         self.point_loss_type = point_loss_type
-        self.return_flow_component = return_flow_component
         self.loop = loop
         self.softmax_temperature = softmax_temperature
 

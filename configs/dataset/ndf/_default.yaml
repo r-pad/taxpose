@@ -3,7 +3,6 @@
 defaults:
   - ../@train_dset.demo_dset.occlusion_cfg: _augmentations
   - ../@val_dset.demo_dset.occlusion_cfg: _augmentations
-  - ../@test_dset.demo_dset.occlusion_cfg: _augmentations
 
 train_folder: train_data
 test_folder: test_data
@@ -11,7 +10,7 @@ test_folder: test_data
 train_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
-    dataset_root: ${benchmark.dataset_root}/${task.name}/${...train_folder}/renders
+    dataset_root: ${benchmark.dataset_root}/${task.phase.name}/${...train_folder}/renders
     dataset_indices: ???
     num_demo: ???
     min_num_points: 1024
@@ -32,28 +31,7 @@ train_dset:
 val_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
-    dataset_root: ${benchmark.dataset_root}/${task.name}/${...test_folder}/renders
-    dataset_indices: ???
-    num_demo: ???
-    min_num_points: ${...train_dset.demo_dset.min_num_points}
-    cloud_type: ${...train_dset.demo_dset.cloud_type}
-    action_class: ${...train_dset.demo_dset.action_class}
-    anchor_class: ${...train_dset.demo_dset.anchor_class}
-    min_num_cameras: ${...train_dset.demo_dset.min_num_cameras}
-    max_num_cameras: ${...train_dset.demo_dset.max_num_cameras}
-    normalize_dist: ${...train_dset.demo_dset.normalize_dist}
-    object_type: ${task.name}
-    action: ${task.phase.name}
-    symmetry_after_transform: ${...train_dset.demo_dset.symmetry_after_transform}
-    occlusion_cfg: ???
-    distractor_anchor_aug: ${...train_dset.demo_dset.distractor_anchor_aug}
-    distractor_rot_sample_method: ${...train_dset.demo_dset.distractor_rot_sample_method}
-    multimodal_transform_base: ${...train_dset.demo_dset.multimodal_transform_base}
-
-test_dset:
-  demo_dset:
-    dataset_type: ${benchmark.name}
-    dataset_root: ${benchmark.dataset_root}/${task.name}/${...test_folder}/renders
+    dataset_root: ${benchmark.dataset_root}/${task.phase.name}/${...test_folder}/renders
     dataset_indices: ???
     num_demo: ???
     min_num_points: ${...train_dset.demo_dset.min_num_points}

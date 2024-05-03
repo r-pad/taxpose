@@ -19,14 +19,14 @@ def scalars_to_rgb(symmetry_labels: npt.NDArray[np.float32]) -> npt.NDArray[np.u
 
     # Convert the color to RGB.
     color = color * 255
-    color = color.round().astype(np.uint8)
+    icolor = color.round().astype(np.uint8)
 
-    return color
+    return icolor
 
 
 def gripper_symmetry_labels(
     gripper_pcd: npt.NDArray[np.float32],
-) -> Tuple[np.float32, np.float32, np.float32]:
+) -> Tuple[npt.NDArray[np.float32], npt.NDArray[np.float32], npt.NDArray[np.float32]]:
     """Compute gripper symmetry labels.
 
     Args:
@@ -72,7 +72,12 @@ def rotational_symmetry_labels(
     obj_class: ObjectClass,
     look_at: Optional[npt.NDArray[np.float32]] = None,
     seed: Optional[int] = None,
-) -> Tuple[np.float32, np.float32, np.float32, np.float32]:
+) -> Tuple[
+    npt.NDArray[np.float32],
+    npt.NDArray[np.float32],
+    npt.NDArray[np.float32],
+    npt.NDArray[np.float32],
+]:
     """Computes object symmetry labels.
 
     Args:
@@ -143,7 +148,9 @@ def rotational_symmetry_labels(
     return l_obj[..., None], principal_axis, s_obj, centroid
 
 
-def nonsymmetric_labels(obj_pcd) -> Tuple[np.float32, np.float32]:
+def nonsymmetric_labels(
+    obj_pcd,
+) -> Tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
     """Computes nonsymmetric labels. This should just be ones.
 
     Args:

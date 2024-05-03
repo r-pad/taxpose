@@ -1,12 +1,18 @@
 # @package _global_
 
 defaults:
-- /pretraining
-- _self_
+  - /pretraining
+  - override /object_class: slab
+  - _self_
 
-data_root: ${hydra:runtime.cwd}/data/
+dataset:
+  root: /data/ndf
+
+resources:
+  num_workers: 0
 
 training:
-  dataset:
-    root: ${data_root}/bottle_place/train_data/renders
-    cloud_class: 1
+  epochs: 2000
+  batch_size: 8
+  check_val_every_n_epoch: 100
+  log_every_n_steps: 10
