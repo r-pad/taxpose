@@ -6,7 +6,3 @@ defaults:
   - override /task: mug
   - override /pose_dist: arbitrary
   - _self_
-
-break_symmetry: False
-model:
-  break_symmetry: False

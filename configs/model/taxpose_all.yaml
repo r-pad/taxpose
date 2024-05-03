@@ -4,4 +4,3 @@ defaults:
 name: taxpose_all
 
 conditional: True
-break_symmetry: False

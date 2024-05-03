@@ -6,5 +6,3 @@ defaults:
   - override /task: mug
   - override /phase: place
   - _self_
-
-break_symmetry: False
