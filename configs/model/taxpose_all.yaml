@@ -1,6 +1,0 @@
-defaults:
-  - _taxpose
-
-name: taxpose_all
-
-conditional: True

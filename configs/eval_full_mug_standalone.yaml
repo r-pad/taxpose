@@ -6,7 +6,6 @@ defaults:
   - _logging
   - _self_
 
-    # Machinery to load the correct model architecture.
   # The model config can be found in configs/model.
   - model: ???
 
@@ -64,7 +63,6 @@ single_instance: False
 start_iteration: 0
 
 # Logging Settings
-# log_dir: logs/ndf_evals
 eval_name: ${task.name}_${pose_dist.name}_${model.name}
 eval_save_dir: ./  # Dump directly inside the eval directory.
 results_file_name: results.txt
@@ -72,10 +70,3 @@ results_file_name: results.txt
 pybullet_viz: True
 image_logging_period: 100
 debug: False
-
-# hydra:
-#   run:
-#     dir: ${log_dir}/${eval_name}/${now:%Y-%m-%d_%H%M%S}/${seed}
-#   sweep:
-#     dir: ${log_dir}/${eval_name}/sweep/${now:%Y-%m-%d_%H%M%S}
-#     subdir: ${hydra.job.num}
