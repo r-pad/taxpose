@@ -491,12 +491,10 @@ def main(hydra_cfg):
         )
     else:
         place_network = ResidualFlow_DiffEmbTransformer(
-            emb_dims=hydra_cfg.emb_dims,
-            emb_nn=hydra_cfg.emb_nn,
+            emb_nn_cfg=hydra_cfg.emb_nn_cfg,
             center_feature=hydra_cfg.center_feature,
             pred_weight=hydra_cfg.pred_weight,
             residual_on=hydra_cfg.residual_on,
-            return_flow_component=hydra_cfg.return_flow_component,
             freeze_embnn=hydra_cfg.freeze_embnn,
             return_attn=hydra_cfg.return_attn,
         )
@@ -525,12 +523,10 @@ def main(hydra_cfg):
         )
     else:
         grasp_network = ResidualFlow_DiffEmbTransformer(
-            emb_dims=hydra_cfg.emb_dims,
-            emb_nn=hydra_cfg.emb_nn,
+            emb_nn_cfg=hydra_cfg.emb_nn_cfg,
             center_feature=hydra_cfg.center_feature,
             pred_weight=hydra_cfg.pred_weight,
             residual_on=hydra_cfg.residual_on,
-            return_flow_component=hydra_cfg.return_flow_component,
             freeze_embnn=hydra_cfg.freeze_embnn,
             return_attn=hydra_cfg.return_attn,
         )

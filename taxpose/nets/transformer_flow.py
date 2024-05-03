@@ -4,7 +4,7 @@
 
 import math
 from dataclasses import dataclass
-from typing import ClassVar, Protocol, cast
+from typing import Any, ClassVar, Protocol, cast
 
 import torch
 import torch.nn as nn
@@ -236,9 +236,7 @@ class ResidualMLPHead(nn.Module):
 
         self.residual_on = residual_on
 
-    def forward(
-        self, *input, scores=None, return_flow_component=False, return_embedding=False
-    ):
+    def forward(self, *input, scores=None, return_embedding=False):
         action_embedding = input[0]
         anchor_embedding = input[1]
         action_points = input[2]
@@ -284,13 +282,23 @@ class ResidualMLPHead(nn.Module):
         }
 
 
+def create_embedding_network(cfg) -> nn.Module:
+    if cfg.name == "dgcnn":
+        network: nn.Module = DGCNN(emb_dims=cfg.emb_dims)
+    elif cfg.name == "vn_dgcnn":
+        args = VNArgs()
+        network = VN_DGCNN(args, num_part=cfg.emb_dims, gc=False)
+    else:
+        raise ValueError(f"Unknown embedding network type: {cfg.name}")
+
+    return network
+
+
 class ResidualFlow_DiffEmbTransformer(nn.Module):
     def __init__(
         self,
-        emb_dims=512,
+        emb_nn_cfg,
         cycle=True,
-        emb_nn="dgcnn",
-        return_flow_component=False,
         center_feature=False,
         pred_weight=True,
         residual_on=True,
@@ -298,17 +306,12 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         return_attn=True,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
-        self.emb_dims = emb_dims
         self.cycle = cycle
-        if emb_nn == "dgcnn":
-            self.emb_nn_action = DGCNN(emb_dims=self.emb_dims)
-            self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims)
-        elif emb_nn == "vn_dgcnn":
-            args = VNArgs()
-            self.emb_nn_action = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
-            self.emb_nn_anchor = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
-        else:
-            raise Exception("Not implemented")
+
+        self.emb_nn_action = create_embedding_network(emb_nn_cfg)
+        self.emb_nn_anchor = create_embedding_network(emb_nn_cfg)
+        emb_dims = emb_nn_cfg.emb_dims
+
         self.center_feature = center_feature
         self.pred_weight = pred_weight
         self.residual_on = residual_on
@@ -426,10 +429,9 @@ class ModelConfig(Protocol):
 class ResidualFlowDiffEmbTransformerConfig:
     model_type: ClassVar[str] = "residual_flow_diff_emb_transformer"
 
-    emb_dims: int
+    emb_nn_cfg: Any
+
     cycle: bool
-    emb_nn: str
-    return_flow_component: bool
     center_feature: bool
     pred_weight: bool
     residual_on: bool
@@ -452,10 +454,8 @@ def create_network(cfg: ModelConfig) -> nn.Module:
     if cfg.model_type == "residual_flow_diff_emb_transformer":
         r_cfg = cast(ResidualFlowDiffEmbTransformerConfig, cfg)
         network: nn.Module = ResidualFlow_DiffEmbTransformer(
-            emb_dims=r_cfg.emb_dims,
+            emb_nn_cfg=r_cfg.emb_nn_cfg,
             cycle=r_cfg.cycle,
-            emb_nn=r_cfg.emb_nn,
-            return_flow_component=r_cfg.return_flow_component,
             center_feature=r_cfg.center_feature,
             pred_weight=r_cfg.pred_weight,
             residual_on=r_cfg.residual_on,
