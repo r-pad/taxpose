@@ -3,81 +3,29 @@ defaults:
   - _self_
   - dataset@dm: ${benchmark}/${task}/${phase}
 
-
-# plane_occlusion: True
-# plane_standoff: 0.04
-# ball_occlusion: True
-# ball_radius: 0.1
-# gripper_lr_label: False
-# occlusion_class: 0
-
 dm:
-
   train_dset:
     demo_dset: ???
-
-    num_points: 1024
     action_rotation_variance: 3.141592653589793
     anchor_rotation_variance: 1e-5
     translation_variance: 0.5
     action_rot_sample_method: "axis_angle"
     anchor_rot_sample_method: "axis_angle_uniform_z"
     dataset_size: 1000
-    angle_degree: 180
-    synthetic_occlusion: True
-    plane_occlusion: True
-    plane_standoff: 0.04
-    ball_occlusion: True
-    ball_radius: 0.1
-    occlusion_class: 0
-    symmetric_class: null
-    overfit: False
-    num_overfit_transforms: 3
-    gripper_lr_label: False
-    testing_symmetry: False
 
   val_dset:
     demo_dset: ???
-    # extra parameters...
-    num_points: ${..train_dset.num_points}
     action_rotation_variance: ${..train_dset.action_rotation_variance}
     anchor_rotation_variance: ${..train_dset.anchor_rotation_variance}
     translation_variance: ${..train_dset.translation_variance}
     action_rot_sample_method: ${..train_dset.action_rot_sample_method}
     anchor_rot_sample_method: ${..train_dset.anchor_rot_sample_method}
     dataset_size: ${..train_dset.dataset_size}
-    angle_degree: ${..train_dset.angle_degree}
-    synthetic_occlusion: ${..train_dset.synthetic_occlusion}
-    ball_radius: ${..train_dset.ball_radius}
-    plane_occlusion: ${..train_dset.plane_occlusion}
-    ball_occlusion: ${..train_dset.ball_occlusion}
-    plane_standoff: ${..train_dset.plane_standoff}
-    occlusion_class: ${..train_dset.occlusion_class}
-    symmetric_class: ${..train_dset.symmetric_class}
-    overfit: ${..train_dset.overfit}
-    num_overfit_transforms: ${..train_dset.num_overfit_transforms}
-    gripper_lr_label: ${..train_dset.gripper_lr_label}
-    testing_symmetry: ${..train_dset.testing_symmetry}
 
   test_dset:
     demo_dset: ???
-    # extra parameters...
-    num_points: ${..train_dset.num_points}
     action_rotation_variance: ${..train_dset.action_rotation_variance}
     anchor_rotation_variance: ${..train_dset.anchor_rotation_variance}
     translation_variance: ${..train_dset.translation_variance}
     action_rot_sample_method: ${..train_dset.action_rot_sample_method}
     anchor_rot_sample_method: ${..train_dset.anchor_rot_sample_method}
-    dataset_size: ${..train_dset.dataset_size}
-    angle_degree: ${..train_dset.angle_degree}
-    synthetic_occlusion: ${..train_dset.synthetic_occlusion}
-    ball_radius: ${..train_dset.ball_radius}
-    plane_occlusion: ${..train_dset.plane_occlusion}
-    ball_occlusion: ${..train_dset.ball_occlusion}
-    plane_standoff: ${..train_dset.plane_standoff}
-    occlusion_class: ${..train_dset.occlusion_class}
-    symmetric_class: ${..train_dset.symmetric_class}
-    overfit: ${..train_dset.overfit}
-    num_overfit_transforms: ${..train_dset.num_overfit_transforms}
-    gripper_lr_label: ${..train_dset.gripper_lr_label}
-    testing_symmetry: True

@@ -29,14 +29,6 @@ defaults:
   - task/${benchmark}/${task}/phase/${phase}@task.phase
 
 
-model:
-
-benchmark:
-
-task:
-
-dm:
-
 mlp: False
 
 training:
