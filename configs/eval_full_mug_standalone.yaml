@@ -49,7 +49,7 @@ model_path: multi_category_weights
 
 # Eval Settings
 seed: ???  # Seeds we use: 10, 123456, 54321, 123152, 19501
-num_points: ${model.num_points}
+num_points: 1024
 include_penetration: False
 num_samples: 100
 model_eval_on: False
