@@ -16,5 +16,3 @@ training:
   batch_size: 8
   check_val_every_n_epoch: 1
   log_every_n_steps: 100
-
-emb_nn: "dgcnn"
