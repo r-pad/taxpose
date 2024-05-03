@@ -28,9 +28,6 @@ defaults:
   - task/${benchmark}/${task}/task@task
   - task/${benchmark}/${task}/phase/${phase}@task.phase
 
-
-mlp: False
-
 training:
   batch_size: 8
   max_epochs: 500

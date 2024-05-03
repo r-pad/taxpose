@@ -3,6 +3,8 @@
 # Pulled from DCP
 
 import math
+from dataclasses import dataclass
+from typing import ClassVar, Protocol, cast
 
 import torch
 import torch.nn as nn
@@ -414,3 +416,61 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             }
 
         return outputs
+
+
+class ModelConfig(Protocol):
+    model_type: str
+
+
+@dataclass
+class ResidualFlowDiffEmbTransformerConfig:
+    model_type: ClassVar[str] = "residual_flow_diff_emb_transformer"
+
+    emb_dims: int
+    cycle: bool
+    emb_nn: str
+    return_flow_component: bool
+    center_feature: bool
+    pred_weight: bool
+    residual_on: bool
+    freeze_embnn: bool
+    return_attn: bool
+
+
+@dataclass
+class CorrespondenceFlowDiffEmbMLPConfig:
+    model_type: ClassVar[str] = "correspondence_flow_diff_emb_mlp"
+
+    emb_dims: int
+    cycle: bool
+    emb_nn: str
+    center_feature: bool
+
+
+def create_network(cfg: ModelConfig) -> nn.Module:
+    # Create the network
+    if cfg.model_type == "residual_flow_diff_emb_transformer":
+        r_cfg = cast(ResidualFlowDiffEmbTransformerConfig, cfg)
+        network: nn.Module = ResidualFlow_DiffEmbTransformer(
+            emb_dims=r_cfg.emb_dims,
+            cycle=r_cfg.cycle,
+            emb_nn=r_cfg.emb_nn,
+            return_flow_component=r_cfg.return_flow_component,
+            center_feature=r_cfg.center_feature,
+            pred_weight=r_cfg.pred_weight,
+            residual_on=r_cfg.residual_on,
+            freeze_embnn=r_cfg.freeze_embnn,
+            return_attn=r_cfg.return_attn,
+        )
+    elif cfg.model_type == "correspondence_flow_diff_emb_mlp":
+        c_cfg = cast(CorrespondenceFlowDiffEmbMLPConfig, cfg)
+        network = CorrespondenceFlow_DiffEmbMLP(
+            emb_dims=c_cfg.emb_dims,
+            cycle=c_cfg.cycle,
+            emb_nn=c_cfg.emb_nn,
+            center_feature=c_cfg.center_feature,
+        )
+    else:
+        raise ValueError(f"Unknown model type: {cfg.model_type}")
+
+    return network

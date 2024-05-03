@@ -10,20 +10,10 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
-from taxpose.nets.transformer_flow import (
-    CorrespondenceFlow_DiffEmbMLP,
-    ResidualFlow_DiffEmbTransformer,
-)
+from taxpose.nets.transformer_flow import create_network
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
-
-
-def write_to_file(file_name, string):
-    with open(file_name, "a") as f:
-        f.writelines(string)
-        f.write("\n")
-    f.close()
 
 
 def load_emb_weights(checkpoint_reference, wandb_cfg=None, run=None):
@@ -121,20 +111,7 @@ def main(cfg):
 
     dm.setup()
 
-    if cfg.mlp:
-        network = CorrespondenceFlow_DiffEmbMLP(
-            emb_dims=cfg.emb_dims,
-            emb_nn=cfg.emb_nn,
-            center_feature=cfg.center_feature,
-        )
-    else:
-        network = ResidualFlow_DiffEmbTransformer(
-            emb_dims=cfg.model.emb_dims,
-            emb_nn=cfg.model.emb_nn,
-            return_flow_component=cfg.model.return_flow_component,
-            center_feature=cfg.model.center_feature,
-            pred_weight=cfg.model.pred_weight,
-        )
+    network = create_network(cfg.model)
 
     model = EquivarianceTrainingModule(
         network,
@@ -164,7 +141,7 @@ def main(cfg):
         # Might be empty and not have those keys defined.
         # TODO: move this pretraining into the model itself.
         # TODO: figure out if we can get rid of the dictionary and make it null.
-        if cfg.model.pretraining:
+        if "pretraining" in cfg.model:
             if cfg.model.pretraining.action.ckpt_path is not None:
                 # # Check to see if it's a wandb checkpoint.
                 # TODO: need to retrain a few things... checkpoint didn't stick...
