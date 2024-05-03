@@ -41,10 +41,6 @@ class MultiviewDataModule(pl.LightningDataModule):
             self.val_dataset = PointCloudDataset(self.cfg.val_dset)
             # Iterate once over the dataset to make sure it's been processed.
             parallel_iterate(self.val_dataset.dataset, self.num_workers)
-        if stage == "test":
-            self.test_dataset = PointCloudDataset(self.cfg.test_dset)
-            # Iterate once over the dataset to make sure it's been processed.
-            parallel_iterate(self.test_dataset.dataset, self.num_workers)
 
     def train_dataloader(self):
         return DataLoader(
@@ -60,9 +56,4 @@ class MultiviewDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             persistent_workers=self.num_workers > 0,
-        )
-
-    def test_dataloader(self):
-        return DataLoader(
-            self.test_dataset, batch_size=self.batch_size, num_workers=self.num_workers
         )

@@ -22,11 +22,3 @@ val_dset:
   cloud_type: ${..train_dset.cloud_type}
   action_class: ${..train_dset.action_class}
   num_points: ${..train_dset.num_points}
-
-test_dset:
-  dataset_type: ${..train_dset.dataset_type}
-  dataset_root: ${..root}/${..task}/${..test_folder}/renders
-  dataset_indices: ${..train_dset.dataset_indices}
-  cloud_type: ${..train_dset.cloud_type}
-  action_class: ${..train_dset.action_class}
-  num_points: ${..train_dset.num_points}

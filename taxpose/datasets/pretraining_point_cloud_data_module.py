@@ -34,7 +34,6 @@ def make_dataset(cfg: PretrainingPointCloudDatasetConfig):
 class PretrainingMultiviewDMConfig:
     train_dset: PretrainingPointCloudDatasetConfig
     val_dset: PretrainingPointCloudDatasetConfig
-    test_dset: PretrainingPointCloudDatasetConfig
 
 
 class PretrainingMultiviewDataModule(pl.LightningDataModule):
@@ -51,15 +50,11 @@ class PretrainingMultiviewDataModule(pl.LightningDataModule):
         self.cfg = cfg
         self.train_dataset: Optional[PretrainingPointCloudDataset] = None
         self.val_dataset: Optional[PretrainingPointCloudDataset] = None
-        self.test_dataset: Optional[PretrainingPointCloudDataset] = None
 
     def setup(self, stage: str):
         if stage == "fit":
             self.train_dataset = make_dataset(self.cfg.train_dset)
             self.val_dataset = make_dataset(self.cfg.val_dset)
-
-        if stage == "test":
-            self.test_dataset = make_dataset(self.cfg.test_dset)
 
     def train_dataloader(self):
         return DataLoader(
@@ -72,14 +67,6 @@ class PretrainingMultiviewDataModule(pl.LightningDataModule):
     def val_dataloader(self):
         return DataLoader(
             self.val_dataset,
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            pin_memory=True,
-        )
-
-    def test_dataloader(self):
-        return DataLoader(
-            self.test_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             pin_memory=True,

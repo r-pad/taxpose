@@ -22,13 +22,3 @@ val_dset:
   phase: 'val'
   obj_class: ${..train_dset.obj_class}
   train_num: ${..train_dset.train_num}
-
-test_dset:
-  dataset_type: ${..train_dset.dataset_type}
-  ndf_data_path: ${..root}
-  sidelength: ${..train_dset.sidelength}
-  depth_aug: ${..train_dset.depth_aug}
-  multiview_aug: ${..train_dset.multiview_aug}
-  phase: 'test'
-  obj_class: ${..train_dset.obj_class}
-  train_num: ${..train_dset.train_num}
