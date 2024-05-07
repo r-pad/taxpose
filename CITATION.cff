@@ -1,8 +1,7 @@
-@inproceedings{
-eisner2024deep,
-title={Deep {SE}(3)-Equivariant Geometric Reasoning for Precise Placement Tasks},
-author={Ben Eisner and Yi Yang and Todor Davchev and Mel Vecerik and Jonathan Scholz and David Held},
-booktitle={The Twelfth International Conference on Learning Representations},
-year={2024},
-url={https://openreview.net/forum?id=2inBuwTyL2}
+@inproceedings{pan2022taxpose,
+    title       = {{TAX}-Pose: Task-Specific Cross-Pose Estimation for Robot Manipulation},
+    author      = {Chuer Pan and Brian Okorn and Harry Zhang and Ben Eisner and David Held},
+    booktitle   = {6th Annual Conference on Robot Learning},
+    year        = {2022},
+    url         = {https://openreview.net/forum?id=YmJi0bTfeNX}
 }
