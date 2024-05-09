@@ -1,3 +1,5 @@
+from typing import Any
+
 import torch
 import wandb
 from pytorch3d.transforms import Transform3d
@@ -70,6 +72,21 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         # The point clouds transformed by the ground truth transforms.
         points_trans_action = batch["points_action_trans"]  # T0 -> action point clouds
         points_trans_anchor = batch["points_anchor_trans"]  # T1 -> anchor point clouds
+
+        # If we've applied some sampling, we need to extract the predictions too...
+        if "sampled_ixs_action" in model_output:
+            ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+            points_action = torch.take_along_dim(points_action, ixs_action, dim=1)
+            points_trans_action = torch.take_along_dim(
+                points_trans_action, ixs_action, dim=1
+            )
+
+        if "sampled_ixs_anchor" in model_output:
+            ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+            points_anchor = torch.take_along_dim(points_anchor, ixs_anchor, dim=1)
+            points_trans_anchor = torch.take_along_dim(
+                points_trans_anchor, ixs_anchor, dim=1
+            )
 
         # Get the transforms.
         T0 = Transform3d(matrix=batch["T0"])
@@ -334,17 +351,92 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
     def module_step(self, batch, batch_idx):
         points_trans_action = batch["points_action_trans"]
         points_trans_anchor = batch["points_anchor_trans"]
+        action_features = batch["action_features"]
+        anchor_features = batch["anchor_features"]
 
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
 
-        model_output = self.model(points_trans_action, points_trans_anchor)
+        model_output = self.model(
+            points_trans_action, points_trans_anchor, action_features, anchor_features
+        )
 
         log_values = {}
         loss, log_values = self.compute_loss(
             model_output, batch, log_values=log_values, loss_prefix=""
         )
         return loss, log_values
+
+    def forward(
+        self,
+        points_trans_action,
+        points_trans_anchor,
+        action_features,
+        anchor_features,
+    ) -> Any:
+        model_output = self.model(
+            points_trans_action, points_trans_anchor, action_features, anchor_features
+        )
+
+        # If we've applied some sampling, we need to extract the predictions too...
+        if "sampled_ixs_action" in model_output:
+            ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+            points_trans_action = torch.take_along_dim(
+                points_trans_action, ixs_action, dim=1
+            )
+
+        if "sampled_ixs_anchor" in model_output:
+            ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+            points_trans_anchor = torch.take_along_dim(
+                points_trans_anchor, ixs_anchor, dim=1
+            )
+
+        x_action = model_output["flow_action"]
+        x_anchor = model_output["flow_anchor"]
+
+        pred_flow_action = x_action[:, :, :3]
+        if x_action.shape[2] > 3:
+            if self.sigmoid_on:
+                pred_w_action = torch.sigmoid(x_action[:, :, 3])
+            else:
+                pred_w_action = x_action[:, :, 3]
+        else:
+            pred_w_action = None
+
+        pred_flow_anchor = x_anchor[:, :, :3]
+        if x_anchor.shape[2] > 3:
+            if self.sigmoid_on:
+                pred_w_anchor = torch.sigmoid(x_anchor[:, :, 3])
+            else:
+                pred_w_anchor = x_anchor[:, :, 3]
+        else:
+            pred_w_anchor = None
+
+        pred_T_action = dualflow2pose(
+            xyz_src=points_trans_action,
+            xyz_tgt=points_trans_anchor,
+            flow_src=pred_flow_action,
+            flow_tgt=pred_flow_anchor,
+            weights_src=pred_w_action,
+            weights_tgt=pred_w_anchor,
+            return_transform3d=True,
+            normalization_scehme=self.weight_normalize,
+            temperature=self.softmax_temperature,
+        )
+
+        pred_points_action = pred_T_action.transform_points(points_trans_action)
+
+        res = {
+            "pred_points_action": pred_points_action,
+            "pred_flow_action": pred_flow_action,
+            "pred_w_action": pred_w_action,
+            "pred_T_action": pred_T_action,
+        }
+
+        if "sampled_ixs_action" in model_output:
+            res["sampled_ixs_action"] = model_output["sampled_ixs_action"]
+
+        return res
 
     def visualize_results(self, batch, batch_idx):
         # classes = batch['classes']
@@ -354,13 +446,57 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         # points_trans = batch['points_trans']
         points_trans_action = batch["points_action_trans"]
         points_trans_anchor = batch["points_anchor_trans"]
+        action_features = (
+            batch["action_features"] if "action_features" in batch else None
+        )
+        anchor_features = (
+            batch["anchor_features"] if "anchor_features" in batch else None
+        )
+        action_symmetry_rgb = (
+            batch["action_symmetry_rgb"] if "action_symmetry_rgb" in batch else None
+        )
+        anchor_symmetry_rgb = (
+            batch["anchor_symmetry_rgb"] if "anchor_symmetry_rgb" in batch else None
+        )
 
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
 
-        model_output = self.model(points_trans_action, points_trans_anchor)
+        model_output = self.model(
+            points_trans_action,
+            points_trans_anchor,
+            action_features,
+            anchor_features,
+        )
         x_action = model_output["flow_action"]
         x_anchor = model_output["flow_anchor"]
+
+        # If we've applied some sampling, we need to extract the predictions too...
+        if "sampled_ixs_action" in model_output:
+            ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
+            points_action = torch.take_along_dim(points_action, ixs_action, dim=1)
+            points_trans_action = torch.take_along_dim(
+                points_trans_action, ixs_action, dim=1
+            )
+            action_symmetry_rgb = torch.take_along_dim(
+                action_symmetry_rgb, ixs_action, dim=1
+            )
+            action_symmetry_features = torch.take_along_dim(
+                action_symmetry_features, ixs_action, dim=1
+            )
+
+        if "sampled_ixs_anchor" in model_output:
+            ixs_anchor = model_output["sampled_ixs_anchor"].unsqueeze(-1)
+            points_anchor = torch.take_along_dim(points_anchor, ixs_anchor, dim=1)
+            points_trans_anchor = torch.take_along_dim(
+                points_trans_anchor, ixs_anchor, dim=1
+            )
+            anchor_symmetry_rgb = torch.take_along_dim(
+                anchor_symmetry_rgb, ixs_anchor, dim=1
+            )
+            anchor_symmetry_features = torch.take_along_dim(
+                anchor_symmetry_features, ixs_anchor, dim=1
+            )
 
         pred_flow_action = x_action[:, :, :3]
         if x_action.shape[2] > 3:
@@ -503,5 +639,11 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
             color_list=["green", "red"],
         )
         res_images["loss_points_action"] = wandb.Object3D(loss_points_action)
+
+        # Stack points and colors
+        action_xyzrgb = torch.cat([points_action[0], action_symmetry_rgb[0]], dim=1)
+        anchor_xyzrgb = torch.cat([points_anchor[0], anchor_symmetry_rgb[0]], dim=1)
+        xyzrgb = torch.cat([action_xyzrgb, anchor_xyzrgb], dim=0)
+        res_images["symmetry_vis"] = wandb.Object3D(xyzrgb.cpu().numpy())
 
         return res_images

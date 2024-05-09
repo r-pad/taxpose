@@ -2,14 +2,15 @@ defaults:
   - ndf/_default@_here_
   - _self_
 
-train_folder: bottle_train_new_3_pregrasp
-test_folder: bottle_test_new_3_pregrasp
+train_folder: train_data
+test_folder: test_data
 
 # Dataset Settings
 train_dset:
   demo_dset:
     dataset_indices: null
     num_demo: 10
+  include_symmetry_features: True
 
 val_dset:
   demo_dset:

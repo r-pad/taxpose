@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+  - /commands/ndf/_train@_here_
+  - override /model: mlat
+  - override /model/encoder: dgcnn
+  - override /task: mug
+  - _self_

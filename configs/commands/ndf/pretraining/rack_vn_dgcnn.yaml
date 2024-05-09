@@ -1,0 +1,5 @@
+# @package _global_
+
+defaults:
+  - rack
+  - override /model/encoder@encoder: vn_dgcnn

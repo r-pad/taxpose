@@ -1,11 +1,8 @@
 # @package _global_
 
 defaults:
-  - /commands/ndf/_train@_here_
+  - _base
   - override /model: taxpose
-  - override /task: bowl
+  - override /task: mug
   - override /phase: grasp
   - _self_
-
-model:
-  feature_channels: 1

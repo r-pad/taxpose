@@ -1,0 +1,5 @@
+# @package _global_
+
+defaults:
+- train_place
+- override /model: mlat
