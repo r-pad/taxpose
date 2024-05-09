@@ -1,0 +1,5 @@
+# @package _global_
+
+defaults:
+  - gripper
+  - override /model/encoder: vn_dgcnn

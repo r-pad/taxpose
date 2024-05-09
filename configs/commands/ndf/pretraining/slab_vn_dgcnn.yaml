@@ -1,0 +1,5 @@
+# @package _global_
+
+defaults:
+  - slab
+  - override /model/encoder: vn_dgcnn
