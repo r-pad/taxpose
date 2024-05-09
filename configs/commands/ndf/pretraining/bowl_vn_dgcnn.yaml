@@ -2,4 +2,4 @@
 
 defaults:
   - bowl
-  - override /model/encoder: vn_dgcnn
+  - override /model/encoder@encoder: vn_dgcnn
