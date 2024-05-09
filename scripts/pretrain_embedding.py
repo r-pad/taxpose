@@ -104,6 +104,7 @@ def main(cfg):
         temperature=cfg.training.temperature,
         con_weighting=cfg.training.con_weighting,
     )
+
     trainer.fit(model, dm)
 
 

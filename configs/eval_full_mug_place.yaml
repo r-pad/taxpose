@@ -35,9 +35,6 @@ log_every_trial: False # True - log success rate at every trial; False - log onl
 
 # Model Settings
 # flow_compute_type: 0
-emb_nn: dgcnn
-num_points: 1024
-multilaterate: False
 emb_dims: ${model.encoder.emb_dims}
 
 # Dataset Settings

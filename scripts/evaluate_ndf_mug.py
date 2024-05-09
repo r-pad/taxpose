@@ -497,7 +497,6 @@ def main(hydra_cfg):
             residual_on=hydra_cfg.residual_on,
             freeze_embnn=hydra_cfg.freeze_embnn,
             return_attn=hydra_cfg.return_attn,
-            multilaterate=hydra_cfg.multilaterate,
         )
 
     place_model = EquivarianceTestingModule(
@@ -530,7 +529,6 @@ def main(hydra_cfg):
             residual_on=hydra_cfg.residual_on,
             freeze_embnn=hydra_cfg.freeze_embnn,
             return_attn=hydra_cfg.return_attn,
-            multilaterate=hydra_cfg.multilaterate,
         )
 
     grasp_model = EquivarianceTestingModule(

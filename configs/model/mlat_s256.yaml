@@ -1,8 +1,0 @@
-defaults:
-  - _mlat
-
-name: mlat_s256
-
-multilaterate: True
-mlat_sample: True
-mlat_nkps: 256

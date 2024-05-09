@@ -12,7 +12,6 @@ defaults:
 
 seed: 0
 
-
 training:
   batch_size: 32
   epochs: 100
