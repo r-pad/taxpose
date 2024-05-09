@@ -1,0 +1,7 @@
+defaults:
+  - _taxpose
+  - override encoder: vn_dgcnn
+
+multilaterate: True
+mlat_sample: True
+mlat_nkps: 256

@@ -376,14 +376,12 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         points_trans_anchor,
         action_features,
         anchor_features,
-        phase_onehot=None,
     ) -> Any:
         model_output = self.model(
             points_trans_action,
             points_trans_anchor,
             action_features,
             anchor_features,
-            phase_onehot,
         )
 
         # If we've applied some sampling, we need to extract the predictions too...
@@ -458,7 +456,6 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         anchor_symmetry_features = batch["anchor_symmetry_features"]
         action_symmetry_rgb = batch["action_symmetry_rgb"]
         anchor_symmetry_rgb = batch["anchor_symmetry_rgb"]
-        onehot = batch["phase_onehot"]
 
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
@@ -468,7 +465,6 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
             points_trans_anchor,
             action_symmetry_features,
             anchor_symmetry_features,
-            onehot,
         )
         x_action = model_output["flow_action"]
         x_anchor = model_output["flow_anchor"]

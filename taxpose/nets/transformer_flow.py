@@ -479,13 +479,13 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         freeze_embnn=False,
         return_attn=True,
         multilaterate=False,
-        sample: bool = False,
+        mlat_sample: bool = False,
         mlat_nkps: int = 100,
-        break_symmetry=False,
+        feature_channels=0,  # Number of extra channels we'll pass into the network.
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.cycle = cycle
-        self.break_symmetry = break_symmetry
+        self.feature_channels = feature_channels
 
         self.emb_nn_action = create_embedding_network(encoder_cfg)
         self.emb_nn_anchor = create_embedding_network(encoder_cfg)
@@ -509,13 +509,13 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             self.head_action = MultilaterationHead(
                 emb_dims=emb_dims,
                 pred_weight=self.pred_weight,
-                sample=sample,
+                sample=mlat_sample,
                 n_kps=mlat_nkps,
             )
             self.head_anchor = MultilaterationHead(
                 emb_dims=emb_dims,
                 pred_weight=self.pred_weight,
-                sample=sample,
+                sample=mlat_sample,
                 n_kps=mlat_nkps,
             )
         else:
@@ -530,16 +530,16 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 residual_on=self.residual_on,
             )
 
-        if self.break_symmetry:
+        if self.feature_channels > 0:
             # We're basically putting a few MLP layers in on top of the invariant module.
-            emb_dims_sym = emb_dims + 1
-            self.proj_flow_symmetry_labels_action = nn.Sequential(
-                PointNet([emb_dims_sym, emb_dims_sym * 2, emb_dims_sym * 4]),
-                nn.Conv1d(emb_dims_sym * 4, emb_dims, kernel_size=1, bias=False),
+            combined_dims = emb_dims + self.feature_channels
+            self.feature_channel_encoder_action = nn.Sequential(
+                PointNet([combined_dims, combined_dims * 2, combined_dims * 4]),
+                nn.Conv1d(combined_dims * 4, emb_dims, kernel_size=1, bias=False),
             )
-            self.proj_flow_symmetry_labels_anchor = nn.Sequential(
-                PointNet([emb_dims_sym, emb_dims_sym * 2, emb_dims_sym * 4]),
-                nn.Conv1d(emb_dims_sym * 4, emb_dims, kernel_size=1, bias=False),
+            self.feature_channel_encoder_anchor = nn.Sequential(
+                PointNet([combined_dims, combined_dims * 2, combined_dims * 4]),
+                nn.Conv1d(combined_dims * 4, emb_dims, kernel_size=1, bias=False),
             )
 
     def forward(self, *input):
@@ -561,23 +561,23 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             action_embedding = action_embedding.detach()
             anchor_embedding = anchor_embedding.detach()
 
-        if self.break_symmetry:
+        if self.feature_channels > 0:
             # Add a symmetry label to the embeddings.
-            action_sym_cls = input[2].permute(0, 2, 1)
-            anchor_sym_cls = input[3].permute(0, 2, 1)
+            action_features = input[2].permute(0, 2, 1)
+            anchor_features = input[3].permute(0, 2, 1)
 
             action_embedding_stack = torch.cat(
-                [action_embedding, action_sym_cls], axis=1
+                [action_embedding, action_features], axis=1
             )
             anchor_embedding_stack = torch.cat(
-                [anchor_embedding, anchor_sym_cls], axis=1
+                [anchor_embedding, anchor_features], axis=1
             )
 
-            action_embedding = self.proj_flow_symmetry_labels_action(
+            action_embedding = self.feature_channel_encoder_action(
                 action_embedding_stack
             )
 
-            anchor_embedding = self.proj_flow_symmetry_labels_anchor(
+            anchor_embedding = self.feature_channel_encoder_anchor(
                 anchor_embedding_stack
             )
 
@@ -677,11 +677,11 @@ class ResidualFlowDiffEmbTransformerConfig:
 
     # Multilateration
     multilaterate: bool
-    sample: bool
+    mlat_sample: bool
     mlat_nkps: bool
 
-    # Symmetry
-    break_symmetry: bool
+    # Extra channels.
+    feature_channels: int
 
 
 @dataclass
@@ -707,9 +707,9 @@ def create_network(cfg: ModelConfig) -> nn.Module:
             freeze_embnn=r_cfg.freeze_embnn,
             return_attn=r_cfg.return_attn,
             multilaterate=r_cfg.multilaterate,
-            sample=r_cfg.sample,
+            mlat_sample=r_cfg.mlat_sample,
             mlat_nkps=r_cfg.mlat_nkps,
-            break_symmetry=r_cfg.break_symmetry,
+            feature_channels=r_cfg.feature_channels,
         )
     elif cfg.model_type == "correspondence_flow_diff_emb_mlp":
         c_cfg = cast(CorrespondenceFlowDiffEmbMLPConfig, cfg)

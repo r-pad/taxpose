@@ -1,0 +1,6 @@
+defaults:
+  - _mlat
+
+# Just means we're using the multilateration head, sampling down to 256 points for reasoning,
+# and using a vector neuron encoder.
+name: mlat_s256_vnn
