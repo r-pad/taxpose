@@ -6,7 +6,6 @@ import math
 from dataclasses import dataclass
 from typing import Any, ClassVar, Protocol, cast
 
-import functorch
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -381,7 +380,7 @@ class MultilaterationHead(nn.Module):
         # We probably want to sample
         if self.sample:
             # This function samples without replacement, in a batch.
-            choice_v = functorch.vmap(
+            choice_v = torch.vmap(
                 lambda x, n: torch.randperm(x.shape[-1])[:n],
                 in_dims=(0, None),
                 randomness="different",
@@ -399,9 +398,9 @@ class MultilaterationHead(nn.Module):
             A_ixs = torch.arange(P_A.shape[1], device=P_A.device).repeat(bs, 1)
             B_ixs = torch.arange(P_B.shape[1], device=P_B.device).repeat(bs, 1)
 
-        # compute_R = functorch.vmap(
-        #     functorch.vmap(
-        #         functorch.vmap(self.kernel, in_dims=(None, 0)), in_dims=(0, None)
+        # compute_R = torch.vmap(
+        #     torch.vmap(
+        #         torch.vmap(self.kernel, in_dims=(None, 0)), in_dims=(0, None)
         #     ),
         #     in_dims=(0, 0),
         # )
@@ -427,7 +426,7 @@ class MultilaterationHead(nn.Module):
         #     scores / scores.detach().sum(dim=-1, keepdim=True) * scores.shape[-1]
         # )
         # mlat_weights = torch.ones_like(scores, device=scores.device)
-        v_est_p = functorch.vmap(functorch.vmap(estimate_p, in_dims=(None, 0, None)))
+        v_est_p = torch.vmap(torch.vmap(estimate_p, in_dims=(None, 0, None)))
         P_A_B_pred = v_est_p(P_B[..., None], R_est, B_weights)[..., 0]
 
         corr_points = P_A_B_pred.permute(0, 2, 1)
@@ -504,6 +503,8 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.transformer_anchor = CustomTransformer(
             emb_dims=emb_dims, return_attn=self.return_attn, bidirectional=False
         )
+        self.head_action: nn.Module
+        self.head_anchor: nn.Module
         if multilaterate:
             self.head_action = MultilaterationHead(
                 emb_dims=emb_dims,
@@ -531,14 +532,14 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
 
         if self.break_symmetry:
             # We're basically putting a few MLP layers in on top of the invariant module.
-            emb_dims_sym = self.emb_dims + 1
+            emb_dims_sym = emb_dims + 1
             self.proj_flow_symmetry_labels_action = nn.Sequential(
                 PointNet([emb_dims_sym, emb_dims_sym * 2, emb_dims_sym * 4]),
-                nn.Conv1d(emb_dims_sym * 4, self.emb_dims, kernel_size=1, bias=False),
+                nn.Conv1d(emb_dims_sym * 4, emb_dims, kernel_size=1, bias=False),
             )
             self.proj_flow_symmetry_labels_anchor = nn.Sequential(
                 PointNet([emb_dims_sym, emb_dims_sym * 2, emb_dims_sym * 4]),
-                nn.Conv1d(emb_dims_sym * 4, self.emb_dims, kernel_size=1, bias=False),
+                nn.Conv1d(emb_dims_sym * 4, emb_dims, kernel_size=1, bias=False),
             )
 
     def forward(self, *input):
@@ -674,6 +675,14 @@ class ResidualFlowDiffEmbTransformerConfig:
     freeze_embnn: bool
     return_attn: bool
 
+    # Multilateration
+    multilaterate: bool
+    sample: bool
+    mlat_nkps: bool
+
+    # Symmetry
+    break_symmetry: bool
+
 
 @dataclass
 class CorrespondenceFlowDiffEmbMLPConfig:
@@ -697,6 +706,10 @@ def create_network(cfg: ModelConfig) -> nn.Module:
             residual_on=r_cfg.residual_on,
             freeze_embnn=r_cfg.freeze_embnn,
             return_attn=r_cfg.return_attn,
+            multilaterate=r_cfg.multilaterate,
+            sample=r_cfg.sample,
+            mlat_nkps=r_cfg.mlat_nkps,
+            break_symmetry=r_cfg.break_symmetry,
         )
     elif cfg.model_type == "correspondence_flow_diff_emb_mlp":
         c_cfg = cast(CorrespondenceFlowDiffEmbMLPConfig, cfg)
