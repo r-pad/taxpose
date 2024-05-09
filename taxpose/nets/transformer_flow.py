@@ -14,7 +14,7 @@ from taxpose.nets.transformer_flow_pm import CustomTransformer
 from taxpose.nets.tv_mlp import MLP as TVMLP
 from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
 from taxpose.utils.multilateration import estimate_p
-from third_party.dcp.model import DGCNN
+from third_party.dcp.model import DGCNN, DGCNN_rgb
 
 
 class EquivariantFeatureEmbeddingNetwork(nn.Module):
@@ -479,12 +479,18 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         mlat_nkps: int = 100,
         break_symmetry=False,
         conditional=False,
+        use_rgb=False,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
+        # TODO: make this a constructor argument.
+        self.use_rgb = use_rgb
         self.emb_dims = emb_dims
         self.cycle = cycle
         self.break_symmetry = break_symmetry
-        if emb_nn == "dgcnn":
+        if emb_nn == "dgcnn" and self.use_rgb:
+            self.emb_nn_action = DGCNN_rgb(emb_dims=self.emb_dims)
+            self.emb_nn_anchor = DGCNN_rgb(emb_dims=self.emb_dims)
+        elif emb_nn == "dgcnn" and not self.use_rgb:
             self.emb_nn_action = DGCNN(emb_dims=self.emb_dims)
             self.emb_nn_anchor = DGCNN(emb_dims=self.emb_dims)
         elif emb_nn == "vn_dgcnn":
@@ -549,6 +555,19 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             )
 
     def forward(self, *input):
+        # SAVE ALL INPUTS, AND VERIFY IN A JUPYTER NOTEBOOK THAT THEY LOOKS
+        # THE SAME ACROSS TRAIN AND EVAL.
+        # print("input", input)
+
+        # # save inputs to a file
+        # import pickle
+        # import os
+
+        # f = "eval_input.pkl"
+        # print(os.getcwd())
+        # pickle.dump(input, open(f, "wb"))
+        # quit()
+
         action_points = input[0].permute(0, 2, 1)[:, :3]  # B,3,num_points
         anchor_points = input[1].permute(0, 2, 1)[:, :3]
 
@@ -559,9 +578,16 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         if not self.center_feature:
             action_points_dmean = action_points
             anchor_points_dmean = anchor_points
-
-        action_embedding = self.emb_nn_action(action_points_dmean)
-        anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
+        
+        if self.use_rgb:
+            # We're going to add the RGB values to the embeddings.
+            rgb_action = input[5].permute(0, 2, 1)
+            rgb_anchor = input[6].permute(0, 2, 1)
+            action_embedding = self.emb_nn_action(action_points_dmean, rgb_action)
+            anchor_embedding = self.emb_nn_anchor(anchor_points_dmean, rgb_anchor)
+        else:
+            action_embedding = self.emb_nn_action(action_points_dmean)
+            anchor_embedding = self.emb_nn_anchor(anchor_points_dmean)
 
         if self.freeze_embnn:
             action_embedding = action_embedding.detach()

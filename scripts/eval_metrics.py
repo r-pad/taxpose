@@ -70,6 +70,7 @@ def main(cfg):
         sample=cfg.model.mlat_sample,
         mlat_nkps=cfg.model.mlat_nkps,
         break_symmetry=cfg.model.break_symmetry,
+        use_rgb=cfg.use_rgb,
         conditional=cfg.model.conditional if "conditional" in cfg.model else False,
     )
 
@@ -139,6 +140,8 @@ def main(cfg):
             action_symmetry_rgb = batch["action_symmetry_rgb"].cuda()
             anchor_symmetry_rgb = batch["anchor_symmetry_rgb"].cuda()
             phase_onehot = batch["phase_onehot"].cuda()
+            rgb_anchor = batch["rgb_anchor"].cuda()
+            rgb_action = batch["rgb_action"].cuda()
 
             res = model(
                 points_action_trans,
@@ -146,6 +149,8 @@ def main(cfg):
                 action_symmetry_features,
                 anchor_symmetry_features,
                 phase_onehot,
+                rgb_action,
+                rgb_anchor,
             )
 
             if "sampled_ixs_action" in res:

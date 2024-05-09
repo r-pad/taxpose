@@ -353,7 +353,7 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         points_trans_anchor = batch["points_anchor_trans"]
         action_symmetry_features = batch["action_symmetry_features"]
         anchor_symmetry_features = batch["anchor_symmetry_features"]
-
+        
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
 
@@ -362,12 +362,22 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         else:
             phase_onehot = None
 
+        # adding rgb features
+        if "rgb_action" in batch:
+            rgb_action = batch["rgb_action"]
+            rgb_anchor = batch["rgb_anchor"]
+        else:
+            rgb_action = None
+            rgb_anchor = None
+
         model_output = self.model(
             points_trans_action,
             points_trans_anchor,
             action_symmetry_features,
             anchor_symmetry_features,
             phase_onehot,
+            rgb_action,
+            rgb_anchor,
         )
 
         log_values = {}
@@ -383,6 +393,8 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         action_features,
         anchor_features,
         phase_onehot=None,
+        rgb_action=None,
+        rgb_anchor=None,
     ) -> Any:
         model_output = self.model(
             points_trans_action,
@@ -390,8 +402,9 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
             action_features,
             anchor_features,
             phase_onehot,
+            rgb_action,
+            rgb_anchor,
         )
-
         # If we've applied some sampling, we need to extract the predictions too...
         if "sampled_ixs_action" in model_output:
             ixs_action = model_output["sampled_ixs_action"].unsqueeze(-1)
@@ -465,6 +478,8 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         action_symmetry_rgb = batch["action_symmetry_rgb"]
         anchor_symmetry_rgb = batch["anchor_symmetry_rgb"]
         onehot = batch["phase_onehot"]
+        rgb_action = batch["rgb_action"]
+        rgb_anchor = batch["rgb_anchor"]
 
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
@@ -475,6 +490,8 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
             action_symmetry_features,
             anchor_symmetry_features,
             onehot,
+            rgb_action,
+            rgb_anchor,
         )
         x_action = model_output["flow_action"]
         x_anchor = model_output["flow_anchor"]

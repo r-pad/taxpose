@@ -3,3 +3,5 @@
 defaults:
   - /eval_metrics
   - override /benchmark: rlbench
+
+use_rgb: False

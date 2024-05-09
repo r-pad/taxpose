@@ -181,8 +181,9 @@ def remove_outliers_o3d(original_points):
 def remove_outliers(original_points, min_neighbors=1):
     """Remove outliers which are far from other points using pure numpy"""
     # Compute the distance between each point and every other point.
+    # NOTE: this assumes that xyz's are the first 3 channels!
     dists = np.linalg.norm(
-        original_points[0, None, ...] - original_points[0, :, None, ...], axis=-1
+        original_points[0, None, ..., :3] - original_points[0, :, None, ..., :3], axis=-1
     )
 
     # The outliers are the points which are far from other points. Remove points that
@@ -244,7 +245,8 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             anchor_mode=cfg.anchor_mode,
             action_mode=cfg.action_mode,
         )
-
+        # TODO: move this into configs
+        self.use_rgb = True
         self.cfg = cfg
 
     def __len__(self):
@@ -254,6 +256,7 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
     def _load_data(
         self, index: int
     ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, torch.Tensor]]:
+        
         data = self.dataset[index]
         # This dataset should really be about the keyframes, but there are some
         # occlusions at keyframes. We may want to switch to using an "imagined"
@@ -277,42 +280,83 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             points_action = points_action[None, ...]
             points_anchor = points_anchor[None, ...]
 
+            # extracting rgb features
+            rgb_action = data["init_action_rgb"].numpy().astype(np.float32) / 255.0
+            rgb_anchor = data["init_anchor_rgb"].numpy().astype(np.float32) / 255.0
+
+            # # adding rgb features
+            # if self.use_rgb:
+            #     action_rgb = data["init_action_rgb"].numpy().astype(np.float32) / 255.0
+            #     anchor_rgb = data["init_anchor_rgb"].numpy().astype(np.float32) / 255.0
+            #     points_action = np.concatenate([points_action, action_rgb[None, ...]], axis=2)
+            #     points_anchor = np.concatenate([points_anchor, anchor_rgb[None, ...]], axis=2)
+
         else:
             points_action = data["key_action_pc"].numpy().astype(np.float32)[None, ...]
             points_anchor = data["key_anchor_pc"].numpy().astype(np.float32)[None, ...]
 
+            # extracting rgb features
+            rgb_action = data["key_action_rgb"].numpy().astype(np.float32) / 255.0
+            rgb_anchor = data["key_anchor_rgb"].numpy().astype(np.float32) / 255.0
+            
+            # # adding rgb features
+            # if self.use_rgb:
+            #     action_rgb = data["key_action_rgb"].numpy().astype(np.float32) / 255.0
+            #     anchor_rgb = data["key_anchor_rgb"].numpy().astype(np.float32) / 255.0
+            #     points_action = np.concatenate([points_action, action_rgb[None, ...]], axis=2)
+            #     points_anchor = np.concatenate([points_anchor, anchor_rgb[None, ...]], axis=2)
+
+        rgb_action = rgb_action[None, ...]
+        rgb_anchor = rgb_anchor[None, ...]
+
         # Quickly remove outliers...
-        points_action = remove_outliers(points_action)
+        features_action = remove_outliers(np.concatenate([points_action, rgb_action], axis=2))
+        points_action = features_action[..., :3]
+        rgb_action = features_action[..., 3:]
+
         if (
             not self.cfg.anchor_mode == AnchorMode.RAW
             and not self.cfg.anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED
         ):
-            points_anchor = remove_outliers(points_anchor)
+            features_anchor = remove_outliers(np.concatenate([points_anchor, rgb_anchor], axis=2))
+            points_anchor = features_anchor[..., :3]
+            rgb_anchor = features_anchor[..., 3:]
 
         new_data = {
             "T_action_key_world": data["T_action_key_world"],
             "T_anchor_key_world": data["T_anchor_key_world"],
             "phase": data["phase"],
             "phase_onehot": data["phase_onehot"],
+            "rgb_action": rgb_action,
+            "rgb_anchor": rgb_anchor,
         }
         return points_action, points_anchor, new_data
 
     def __getitem__(self, index: int) -> PlacementPointCloudData:
         # Load the data.
         points_action, points_anchor, data = self._load_data(index)
+        # separate rgb features
+        # if self.use_rgb:
+        #     points_action, action_rgb = points_action[..., :3], points_action[..., 3:]
+        #     points_anchor, anchor_rgb = points_anchor[..., :3], points_anchor[..., 3:]
+        rgb_action = data["rgb_action"]
+        rgb_anchor = data["rgb_anchor"]
+
         # Occlude if necessary.
         # TODO: implement occlusions here.
 
         # Downsample if necessary.
         try:
-            points_action = maybe_downsample(points_action, self.cfg.num_points)
+            points_action, action_ids = maybe_downsample(points_action, self.cfg.num_points)
+            rgb_action = rgb_action[0, action_ids]
 
             num_anchor_points = (
                 self.cfg.num_points
                 if not self.cfg.anchor_mode == AnchorMode.RAW
                 else 1024
             )
-            points_anchor = maybe_downsample(points_anchor, num_anchor_points)
+            points_anchor, anchor_ids = maybe_downsample(points_anchor, num_anchor_points)
+            rgb_anchor = rgb_anchor[0, anchor_ids]
         except:
             print(f"Failed to downsample {index}.")
 
@@ -367,6 +411,7 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             anchor_symmetry_features[0, ..., 0]
         )[None]
 
+        res = {}
         # Assert shapes
         assert len(points_action.shape) == 3
         assert len(points_anchor.shape) == 3
@@ -374,14 +419,28 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
         assert len(anchor_symmetry_features.shape) == 3
         assert len(action_symmetry_rgb.shape) == 3
         assert len(anchor_symmetry_rgb.shape) == 3
+        assert len(rgb_action.shape) == 3
+        assert len(rgb_anchor.shape) == 3
 
-        return {
+        # assert rgb features shapes
+        # if self.use_rgb:
+        #     assert len(rgb.shape) == 3
+        #     assert len(anchor_rgb.shape) == 3
+        #     res.update({
+        #         "rgb_action": action_rgb,
+        #         "rgb_anchor": anchor_rgb,
+        #     })
+
+        res.update({
             "points_action": points_action,
             "points_anchor": points_anchor,
+            "rgb_action": rgb_action,
+            "rgb_anchor": rgb_anchor,
             "action_symmetry_features": action_symmetry_features,
             "anchor_symmetry_features": anchor_symmetry_features,
             "action_symmetry_rgb": action_symmetry_rgb,
             "anchor_symmetry_rgb": anchor_symmetry_rgb,
             "phase": data["phase"],
             "phase_onehot": torch.as_tensor(data["phase_onehot"]),
-        }
+        })
+        return res

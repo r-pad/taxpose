@@ -28,7 +28,7 @@ def maybe_downsample(
         torch.from_numpy(points), K=num_points, random_start_point=True
     )
 
-    return points.numpy()
+    return points.numpy(), ids.numpy()
 
 
 @dataclass

@@ -95,6 +95,8 @@ class PointCloudDataset(Dataset):
         self.testing_symmetry = cfg.testing_symmetry
 
         self.demo_dset_cfg = cfg.demo_dset
+        # TODO: move this into configs
+        self.use_rgb = True
 
     # def get_fixed_transforms(self):
     #     points_action, points_anchor, _ = self.load_data(
@@ -186,6 +188,17 @@ class PointCloudDataset(Dataset):
         anchor_sym_rgb = (
             torch.from_numpy(data["anchor_symmetry_rgb"])
             if data["anchor_symmetry_rgb"] is not None
+            else None
+        )
+        # extracting rgb features
+        rgb_action = (
+            torch.from_numpy(data["rgb_action"]) 
+            if data["rgb_action"] is not None 
+            else None
+        )
+        rgb_anchor = (
+            torch.from_numpy(data["rgb_anchor"]) 
+            if data["rgb_anchor"] is not None 
             else None
         )
 
@@ -310,6 +323,10 @@ class PointCloudDataset(Dataset):
             out_dict["anchor_symmetry_features"] = anchor_sym_feats.squeeze(0)
             out_dict["action_symmetry_rgb"] = action_sym_rgb.squeeze(0)
             out_dict["anchor_symmetry_rgb"] = anchor_sym_rgb.squeeze(0)
+        # adding rgb features if they exist
+        if rgb_action is not None:
+            out_dict["rgb_action"] = rgb_action.squeeze(0)
+            out_dict["rgb_anchor"] = rgb_anchor.squeeze(0)
 
         if "phase_onehot" in data:
             out_dict["phase_onehot"] = data["phase_onehot"]

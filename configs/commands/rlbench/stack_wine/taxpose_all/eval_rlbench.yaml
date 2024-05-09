@@ -10,3 +10,7 @@ model:
   break_symmetry: false
   conditional: true
   z_offset: 0.0
+  use_rgb: False
+
+checkpoints:
+  single_model_override:

@@ -329,6 +329,7 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
             sample=model_cfg.mlat_sample,
             mlat_nkps=model_cfg.mlat_nkps,
             break_symmetry=model_cfg.break_symmetry,
+            use_rgb=model_cfg.use_rgb,
             conditional=model_cfg.conditional if "conditional" in model_cfg else False,
         )
         model = EquivarianceTrainingModule(
@@ -366,9 +367,8 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         # TODO: modify this code chunk to handle rgb and non-rgb inputs
         action_pc, action_idx  = sample_farthest_points(action_pc, K=K, random_start_point=True)
         anchor_pc, anchor_idx = sample_farthest_points(anchor_pc, K=K, random_start_point=True)
-
-        action_rgb = action_rgb[0][action_idx[0]].unsqueeze(0)
-        anchor_rgb = anchor_rgb[0][anchor_idx[0]].unsqueeze(0)
+        action_rgb = action_rgb[0][action_idx[0]].unsqueeze(0) / 255.0
+        anchor_rgb = anchor_rgb[0][anchor_idx[0]].unsqueeze(0) / 255.0
 
 
         if self.model_cfg.break_symmetry:
@@ -528,11 +528,26 @@ def obs_to_input(
         rgb, point_cloud, mask, action_names
     )
 
+    pointcloud_fig = rvp.pointcloud_fig(
+        action_point_cloud.squeeze(),
+        colors=action_rgb.squeeze(),
+    )
+    # Dump to disk
+    pointcloud_fig.write_html("action_pc.html")
+    
+
     if anchor_mode == AnchorMode.RAW:
         raise NotImplementedError()
     elif anchor_mode == AnchorMode.BACKGROUND_REMOVED:
         raise NotImplementedError()
     elif anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED:
+        pointcloud_fig = rvp.pointcloud_fig(
+            point_cloud.squeeze(),
+            colors=rgb.squeeze(),
+        )
+        # Dump to disk
+        pointcloud_fig.write_html("raw_pointcloud.html")
+
         anchor_rgb, anchor_point_cloud = filter_out_names(
             rgb,
             point_cloud,
@@ -540,6 +555,14 @@ def obs_to_input(
             handlemap,
             BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES,
         )
+
+        pointcloud_fig = rvp.pointcloud_fig(
+            anchor_point_cloud.squeeze(),
+            colors=anchor_rgb.squeeze(),
+        )
+        # Dump to disk
+        pointcloud_fig.write_html("anchor_pc.html")
+
     elif anchor_mode == AnchorMode.SINGLE_OBJECT:
         # Get the rgb and point cloud for the anchor objects.
         anchor_rgb, anchor_point_cloud = get_rgb_point_cloud_by_object_names(
@@ -551,6 +574,11 @@ def obs_to_input(
     else:
         raise ValueError(f"Invalid anchor mode: {anchor_mode}")
 
+
+
+    action_point_cloud = np.concatenate([action_point_cloud, action_rgb], axis=-1)
+    anchor_point_cloud = np.concatenate([anchor_point_cloud, anchor_rgb], axis=-1)
+
     # Remove outliers in the same way...
     action_point_cloud = remove_outliers(action_point_cloud[None])[0]
 
@@ -559,6 +587,9 @@ def obs_to_input(
         and anchor_mode != AnchorMode.BACKGROUND_ROBOT_REMOVED
     ):
         anchor_point_cloud = remove_outliers(anchor_point_cloud[None])[0]
+
+    action_point_cloud, action_rgb = action_point_cloud[..., :3], action_point_cloud[..., 3:]
+    anchor_point_cloud, anchor_rgb = anchor_point_cloud[..., :3], anchor_point_cloud[..., 3:]
 
     # Visualize the point clouds.
     # act_pc = o3d.geometry.PointCloud()
@@ -576,9 +607,9 @@ def obs_to_input(
     # o3d.visualization.draw_geometries([act_pc, anc_pc])
 
     return {
-        "action_rgb": torch.from_numpy(action_rgb),
+        "action_rgb": torch.from_numpy(action_rgb).float(),
         "action_pc": torch.from_numpy(action_point_cloud).float(),
-        "anchor_rgb": torch.from_numpy(anchor_rgb),
+        "anchor_rgb": torch.from_numpy(anchor_rgb).float(),
         "anchor_pc": torch.from_numpy(anchor_point_cloud).float(),
     }
 

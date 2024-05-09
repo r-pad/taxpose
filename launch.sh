@@ -71,10 +71,10 @@ elif [ $PLATFORM == "local-docker" ]; then
     -e WANDB_API_KEY="${WANDB_API_KEY}" \
     -e WANDB_DOCKER_IMAGE=taxpose \
     -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json \
-    -v /home/beisner/datasets/:/data \
-    -v /home/beisner/code/rpad/taxpose/artifacts:/opt/artifacts \
-    -v /home/beisner/code/rpad/taxpose/logs:/opt/logs \
-    -v /home/beisner/code/rpad/taxpose:/opt/baeisner/code \
+    -v /data/datasets/:/data \
+    -v /home/eycai/Documents/taxpose/artifacts:/opt/artifacts \
+    -v /home/eycai/Documents/taxpose/logs:/opt/logs \
+    -v /home/eycai/Documents/taxpose:/opt/baeisner/code \
     beisner/taxpose \
     $COMMAND \
     log_dir=/opt/logs \
