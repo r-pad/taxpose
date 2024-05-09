@@ -1,8 +1,0 @@
-# @package _global_
-
-defaults:
-  - /commands/ablations/se3_augmentation/_base@_here_
-  - override /model: taxpose
-  - override /task: mug
-  - override /task: grasp
-  - _self_

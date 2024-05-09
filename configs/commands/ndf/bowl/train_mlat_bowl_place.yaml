@@ -1,8 +1,0 @@
-# @package _global_
-
-defaults:
-  - /commands/ndf/_train@_here_
-  - override /model: mlat_s256_vnn
-  - override /task: bowl
-  - override /phase: place
-  - _self_

@@ -1,8 +1,0 @@
-# @package _global_
-
-defaults:
-  - /commands/ndf/_eval@_here_
-  - override /model: mlat_s256_vnn
-  - override /task: bowl
-  - override /pose_dist: upright
-  - _self_
