@@ -47,6 +47,8 @@ def make_dataset(
         return real_world_mug.RealWorldMugPointCloudDataset(
             cast(real_world_mug.RealWorldMugPointCloudDatasetConfig, cfg)
         )
+    else:
+        raise NotImplementedError(f"Unknown dataset type: {cfg.dataset_type}")
 
 
 class PointCloudDataset(Dataset):
