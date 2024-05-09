@@ -1,0 +1,7 @@
+# @package task
+
+action_class: phone_visual
+anchor_class: phone_case_visual
+name: place
+softmax_temperature: 0.1
+weight_normalize: softmax

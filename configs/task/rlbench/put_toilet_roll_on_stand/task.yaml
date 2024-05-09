@@ -1,0 +1,4 @@
+defaults:
+- phase@phases.grasp: grasp
+- phase@phases.place: place
+name: put_toilet_roll_on_stand

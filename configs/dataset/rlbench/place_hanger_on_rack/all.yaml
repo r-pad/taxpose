@@ -1,0 +1,3 @@
+defaults:
+- rlbench/place_hanger_on_rack/_default@_here_
+- _self_

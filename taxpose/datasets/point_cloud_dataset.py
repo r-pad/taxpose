@@ -35,6 +35,12 @@ def make_dataset(
         import taxpose.datasets.ndf as ndf
 
         return ndf.NDFPointCloudDataset(cast(ndf.NDFPointCloudDatasetConfig, cfg))
+    elif cfg.dataset_type == "rlbench":
+        import taxpose.datasets.rlbench as rlbench
+
+        return rlbench.RLBenchPointCloudDataset(
+            cast(rlbench.RLBenchPointCloudDatasetConfig, cfg)
+        )
     elif cfg.dataset_type == "real_world_mug":
         import taxpose.datasets.real_world_mug as real_world_mug
 
