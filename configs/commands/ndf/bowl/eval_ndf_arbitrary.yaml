@@ -6,3 +6,6 @@ defaults:
   - override /task: bowl
   - override /pose_dist: arbitrary
   - _self_
+
+model:
+  feature_channels: 1

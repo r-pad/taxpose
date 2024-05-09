@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+- eval_ndf_arbitrary
+- override /model: mlat
+
+model:
+  feature_channels: 1
