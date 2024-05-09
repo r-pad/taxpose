@@ -1,0 +1,6 @@
+# @package _global_
+
+defaults:
+  - _base
+  - override /phase: place
+  - _self_

@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+  - /commands/ndf/_train@_here_
+  - override /model: mlat
+  - override /task: mug
+  - _self_
+
+model:
+  mlat_nkps: 100
