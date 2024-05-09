@@ -1,0 +1,5 @@
+# @package _global_
+
+defaults:
+- eval_ndf_arbitrary
+- override /model: mlat

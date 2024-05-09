@@ -6,3 +6,6 @@ defaults:
   - override /task: bottle
   - override /phase: place
   - _self_
+
+model:
+  feature_channels: 1

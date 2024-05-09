@@ -1,0 +1,8 @@
+@inproceedings{
+pan2022taxpose,
+title={{TAX}-Pose: Task-Specific Cross-Pose Estimation for Robot Manipulation},
+author={Chuer Pan and Brian Okorn and Harry Zhang and Ben Eisner and David Held},
+booktitle={6th Annual Conference on Robot Learning},
+year={2022},
+url={https://openreview.net/forum?id=YmJi0bTfeNX}
+}

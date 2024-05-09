@@ -12,10 +12,15 @@ residual_on: True
 cycle: True
 freeze_embnn: False
 return_attn: True
+
+# We're not using multilateration for the head.
 multilaterate: False
 mlat_sample: null
 mlat_nkps: null
-break_symmetry: True
+
+# By default, the number of additional feature channels will be 0.
+# But these could be RGB, symmetry features, etc.
+feature_channels: 0
 
 pretraining:
   action:

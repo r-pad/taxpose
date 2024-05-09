@@ -351,8 +351,8 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
     def module_step(self, batch, batch_idx):
         points_trans_action = batch["points_action_trans"]
         points_trans_anchor = batch["points_anchor_trans"]
-        action_symmetry_features = batch["action_symmetry_features"]
-        anchor_symmetry_features = batch["anchor_symmetry_features"]
+        action_features = batch["action_features"]
+        anchor_features = batch["anchor_features"]
 
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
@@ -365,8 +365,8 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         model_output = self.model(
             points_trans_action,
             points_trans_anchor,
-            action_symmetry_features,
-            anchor_symmetry_features,
+            action_features,
+            anchor_features,
             phase_onehot,
         )
 
@@ -460,11 +460,19 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         # points_trans = batch['points_trans']
         points_trans_action = batch["points_action_trans"]
         points_trans_anchor = batch["points_anchor_trans"]
-        action_symmetry_features = batch["action_symmetry_features"]
-        anchor_symmetry_features = batch["anchor_symmetry_features"]
-        action_symmetry_rgb = batch["action_symmetry_rgb"]
-        anchor_symmetry_rgb = batch["anchor_symmetry_rgb"]
-        onehot = batch["phase_onehot"]
+        action_features = (
+            batch["action_features"] if "action_features" in batch else None
+        )
+        anchor_features = (
+            batch["anchor_features"] if "anchor_features" in batch else None
+        )
+        action_symmetry_rgb = (
+            batch["action_symmetry_rgb"] if "action_symmetry_rgb" in batch else None
+        )
+        anchor_symmetry_rgb = (
+            batch["anchor_symmetry_rgb"] if "anchor_symmetry_rgb" in batch else None
+        )
+        onehot = batch["phase_onehot"] if "phase_onehot" in batch else None
 
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
@@ -472,8 +480,8 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         model_output = self.model(
             points_trans_action,
             points_trans_anchor,
-            action_symmetry_features,
-            anchor_symmetry_features,
+            action_features,
+            anchor_features,
             onehot,
         )
         x_action = model_output["flow_action"]

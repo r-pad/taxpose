@@ -218,6 +218,8 @@ TODO(beisner, chuer): Add links.
 
 # Reproduce our entire paper.
 
+TODO: These instructions are superceded by instructions found in REPRODUCING_TAXPOSE.md and REPRODUCING_RELDIST.md. We would like to remove this section from the README.
+
 ## Table 1: NDF Tasks
 
 In our work, we compare against the performance of Neural Descriptor Fields on the task they released in their paper.

@@ -63,13 +63,13 @@ from taxpose.datasets.symmetry_utils import (
     rotational_symmetry_labels,
     scalars_to_rgb,
 )
+from taxpose.nets.pointnet import PointNet
 
 # from taxpose.datasets.ndf import compute_demo_symmetry_features
 from taxpose.nets.transformer_flow import CustomTransformer as Transformer
 from taxpose.nets.transformer_flow import MultilaterationHead
 from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer as RF_DET
-from taxpose.nets.transformer_flow import ResidualMLPHead
-from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
+from taxpose.nets.transformer_flow import ResidualMLPHead, create_embedding_network
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
@@ -136,38 +136,26 @@ class DGCNN(nn.Module):
 class ResidualFlow_DiffEmbTransformer(nn.Module):
     def __init__(
         self,
-        emb_dims=512,
+        encoder_cfg,
         cycle=True,
-        emb_nn="dgcnn",
         center_feature=False,
-        inital_sampling_ratio=0.2,
         pred_weight=True,
         residual_on=True,
         freeze_embnn=False,
         return_attn=True,
-        input_dims=3,
         multilaterate=False,
-        sample: bool = False,
+        mlat_sample: bool = False,
         mlat_nkps: int = 100,
+        feature_channels=0,  # Number of extra channels we'll pass into the network.
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
-        self.emb_dims = emb_dims
         self.cycle = cycle
-        self.input_dims = input_dims
+        self.feature_channels = feature_channels
 
-        if emb_nn == "dgcnn":
-            self.emb_nn_action = DGCNN(
-                emb_dims=self.emb_dims, input_dims=self.input_dims
-            )
-            self.emb_nn_anchor = DGCNN(
-                emb_dims=self.emb_dims, input_dims=self.input_dims
-            )
-        elif emb_nn == "vn_dgcnn":
-            args = VNArgs()
-            self.emb_nn_action = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
-            self.emb_nn_anchor = VN_DGCNN(args, num_part=self.emb_dims, gc=False)
-        else:
-            raise Exception("Not implemented")
+        self.emb_nn_action = create_embedding_network(encoder_cfg)
+        self.emb_nn_anchor = create_embedding_network(encoder_cfg)
+        emb_dims = encoder_cfg.emb_dims
+
         self.center_feature = center_feature
         self.pred_weight = pred_weight
         self.residual_on = residual_on
@@ -180,17 +168,19 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.transformer_anchor = Transformer(
             emb_dims=emb_dims, return_attn=self.return_attn, bidirectional=False
         )
+        self.head_action: nn.Module
+        self.head_anchor: nn.Module
         if multilaterate:
             self.head_action = MultilaterationHead(
                 emb_dims=emb_dims,
                 pred_weight=self.pred_weight,
-                sample=sample,
+                sample=mlat_sample,
                 n_kps=mlat_nkps,
             )
             self.head_anchor = MultilaterationHead(
                 emb_dims=emb_dims,
                 pred_weight=self.pred_weight,
-                sample=sample,
+                sample=mlat_sample,
                 n_kps=mlat_nkps,
             )
         else:
@@ -205,26 +195,19 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 residual_on=self.residual_on,
             )
 
+        if self.feature_channels > 0:
+            # We're basically putting a few MLP layers in on top of the invariant module.
+            combined_dims = emb_dims + self.feature_channels
+            self.feature_channel_encoder_action = nn.Sequential(
+                PointNet([combined_dims, combined_dims * 2, combined_dims * 4]),
+                nn.Conv1d(combined_dims * 4, emb_dims, kernel_size=1, bias=False),
+            )
+            self.feature_channel_encoder_anchor = nn.Sequential(
+                PointNet([combined_dims, combined_dims * 2, combined_dims * 4]),
+                nn.Conv1d(combined_dims * 4, emb_dims, kernel_size=1, bias=False),
+            )
+
     def forward(self, *input):
-        assert input[0].shape[2] in [
-            3,
-            4,
-        ], f"action_points should be of shape (Batch, {3,4}. num_points), but got {input[0].shape}"
-
-        # compute action_dmean
-        if input[0].shape[2] == 4:
-            raise ValueError("this is not expected...")
-            # action_xyz = action_points_input[:, :3]
-            # anchor_xyz = anchor_points_input[:, :3]
-            # action_sym_cls = action_points_input[:, 3:]
-            # anchor_sym_cls = anchor_points_input[:, 3:]
-            # action_xyz_dmean = action_xyz - action_xyz.mean(dim=2, keepdim=True)
-            # anchor_xyz_dmean = anchor_xyz - anchor_xyz.mean(dim=2, keepdim=True)
-            # action_points_dmean = torch.cat([action_xyz_dmean, action_sym_cls], axis=1)
-            # anchor_points_dmean = torch.cat([anchor_xyz_dmean, anchor_sym_cls], axis=1)
-
-        # elif action_points.shape[1] == 3:
-
         action_points = input[0].permute(0, 2, 1)[:, :3]  # B,3,num_points
         anchor_points = input[1].permute(0, 2, 1)[:, :3]
 
@@ -242,6 +225,26 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         if self.freeze_embnn:
             action_embedding = action_embedding.detach()
             anchor_embedding = anchor_embedding.detach()
+
+        if self.feature_channels > 0:
+            # Add a symmetry label to the embeddings.
+            action_features = input[2].permute(0, 2, 1)
+            anchor_features = input[3].permute(0, 2, 1)
+
+            action_embedding_stack = torch.cat(
+                [action_embedding, action_features], axis=1
+            )
+            anchor_embedding_stack = torch.cat(
+                [anchor_embedding, anchor_features], axis=1
+            )
+
+            action_embedding = self.feature_channel_encoder_action(
+                action_embedding_stack
+            )
+
+            anchor_embedding = self.feature_channel_encoder_anchor(
+                anchor_embedding_stack
+            )
 
         # tilde_phi, phi are both B,512,N
         # Get the new cross-attention embeddings.
@@ -291,9 +294,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             outputs["sampled_ixs_action"] = head_action_output["A_ixs"]
 
         if self.cycle:
-            if anchor_attn is not None:
-                anchor_attn = anchor_attn.mean(dim=1)
-
+            anchor_attn = anchor_attn.mean(dim=1)
             head_anchor_output = self.head_anchor(
                 anchor_embedding_tf,
                 action_embedding_tf,
@@ -677,14 +678,14 @@ MAX_TIME = 5.0
 def create_network(model_cfg):
     network = RF_DET(
         pred_weight=model_cfg.pred_weight,
-        encoder_cfg=model_cfg.emb_nn,
+        encoder_cfg=model_cfg.encoder,
         center_feature=model_cfg.center_feature,
         # inital_sampling_ratio=model_cfg.inital_sampling_ratio,
         residual_on=model_cfg.residual_on,
         multilaterate=model_cfg.multilaterate,
-        sample=model_cfg.mlat_sample,
+        mlat_sample=model_cfg.mlat_sample,
         mlat_nkps=model_cfg.mlat_nkps,
-        break_symmetry=model_cfg.break_symmetry,
+        feature_channels=model_cfg.feature_channels,
     )
     return network
 
@@ -814,14 +815,14 @@ def main(hydra_cfg):
     results_file_name = hydra_cfg.results_file_name
     results_path = osp.join(eval_save_dir, results_file_name)
 
-    obj_class = hydra_cfg.object_class.name
+    obj_class = hydra_cfg.task.name
 
     shapenet_obj_dir = osp.join(
         path_util.get_ndf_obj_descriptions(), obj_class + "_centered_obj_normalized"
     )
 
     demo_load_dir = osp.join(
-        path_util.get_ndf_data(), "demos", obj_class, hydra_cfg.object_class.demo_exp
+        path_util.get_ndf_data(), "demos", obj_class, hydra_cfg.task.demo_exp
     )
 
     global_dict = dict(

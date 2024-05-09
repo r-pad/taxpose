@@ -24,6 +24,9 @@ class PointCloudDatasetConfig:
     anchor_rot_sample_method: str = "axis_angle"
     dataset_size: int = 1000
 
+    # Handle the synthesizing of various features.
+    include_symmetry_features: bool = False
+
 
 def make_dataset(
     cfg: PlacementPointCloudDatasetConfig,
@@ -55,32 +58,13 @@ class PointCloudDataset(Dataset):
         self.trans_var = cfg.translation_variance
         self.action_rot_sample_method = cfg.action_rot_sample_method
         self.anchor_rot_sample_method = cfg.anchor_rot_sample_method
+        self.cfg = cfg
 
     def __getitem__(self, index):
         data_ix = torch.randint(len(self.dataset), [1]).item()
         data = self.dataset[data_ix]
         points_action = torch.from_numpy(data["points_action"])
         points_anchor = torch.from_numpy(data["points_anchor"])
-        action_sym_feats = (
-            torch.from_numpy(data["action_symmetry_features"])
-            if data["action_symmetry_features"] is not None
-            else None
-        )
-        anchor_sym_feats = (
-            torch.from_numpy(data["anchor_symmetry_features"])
-            if data["anchor_symmetry_features"] is not None
-            else None
-        )
-        action_sym_rgb = (
-            torch.from_numpy(data["action_symmetry_rgb"])
-            if data["action_symmetry_rgb"] is not None
-            else None
-        )
-        anchor_sym_rgb = (
-            torch.from_numpy(data["anchor_symmetry_rgb"])
-            if data["anchor_symmetry_rgb"] is not None
-            else None
-        )
 
         T0 = random_se3(
             1,
@@ -109,14 +93,40 @@ class PointCloudDataset(Dataset):
             "T0": T0.get_matrix().squeeze(0),
             "T1": T1.get_matrix().squeeze(0),
         }
-        if action_sym_feats is not None:
-            out_dict["action_symmetry_features"] = action_sym_feats.squeeze(0)
-            out_dict["anchor_symmetry_features"] = anchor_sym_feats.squeeze(0)
-            out_dict["action_symmetry_rgb"] = action_sym_rgb.squeeze(0)
-            out_dict["anchor_symmetry_rgb"] = anchor_sym_rgb.squeeze(0)
 
-        if "phase_onehot" in data:
-            out_dict["phase_onehot"] = data["phase_onehot"]
+        # Handle the extra features.
+
+        # We might have different features to include here.
+        action_features = None
+        anchor_features = None
+        if self.cfg.include_symmetry_features:
+            if (
+                "action_symmetry_features" not in data
+                or "anchor_symmetry_features" not in data
+                or "action_symmetry_rgb" not in data
+                or "anchor_symmetry_rgb" not in data
+            ):
+                raise ValueError("expected symmetry features to be present in dataset")
+            action_sym_feats = torch.from_numpy(
+                data["action_symmetry_features"]
+            ).squeeze(0)
+            anchor_sym_feats = torch.from_numpy(
+                data["anchor_symmetry_features"]
+            ).squeeze(0)
+            action_sym_rgb = torch.from_numpy(data["action_symmetry_rgb"]).squeeze(0)
+            anchor_sym_rgb = torch.from_numpy(data["anchor_symmetry_rgb"]).squeeze(0)
+
+            out_dict["action_symmetry_features"] = action_sym_feats
+            out_dict["anchor_symmetry_features"] = anchor_sym_feats
+            out_dict["action_symmetry_rgb"] = action_sym_rgb
+            out_dict["anchor_symmetry_rgb"] = anchor_sym_rgb
+
+            action_features = action_sym_feats
+            anchor_features = anchor_sym_feats
+
+        if action_features is not None and anchor_features is not None:
+            out_dict["action_features"] = action_features
+            out_dict["anchor_features"] = anchor_features
 
         return out_dict
 

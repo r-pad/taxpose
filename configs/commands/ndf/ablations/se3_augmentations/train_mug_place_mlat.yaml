@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+  - _base
+  - override /model: mlat
+  - override /task: mug
+  - override /phase: place
+  - _self_

@@ -335,8 +335,12 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
         assert not isinstance(anchor_symmetry_features, torch.Tensor)
 
         if action_symmetry_features is not None:
-            action_symmetry_features = np.expand_dims(action_symmetry_features, 0)
-            anchor_symmetry_features = np.expand_dims(anchor_symmetry_features, 0)
+            action_symmetry_features = np.expand_dims(
+                action_symmetry_features, 0
+            ).astype(np.float32)
+            anchor_symmetry_features = np.expand_dims(
+                anchor_symmetry_features, 0
+            ).astype(np.float32)
             action_symmetry_rgb = np.expand_dims(action_symmetry_rgb, 0)
             anchor_symmetry_rgb = np.expand_dims(anchor_symmetry_rgb, 0)
 
