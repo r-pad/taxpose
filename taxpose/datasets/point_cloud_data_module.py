@@ -43,17 +43,21 @@ class MultiviewDataModule(pl.LightningDataModule):
             parallel_iterate(self.val_dataset.dataset, self.num_workers)
 
     def train_dataloader(self):
+        num_workers = self.num_workers
+        # num_workers = 0
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            persistent_workers=self.num_workers > 0,
+            num_workers=num_workers,
+            persistent_workers=num_workers > 0,
         )
 
     def val_dataloader(self):
+        num_workers = self.num_workers
+        # num_workers = 0
         return DataLoader(
             self.val_dataset,
             batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            persistent_workers=self.num_workers > 0,
+            num_workers=num_workers,
+            persistent_workers=num_workers > 0,
         )
