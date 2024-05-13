@@ -35,12 +35,12 @@ class MultiviewDataModule(pl.LightningDataModule):
         if stage == "train" or stage is None:
             self.train_dataset = PointCloudDataset(self.cfg.train_dset)
             # Iterate once over the dataset to make sure it's been processed.
-            parallel_iterate(self.train_dataset.dataset, self.num_workers)
+            # parallel_iterate(self.train_dataset.dataset, self.num_workers)
 
         if stage == "val" or stage is None:
             self.val_dataset = PointCloudDataset(self.cfg.val_dset)
             # Iterate once over the dataset to make sure it's been processed.
-            parallel_iterate(self.val_dataset.dataset, self.num_workers)
+            # parallel_iterate(self.val_dataset.dataset, self.num_workers)
 
     def train_dataloader(self):
         num_workers = self.num_workers

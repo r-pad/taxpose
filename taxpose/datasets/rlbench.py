@@ -300,6 +300,7 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
     def __getitem__(self, index: int) -> PlacementPointCloudData:
         # Load the data.
         points_action, points_anchor, data = self._load_data(index)
+        # breakpoint()
         # Occlude if necessary.
         # TODO: implement occlusions here.
 

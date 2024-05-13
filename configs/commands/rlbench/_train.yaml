@@ -1,0 +1,23 @@
+# @package _global_
+
+defaults:
+  - /train_ndf
+  - override /benchmark: rlbench
+  - _self_
+
+resources:
+  num_workers: 4
+
+pretraining:
+  mode: none
+
+training:
+  max_epochs: 500
+  batch_size: 8
+  check_val_every_n_epoch: 10
+  log_every_n_steps: 100
+
+dm:
+  train_dset:
+    num_points: 256
+    synthetic_occlusion: False
