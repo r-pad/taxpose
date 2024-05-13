@@ -1,11 +1,16 @@
  # @package _global_
 
 defaults:
-  - override /task: stack_wine
+  - override /task: put_toilet_roll_on_stand
   - override /phase: place
+
+# Needs override for adding the symmetry features.
+model:
+  feature_channels: 1
 
 dm:
   train_dset:
+    include_symmetry_features: True
     demo_dset:
       episodes:
         - 0

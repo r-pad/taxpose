@@ -1,4 +1,8 @@
-# @package _global_
+ # @package _global_
+
+defaults:
+  - override /task: phone_on_base
+  - override /phase: place
 
 dm:
   train_dset:
