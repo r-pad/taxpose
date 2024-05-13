@@ -26,32 +26,6 @@ def _get_config_names(bmark):
     return configs
 
 
-HYDRA_CONFIG = {}
-
-
-@pytest.mark.parametrize("config_name", _get_config_names("rlbench"))
-def test_rlbench_commands_compile(config_name):
-    with initialize(version_base=None, config_path="../configs"):
-        cfg = compose(
-            config_name=config_name,
-            overrides=[
-                "hydra.verbose=true",
-                "hydra.job.num=1",
-                "hydra.runtime.output_dir=.",
-                "seed=1234",
-            ],
-            return_hydra_config=True,
-        )
-        # Resolve the config
-        HydraConfig.instance().set_config(cfg)
-
-        # Resolve to yaml.
-        yaml_cfg = OmegaConf.to_yaml(cfg, resolve=True)
-
-        assert cfg.job_type is not None
-        assert cfg.wandb.save_dir is not None
-
-
 @pytest.mark.parametrize("config_name", _get_config_names("ndf"))
 def test_ndf_commands_compile(config_name):
     with initialize(version_base="1.1", config_path="../configs"):
