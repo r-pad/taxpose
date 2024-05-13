@@ -1,0 +1,7 @@
+# @package task
+
+action_class: dollar_stack
+anchor_class: safe_body
+name: preplace
+softmax_temperature: 0.1
+weight_normalize: softmax

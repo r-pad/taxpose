@@ -1,0 +1,6 @@
+defaults:
+- phase@phases.pregrasp: pregrasp
+- phase@phases.grasp: grasp
+- phase@phases.lift: lift
+- phase@phases.place: place
+name: put_knife_on_chopping_board

@@ -1,0 +1,6 @@
+defaults:
+- phase@phases.pregrasp: pregrasp
+- phase@phases.grasp: grasp
+- phase@phases.lift: lift
+- phase@phases.final: final
+name: pick_and_lift
