@@ -1,4 +1,0 @@
-defaults:
-- phase@phases.grasp: grasp
-- phase@phases.place: place
-name: solve_puzzle

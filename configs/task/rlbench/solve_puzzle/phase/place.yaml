@@ -1,7 +1,0 @@
-# @package task
-
-action_class: solve_puzzle_piece_visual2
-anchor_class: solve_puzzle_piece1
-name: place
-softmax_temperature: 0.1
-weight_normalize: softmax

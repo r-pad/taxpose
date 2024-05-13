@@ -1,7 +1,0 @@
-# @package task
-
-name: DEFAULT
-action_class: DEFAULT
-anchor_class: DEFAULT
-softmax_temperature: 0.1
-weight_normalize: softmax
