@@ -11,7 +11,7 @@ class PlacementPointCloudData(TypedDict):
     anchor_symmetry_features: Optional[npt.NDArray[np.float32]]  # (1, num_points, 1)
     action_symmetry_rgb: Optional[npt.NDArray[np.uint8]]  # (1, num_points, 3)
     anchor_symmetry_rgb: Optional[npt.NDArray[np.uint8]]  # (1, num_points, 3)
-    phase: Optional[npt.NDArray[np.int32]]  # (1,)
+    phase: Optional[str]
     phase_onehot: Optional[npt.NDArray[np.float32]]  # (1, num_phases)
 
 

@@ -126,9 +126,9 @@ def generate_training_command_configs(
 
     make_dirs(commands_dir, dry_run=dry_run)
 
-    # Find and replace the string "DEFAULT" with the task name in the file train_taxpose_all.yaml.
-    default_file = os.path.join(default_dir, "train_taxpose_all.yaml")
-    task_file = os.path.join(commands_dir, "train_taxpose_all.yaml")
+    # Find and replace the string "DEFAULT" with the task name in the file train_taxpose_tc.yaml.
+    default_file = os.path.join(default_dir, "train_taxpose_tc.yaml")
+    task_file = os.path.join(commands_dir, "train_taxpose_tc.yaml")
 
     with open(default_file, "r") as f:
         contents = f.read()
@@ -146,18 +146,18 @@ def generate_precision_eval_command_configs(
     make_dirs(commands_dir, dry_run=dry_run)
 
     # For each phase, create a file called "phase.yaml" in the taxpose directory, which is a copy of
-    # commands/rlbench/task_name/train_taxpose_all.yaml. Replace "_train" with "_eval", and replace
+    # commands/rlbench/task_name/train_taxpose_tc.yaml. Replace "_train" with "_eval", and replace
     # "/phase: all" with "/phase: phase".
     for phase in TASK_DICT[task_name]["phase_order"]:
         default_file = os.path.join(
-            config_root, "commands", "rlbench", task_name, "train_taxpose_all.yaml"
+            config_root, "commands", "rlbench", task_name, "train_taxpose_tc.yaml"
         )
         task_file = os.path.join(commands_dir, f"{phase}.yaml")
 
         with open(default_file, "r") as f:
             contents = f.read()
         contents = contents.replace("DEFAULT", task_name)
-        contents = contents.replace("_train", "_eval")
+        contents = contents.replace("_train", "_eval_metrics")
         contents = contents.replace("/phase: all", f"/phase: {phase}")
         contents = contents.replace("/model: taxpose\n", f"/model: {method_name}\n")
         write_file(task_file, contents, dry_run=dry_run)
@@ -172,9 +172,9 @@ def generate_rlbench_eval_command_configs(
 
     make_dirs(commands_dir, dry_run=dry_run)
 
-    # Copy the "train_taxpose_all.yaml" file from the task directory to the method directory.
+    # Copy the "train_taxpose_tc.yaml" file from the task directory to the method directory.
     default_file = os.path.join(
-        config_root, "commands", "rlbench", task_name, "train_taxpose_all.yaml"
+        config_root, "commands", "rlbench", task_name, "train_taxpose_tc.yaml"
     )
 
     task_file = os.path.join(commands_dir, "eval_rlbench.yaml")
@@ -192,8 +192,6 @@ def generate_rlbench_eval_command_configs(
         contents["model"]["num_points"] = contents["dm"]["train_dset"]["demo_dset"][
             "num_points"
         ]
-    contents["model"]["z_offset"] = 0.0
-    contents["model"]["break_symmetry"] = contents["break_symmetry"]
 
     # Write the contents back to the file.
     contents_str = yaml.dump(contents)
@@ -242,104 +240,38 @@ def generate_precision_eval_script(
         os.chmod(script_file, 0o777)
 
 
-def generate_checkpoint_configs(
-    task_name: str, config_root: str, method_name: str, dry_run: bool = False
-):
-    checkpoint_dir = os.path.join(config_root, "checkpoints", "rlbench", task_name)
-
-    make_dirs(checkpoint_dir, dry_run=dry_run)
-    make_dirs(os.path.join(checkpoint_dir, "pretraining"), dry_run=dry_run)
-
-    # Create empty files for the pretraining checkpoints.
-    for phase in TASK_DICT[task_name]["phase_order"] + ["all"]:
-        phase_file = os.path.join(checkpoint_dir, "pretraining", f"{phase}.yaml")
-        write_file(phase_file, "", dry_run=dry_run)
-
-
-def generate_method_checkpoint_configs(
-    task_name: str, config_root: str, method_name: str, dry_run: bool = False
-):
-    checkpoint_dir = os.path.join(config_root, "checkpoints", "rlbench", task_name)
-
-    # Create a method folder in the task directory.
-    method_dir = os.path.join(checkpoint_dir, method_name)
-    make_dirs(method_dir, dry_run=dry_run)
-
-    # For each phase, create a file called "phase.yaml" in the method directory.
-    for phase in TASK_DICT[task_name]["phase_order"]:
-        phase_file = os.path.join(method_dir, f"{phase}.yaml")
-        # contents = {"ckpt_file": "r-pad/taxpose/model-???:v0"}
-        contents = {
-            "defaults": [
-                f"/checkpoints/rlbench/{task_name}/{method_name}/_model@_here_"
-            ]
-        }
-        contents = yaml.dump(contents)
-
-        # Prepend the contents with "# @package checkpoints.{task_name}.{method_name}".
-        # contents = (
-        #     f"# @package checkpoints.rlbench.{task_name}.{method_name}\n\n" + contents
-        # )
-        write_file(phase_file, contents, dry_run=dry_run, overwrite=True)
-
-    # Create a file called _model.yaml
-    model_file = os.path.join(method_dir, "_model.yaml")
-    contents = {"ckpt_file": f"r-pad/{method_name}/model-???:v0"}
-    contents = yaml.dump(contents)
-    write_file(model_file, contents, dry_run=dry_run, overwrite=False)
-
-    # Create a file called method_name in the task directory.
-    method_file = os.path.join(checkpoint_dir, f"{method_name}.yaml")
-    contents = {
-        "defaults": [
-            {f"{task_name}/{method_name}@{phase}": phase}
-            for phase in TASK_DICT[task_name]["phase_order"]
-        ]
-    }
-    contents_str = yaml.dump(contents)
-    write_file(method_file, contents_str, dry_run=dry_run)
-
-
 def main(
     task_names: List[str],
     dry_run: bool = False,
-    evals: bool = True,
-    model_cfgs: bool = True,
+    training_cfgs: bool = True,
+    rlbench_eval: bool = True,
 ):
     for task_name in task_names:
         print(f"Generating task configs for {task_name}")
 
         config_root = "configs"
 
-        if not evals:
+        if not training_cfgs:
             generate_task_configs(task_name, config_root, dry_run=dry_run)
 
             generate_dataset_configs(task_name, config_root, dry_run=dry_run)
 
-            if model_cfgs:
-                generate_training_command_configs(
-                    task_name, config_root, dry_run=dry_run
-                )
-
-                generate_checkpoint_configs(
-                    task_name, config_root, "taxpose_all", dry_run=dry_run
-                )
-
         else:
-            generate_method_checkpoint_configs(
-                task_name, config_root, "taxpose_all", dry_run=dry_run
-            )
+            generate_training_command_configs(task_name, config_root, dry_run=dry_run)
+
             generate_precision_eval_command_configs(
-                task_name, config_root, "taxpose_all", dry_run=dry_run
+                task_name, config_root, "taxpose_tc", dry_run=dry_run
             )
 
             generate_precision_eval_script(
-                task_name, config_root, "taxpose_all", dry_run=dry_run
+                task_name, config_root, "taxpose_tc", dry_run=dry_run
             )
 
-            generate_rlbench_eval_command_configs(
-                task_name, config_root, "taxpose_all", dry_run=dry_run
-            )
+            if rlbench_eval:
+
+                generate_rlbench_eval_command_configs(
+                    task_name, config_root, "taxpose_tc", dry_run=dry_run
+                )
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import functools
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar, Dict, List, Literal, Optional, Tuple, Union
+from typing import ClassVar, Dict, List, Literal, Optional, Tuple, Union, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -386,7 +386,7 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
         assert len(action_symmetry_rgb.shape) == 3
         assert len(anchor_symmetry_rgb.shape) == 3
 
-        phase = data["phase"].numpy().astype(np.float32)
+        phase = cast(str, data["phase"])
         phase_onehot = data["phase_onehot"].numpy().astype(np.float32)
 
         return {

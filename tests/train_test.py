@@ -45,15 +45,17 @@ def _get_training_config_names(bmark, ablation=False):
     return configs
 
 
-DEFAULT_NDF_PATH = "/data"
+DEFAULT_DATA_PATH = "/data"
+DEFAULT_RLBENCH_ROOT = "rlbench"
 
 
-def _test_commands_run(config_name):
+def _test_commands_run(config_name, bmark_dataset_root="ndf"):
     dataset_root = (
-        os.environ["NDF_DATASET_ROOT"]
-        if "NDF_DATASET_ROOT" in os.environ
-        else DEFAULT_NDF_PATH
+        os.environ["DEFAULT_DATA_PATH"]
+        if "DEFAULT_DATA_PATH" in os.environ
+        else DEFAULT_DATA_PATH
     )
+    bmark_dataset_root = os.path.join(dataset_root, bmark_dataset_root)
     torch.multiprocessing.set_sharing_strategy("file_system")
 
     with initialize(version_base=None, config_path="../configs"):
@@ -65,6 +67,7 @@ def _test_commands_run(config_name):
                 "hydra.runtime.output_dir=.",
                 "seed=1234",
                 f"data_root={dataset_root}",
+                f"benchmark.dataset_root={bmark_dataset_root}",
                 "training.batch_size=2",
             ],
             return_hydra_config=True,
@@ -79,26 +82,33 @@ def _test_commands_run(config_name):
 
 
 # Skip this if the environment variable is not set or the path does not exist.
-@pytest.mark.training
+@pytest.mark.ndf_training
 @pytest.mark.skipif(
-    ("NDF_DATASET_ROOT" not in os.environ or not os.path.exists(DEFAULT_NDF_PATH))
+    ("DEFAULT_DATA_PATH" not in os.environ or not os.path.exists(DEFAULT_DATA_PATH))
     and not torch.cuda.is_available(),
-    reason="NDF_DATASET_ROOT environment variable is not set or the path does not exist.",
+    reason="DEFAULT_DATA_PATH environment variable is not set or the path does not exist.",
 )
 @pytest.mark.parametrize("config_name", _get_training_config_names("ndf"))
-def test_training_commands_run(config_name):
-    _test_commands_run(config_name)
+def test_ndf_training_commands_run(config_name):
+    _test_commands_run(config_name, "ndf")
 
 
 # Do the same for the ablation configs.
 @pytest.mark.ablations
 @pytest.mark.skipif(
-    ("NDF_DATASET_ROOT" not in os.environ or not os.path.exists(DEFAULT_NDF_PATH))
+    ("DEFAULT_DATA_PATH" not in os.environ or not os.path.exists(DEFAULT_DATA_PATH))
     and not torch.cuda.is_available(),
-    reason="NDF_DATASET_ROOT environment variable is not set or the path does not exist.",
+    reason="DEFAULT_DATA_PATH environment variable is not set or the path does not exist.",
 )
 @pytest.mark.parametrize(
     "config_name", _get_training_config_names("ndf", ablation=True)
 )
 def test_training_ablation_commands_run(config_name):
-    _test_commands_run(config_name)
+    _test_commands_run(config_name, "ndf")
+
+
+# Skip this if the environment variable is not set or the path does not exist.
+@pytest.mark.rlbench_training
+@pytest.mark.parametrize("config_name", _get_training_config_names("rlbench"))
+def test_rlbench_training_commands_run(config_name):
+    _test_commands_run(config_name, DEFAULT_RLBENCH_ROOT)

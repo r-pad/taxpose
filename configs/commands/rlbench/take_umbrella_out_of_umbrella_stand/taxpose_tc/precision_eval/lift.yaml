@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_eval_metrics@_here_
+  - override /model: taxpose_tc
+  - override /task: take_umbrella_out_of_umbrella_stand
+  - override /phase: lift
+  - _self_

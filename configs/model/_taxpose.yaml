@@ -22,6 +22,9 @@ mlat_nkps: null
 # But these could be RGB, symmetry features, etc.
 feature_channels: 0
 
+# Whether or not we want to include a conditioning vector to include a specific task.
+conditional: False
+
 pretraining:
   action:
     ckpt_path: null
