@@ -7,7 +7,11 @@ import numpy as np
 import numpy.typing as npt
 import open3d as o3d
 import torch
-from rpad.rlbench_utils.placement_dataset import AnchorMode, RLBenchPlacementDataset
+from rpad.rlbench_utils.placement_dataset import (
+    ActionMode,
+    AnchorMode,
+    RLBenchPlacementDataset,
+)
 from torch.utils.data import Dataset
 
 from taxpose.datasets.augmentations import OcclusionConfig, maybe_downsample
@@ -15,7 +19,9 @@ from taxpose.datasets.base import PlacementPointCloudData
 
 
 def rotational_symmetry_labels(
-    points, symmetry_axis, second_axis
+    points: npt.NDArray[np.float32],
+    symmetry_axis: npt.NDArray[np.float32],
+    second_axis: npt.NDArray[np.float32],
 ) -> npt.NDArray[np.float32]:
     """Get some 1-D symmetry labels for rotational symmetry.
 
@@ -36,7 +42,7 @@ def rotational_symmetry_labels(
     # Normalize by the largest inner product.
     inner_products /= np.max(np.abs(inner_products))
 
-    return inner_products.astype(np.float32)
+    return inner_products.astype(np.float32)  # type: ignore
 
 
 DEMO_SYMMETRY_LABELS = {
@@ -228,15 +234,15 @@ class RLBenchPointCloudDatasetConfig:
     # the initial, onoccluded observation to the final, occluded position.
     teleport_initial_to_final: bool = True
     with_symmetry: bool = True
-    anchor_mode: str = "single_object"
-    action_mode: str = "object"
+    anchor_mode: AnchorMode = AnchorMode.SINGLE_OBJECT
+    action_mode: ActionMode = ActionMode.OBJECT
 
 
 class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
     def __init__(self, cfg: RLBenchPointCloudDatasetConfig):
         super().__init__()
         self.dataset = RLBenchPlacementDataset(
-            dataset_root=cfg.dataset_root,
+            dataset_root=str(cfg.dataset_root),
             task_name=cfg.task_name,
             demos=cfg.episodes,
             phase=cfg.phase,
@@ -253,7 +259,11 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
     @functools.lru_cache(maxsize=1000)
     def _load_data(
         self, index: int
-    ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, torch.Tensor]]:
+    ) -> Tuple[
+        npt.NDArray[np.float32],
+        npt.NDArray[np.float32],
+        Dict[str, torch.Tensor],
+    ]:
         data = self.dataset[index]
         # This dataset should really be about the keyframes, but there are some
         # occlusions at keyframes. We may want to switch to using an "imagined"
@@ -292,28 +302,26 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
         new_data = {
             "T_action_key_world": data["T_action_key_world"],
             "T_anchor_key_world": data["T_anchor_key_world"],
-            "phase": data["phase"],
-            "phase_onehot": data["phase_onehot"],
         }
         return points_action, points_anchor, new_data
 
     def __getitem__(self, index: int) -> PlacementPointCloudData:
         # Load the data.
-        points_action, points_anchor, data = self._load_data(index)
+        points_action_np, points_anchor_np, data = self._load_data(index)
         # breakpoint()
         # Occlude if necessary.
         # TODO: implement occlusions here.
 
         # Downsample if necessary.
         try:
-            points_action = maybe_downsample(points_action, self.cfg.num_points)
+            points_action = maybe_downsample(points_action_np, self.cfg.num_points)
 
             num_anchor_points = (
                 self.cfg.num_points
                 if not self.cfg.anchor_mode == AnchorMode.RAW
                 else 1024
             )
-            points_anchor = maybe_downsample(points_anchor, num_anchor_points)
+            points_anchor = maybe_downsample(points_anchor_np, num_anchor_points)
         except:
             print(f"Failed to downsample {index}.")
 
@@ -383,6 +391,4 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             "anchor_symmetry_features": anchor_symmetry_features,
             "action_symmetry_rgb": action_symmetry_rgb,
             "anchor_symmetry_rgb": anchor_symmetry_rgb,
-            "phase": data["phase"],
-            "phase_onehot": torch.as_tensor(data["phase_onehot"]),
         }

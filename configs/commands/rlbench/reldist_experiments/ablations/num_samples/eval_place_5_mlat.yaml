@@ -1,0 +1,6 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_eval_metrics@_here_
+  - _5
+  - override /model: mlat
