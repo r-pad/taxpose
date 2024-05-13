@@ -300,7 +300,12 @@ def generate_method_checkpoint_configs(
     write_file(method_file, contents_str, dry_run=dry_run)
 
 
-def main(task_names: List[str], dry_run: bool = False, evals: bool = True):
+def main(
+    task_names: List[str],
+    dry_run: bool = False,
+    evals: bool = True,
+    model_cfgs: bool = True,
+):
     for task_name in task_names:
         print(f"Generating task configs for {task_name}")
 
@@ -311,11 +316,14 @@ def main(task_names: List[str], dry_run: bool = False, evals: bool = True):
 
             generate_dataset_configs(task_name, config_root, dry_run=dry_run)
 
-            generate_training_command_configs(task_name, config_root, dry_run=dry_run)
+            if model_cfgs:
+                generate_training_command_configs(
+                    task_name, config_root, dry_run=dry_run
+                )
 
-            generate_checkpoint_configs(
-                task_name, config_root, "taxpose_all", dry_run=dry_run
-            )
+                generate_checkpoint_configs(
+                    task_name, config_root, "taxpose_all", dry_run=dry_run
+                )
 
         else:
             generate_method_checkpoint_configs(

@@ -2,7 +2,58 @@
 
 ## Table 1 - RLBench Placement Tasks
 
-TODO: Once the RLBench envs are merged.
+```
+####### insert_onto_square_peg ########
+
+# Taxpose
+python scripts/train_residual_flow.py --config-name commands/rlbench/reldist_experiments/insert_onto_square_peg/train_place_taxpose
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/insert_onto_square_peg/eval_place_taxpose
+
+# MLAT
+python scripts/train_residual_flow.py --config-name commands/rlbench/reldist_experiments/insert_onto_square_peg/train_place_mlat
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/insert_onto_square_peg/eval_place_mlat
+
+####### phone_on_base ########
+
+# Taxpose
+python scripts/train_residual_flow.py --config-name commands/rlbench/reldist_experiments/phone_on_base/train_place_taxpose
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/phone_on_base/eval_place_taxpose
+
+# MLAT
+python scripts/train_residual_flow.py --config-name commands/rlbench/reldist_experiments/phone_on_base/train_place_mlat
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/phone_on_base/eval_place_mlat
+
+####### place_hanger_on_rack ########
+
+# Taxpose
+python scripts/train_residual_flow.py --config-name commands/rlbench/reldist_experiments/place_hanger_on_rack/train_place_taxpose
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/place_hanger_on_rack/eval_place_taxpose
+
+# MLAT
+python scripts/train_residual_flow.py --config-name commands/rlbench/reldist_experiments/place_hanger_on_rack/train_place_mlat
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/place_hanger_on_rack/eval_place_mlat
+
+####### put_toilet_roll_on_stand ########
+
+# Taxpose
+python scripts/train_residual_flow.py --config-name commands/rlbench/reldist_experiments/put_toilet_roll_on_stand/train_place_taxpose
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/put_toilet_roll_on_stand/eval_place_taxpose
+
+# MLAT
+python scripts/train_residual_flow.py --config-name commands/rlbench/reldist_experiments/put_toilet_roll_on_stand/train_place_mlat
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/put_toilet_roll_on_stand/eval_place_mlat
+
+####### stack_wine ########
+
+# Taxpose
+python scripts/train_residual_flow.py --config-name commands/rlbench/reldist_experiments/stack_wine/train_place_taxpose
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/stack_wine/eval_place_taxpose
+
+# MLAT
+python scripts/train_residual_flow.py --config-name commands/rlbench/reldist_experiments/stack_wine/train_place_mlat
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/stack_wine/eval_place_mlat
+
+```
 
 ## Table 2 - Mug Hanging (Upright/Arbitrary)
 
@@ -146,3 +197,21 @@ python scripts/evaluate_ndf_mug_standalone.py --config-name commands/ndf/mug/eva
 ## Table 7
 
 N/A, real-world reproduction requires our robot setup.
+
+## Figure 7
+
+The sample complexity ablation experiments are done as follows:
+
+```
+# Train
+python scripts/train_residual_flow.py --configs/commands/rlbench/reldist_experiments/ablations/num_samples/train_place_1_taxpose.yaml
+python scripts/train_residual_flow.py --configs/commands/rlbench/reldist_experiments/ablations/num_samples/train_place_5_taxpose.yaml
+python scripts/train_residual_flow.py --configs/commands/rlbench/reldist_experiments/ablations/num_samples/train_place_1_mlat.yaml
+python scripts/train_residual_flow.py --configs/commands/rlbench/reldist_experiments/ablations/num_samples/train_place_5_mlat.yaml
+
+# Eval
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/ablations/num_samples/eval_place_1_taxpose.yaml
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/ablations/num_samples/eval_place_5_taxpose.yaml
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/ablations/num_samples/eval_place_1_mlat.yaml
+python scripts/eval_metrics.py --config-name commands/rlbench/reldist_experiments/ablations/num_samples/eval_place_5_mlat.yaml
+```

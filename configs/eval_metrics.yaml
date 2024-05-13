@@ -8,29 +8,22 @@ defaults:
   - _self_
   - _logging
 
-  - model: release
+  - model: taxpose
 
   - datamodule  # This loops in the dataset.
-  - benchmark: ndf # {ndf, rlbench}
-  - pose_dist: upright # {upright, arbitrary}
-
+  - benchmark: rlbench # {ndf, rlbench}
   - optional task: stack_wine
   - optional phase: place
   - task/${benchmark}/${task}/task@task
   - task/${benchmark}/${task}/phase/${phase}@task.phase
-  - optional checkpoints/rlbench@checkpoints: ${task}/${model}/${phase}
 
-checkpoints:
-  ckpt_file: None
-
-checkpoint: ${checkpoints.ckpt_file}
-
+checkpoint: ???
 
 seed: 0
-break_symmetry: True
 inference:
   batch_size: 8
   sigmoid_on: True
+
 split: "train"
 
 resources:

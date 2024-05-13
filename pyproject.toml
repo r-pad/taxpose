@@ -57,10 +57,12 @@ develop = [
   "types-tqdm",
 ]
 rlbench = [
+  # These should be installed manually...
+  "pyrep",
+  "rlbench",
   "rpad-rlbench-utils @ git+https://github.com/r-pad/rlbench_utils.git",
 ]
 build_docs = ["mkdocs-material", "mkdocstrings[python]"]
-
 
 # This is required to allow us to have notebooks/ at the top level.
 [tool.setuptools]
@@ -94,16 +96,17 @@ module = [
   "h5py.*",
   "joblib.*",
   "matplotlib.*",
+  "ompl.*",
   "open3d.*",
   "pandas.*",
   "plotly.*",
   "pybullet.*",
   "pytorch3d.*",
+  "rpad.rlbench_utils.*",
   "scipy.*",
   "torch_cluster.*",
   "torch_geometric.*",
   "torchvision.*",
-  "ompl.*",
 ]
 ignore_missing_imports = true
 

@@ -1,5 +1,4 @@
 import logging
-import os
 
 import hydra
 import numpy as np
@@ -8,6 +7,7 @@ import pytorch_lightning as pl
 import torch
 import wandb
 from omegaconf import OmegaConf
+from rpad.visualize_3d.plots import pointcloud_fig, segmentation_fig
 from tqdm import tqdm
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
@@ -18,31 +18,72 @@ from taxpose.training.flow_equivariance_training_module_nocentering import (
 from taxpose.utils.load_model import get_weights_path
 
 
-def load_emb_weights(checkpoint_reference, wandb_cfg=None, run=None):
-    if checkpoint_reference.startswith(wandb_cfg.entity):
-        artifact_dir = os.path.join(wandb_cfg.artifact_dir, checkpoint_reference)
-        artifact = run.use_artifact(checkpoint_reference)
-        checkpoint_path = artifact.get_path("model.ckpt").download(root=artifact_dir)
-        weights = torch.load(checkpoint_path)["state_dict"]
-        # remove "model.emb_nn" prefix from keys
-        weights = {k.replace("model.emb_nn.", ""): v for k, v in weights.items()}
-        return weights
-    else:
-        return torch.load(hydra.utils.to_absolute_path(checkpoint_reference))[
-            "embnn_state_dict"
-        ]
+def visualize_preds(
+    points_action_trans,
+    points_anchor_trans,
+    res,
+    points_action,
+    points_anchor,
+    action_symmetry_rgb,
+    anchor_symmetry_rgb,
+):
+    # Evaluate the model on the prediction.
 
+    fig = segmentation_fig(
+        torch.cat(
+            [
+                points_action_trans[0].cpu(),
+                points_anchor_trans[0].cpu(),
+                res["pred_points_action"][0].cpu(),
+            ],
+            dim=0,
+        ).numpy(),
+        torch.cat(
+            [
+                torch.ones(points_action_trans.shape[1]),
+                2 * torch.ones(points_anchor_trans.shape[1]),
+                3 * torch.ones(res["pred_points_action"].shape[1]),
+            ],
+            dim=0,
+        )
+        .int()
+        .numpy(),
+        labelmap={1: "mug", 2: "rack", 3: "pred"},
+    )
+    fig.show()
+    fig = pointcloud_fig(
+        np.concatenate(
+            [
+                points_action[0].cpu(),
+                points_anchor[0].cpu(),
+            ]
+        ),
+        downsample=1,
+        colors=np.concatenate(
+            [
+                action_symmetry_rgb[0].cpu().numpy(),
+                anchor_symmetry_rgb[0].cpu().numpy(),
+            ]
+        ),
+    )
+    fig.show()
 
-def maybe_load_from_wandb(checkpoint_reference, wandb_cfg, run):
-    if checkpoint_reference.startswith(wandb_cfg.entity):
-        # download checkpoint locally (if not already cached)
-        artifact_dir = os.path.join(wandb_cfg.artifact_dir, checkpoint_reference)
-        artifact = run.use_artifact(checkpoint_reference)
-        ckpt_file = artifact.get_path("model.ckpt").download(root=artifact_dir)
-    else:
-        ckpt_file = checkpoint_reference
-
-    return ckpt_file
+    fig = pointcloud_fig(
+        np.concatenate(
+            [
+                res["pred_points_action"][0].cpu(),
+                points_anchor_trans[0].cpu(),
+            ]
+        ),
+        downsample=1,
+        colors=np.concatenate(
+            [
+                action_symmetry_rgb[0].cpu().numpy(),
+                anchor_symmetry_rgb[0].cpu().numpy(),
+            ]
+        ),
+    )
+    fig.show()
 
 
 @torch.no_grad()
@@ -61,15 +102,17 @@ def main(cfg):
     dm.setup(stage=cfg.split)
 
     network = ResidualFlow_DiffEmbTransformer(
-        emb_dims=cfg.model.emb_dims,
-        emb_nn=cfg.model.emb_nn,
-        return_flow_component=cfg.model.return_flow_component,
+        encoder_cfg=cfg.model.encoder,
+        cycle=cfg.model.cycle,
         center_feature=cfg.model.center_feature,
         pred_weight=cfg.model.pred_weight,
+        residual_on=cfg.model.residual_on,
+        freeze_embnn=cfg.model.freeze_embnn,
+        return_attn=cfg.model.return_attn,
         multilaterate=cfg.model.multilaterate,
-        sample=cfg.model.mlat_sample,
+        mlat_sample=cfg.model.mlat_sample,
         mlat_nkps=cfg.model.mlat_nkps,
-        break_symmetry=cfg.model.break_symmetry,
+        feature_channels=cfg.model.feature_channels,
         conditional=cfg.model.conditional if "conditional" in cfg.model else False,
     )
 
@@ -92,16 +135,9 @@ def main(cfg):
     )
 
     if cfg.checkpoint is not None:
-        # ckpt_file = maybe_load_from_wandb(cfg.checkpoint, cfg.wandb, run)
         ckpt_file = get_weights_path(cfg.checkpoint, cfg.wandb, run)
-        try:
-            weights = torch.load(ckpt_file)["state_dict"]
-            model.load_state_dict(weights)
-        except RuntimeError:
-            # This is an "older" style model, so we need to load the weights
-            # manually.
-            model.model.load_state_dict(weights)
-
+        weights = torch.load(ckpt_file)["state_dict"]
+        model.load_state_dict(weights)
         logging.info(f"Loaded checkpoint from {ckpt_file}")
 
     model.cuda()
@@ -134,17 +170,21 @@ def main(cfg):
             points_action = batch["points_action"].cuda()
             points_action_trans = batch["points_action_trans"].cuda()
             points_anchor_trans = batch["points_anchor_trans"].cuda()
-            action_symmetry_features = batch["action_symmetry_features"].cuda()
-            anchor_symmetry_features = batch["anchor_symmetry_features"].cuda()
-            action_symmetry_rgb = batch["action_symmetry_rgb"].cuda()
-            anchor_symmetry_rgb = batch["anchor_symmetry_rgb"].cuda()
-            phase_onehot = batch["phase_onehot"].cuda()
+            action_features = (
+                batch["action_features"].cuda() if "action_features" in batch else None
+            )
+            anchor_features = (
+                batch["anchor_features"].cuda() if "anchor_features" in batch else None
+            )
+            phase_onehot = (
+                batch["phase_onehot"].cuda() if "phase_onehot" in batch else None
+            )
 
             res = model(
                 points_action_trans,
                 points_anchor_trans,
-                action_symmetry_features,
-                anchor_symmetry_features,
+                action_features,
+                anchor_features,
                 phase_onehot,
             )
 
@@ -152,9 +192,6 @@ def main(cfg):
                 ixs_action = res["sampled_ixs_action"]
                 points_action = torch.take_along_dim(
                     points_action, ixs_action.unsqueeze(-1), dim=1
-                )
-                action_symmetry_rgb = torch.take_along_dim(
-                    action_symmetry_rgb, ixs_action.unsqueeze(-1), dim=1
                 )
 
             # Apply the transform to the original transform.
@@ -207,64 +244,6 @@ def main(cfg):
                     "t_err": t_err.cpu().numpy(),
                 }
             )
-
-            # Evaluate the model on the prediction.
-
-            # fig = segmentation_fig(
-            #     torch.cat(
-            #         [
-            #             points_action_trans[0].cpu(),
-            #             points_anchor_trans[0].cpu(),
-            #             res["pred_points_action"][0].cpu(),
-            #         ],
-            #         dim=0,
-            #     ).numpy(),
-            #     torch.cat(
-            #         [
-            #             torch.ones(points_action_trans.shape[1]),
-            #             2 * torch.ones(points_anchor_trans.shape[1]),
-            #             3 * torch.ones(res["pred_points_action"].shape[1]),
-            #         ],
-            #         dim=0,
-            #     )
-            #     .int()
-            #     .numpy(),
-            #     labelmap={1: "mug", 2: "rack", 3: "pred"},
-            # )
-            # fig.show()
-            # fig = pointcloud_fig(
-            #     np.concatenate(
-            #         [
-            #             points_action[0].cpu(),
-            #             points_anchor[0].cpu(),
-            #         ]
-            #     ),
-            #     downsample=1,
-            #     colors=np.concatenate(
-            #         [
-            #             action_symmetry_rgb[0].cpu().numpy(),
-            #             anchor_symmetry_rgb[0].cpu().numpy(),
-            #         ]
-            #     ),
-            # )
-            # fig.show()
-
-            # fig = pointcloud_fig(
-            #     np.concatenate(
-            #         [
-            #             res["pred_points_action"][0].cpu(),
-            #             points_anchor_trans[0].cpu(),
-            #         ]
-            #     ),
-            #     downsample=1,
-            #     colors=np.concatenate(
-            #         [
-            #             action_symmetry_rgb[0].cpu().numpy(),
-            #             anchor_symmetry_rgb[0].cpu().numpy(),
-            #         ]
-            #     ),
-            # )
-            # fig.show()
 
         metrics = {
             k: np.concatenate([m[k] for m in metrics]) for k in metrics[0].keys()

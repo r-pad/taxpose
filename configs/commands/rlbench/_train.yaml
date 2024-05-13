@@ -5,10 +5,8 @@ defaults:
   - override /benchmark: rlbench
   - _self_
 
-break_symmetry: True
-
 resources:
-  num_workers: 4
+  num_workers: 16
 
 pretraining:
   mode: none
