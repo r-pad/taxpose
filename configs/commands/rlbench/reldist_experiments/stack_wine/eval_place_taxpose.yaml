@@ -1,7 +1,7 @@
 # @package _global_
 
 defaults:
-  - /commands/rlbench/_train@_here_
+  - /commands/rlbench/_eval_metrics@_here_
   - _dataset
   - _task
   - override /model: taxpose

@@ -1,0 +1,11 @@
+# @package _global_
+
+defaults:
+  - /eval_metrics
+  - override /benchmark: rlbench
+  - _self_
+
+dm:
+  train_dset:
+    num_points: 256
+    synthetic_occlusion: False

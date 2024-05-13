@@ -1,11 +1,5 @@
 # @package _global_
 
-defaults:
-  - /commands/rlbench/_train@_here_
-  - override /task: stack_wine
-  - override /phase: place
-  - _self_
-
 dm:
   train_dset:
     demo_dset:
