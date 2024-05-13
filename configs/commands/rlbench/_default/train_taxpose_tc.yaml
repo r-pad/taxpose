@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_train@_here_
+  - override /model: taxpose_tc
+  - override /task: DEFAULT
+  - override /phase: all
+  - _self_

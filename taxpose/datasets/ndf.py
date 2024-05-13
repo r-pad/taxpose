@@ -351,6 +351,8 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
             "anchor_symmetry_features": anchor_symmetry_features,
             "action_symmetry_rgb": action_symmetry_rgb,
             "anchor_symmetry_rgb": anchor_symmetry_rgb,
+            "phase": None,
+            "phase_onehot": None,
         }
 
     def __len__(self) -> int:

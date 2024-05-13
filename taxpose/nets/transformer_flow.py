@@ -482,6 +482,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         mlat_sample: bool = False,
         mlat_nkps: int = 100,
         feature_channels=0,  # Number of extra channels we'll pass into the network.
+        conditional: bool = False,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.cycle = cycle
@@ -699,6 +700,7 @@ class ResidualFlowDiffEmbTransformerConfig:
 
     # Extra channels.
     feature_channels: int
+    conditional: bool
 
 
 @dataclass
@@ -727,6 +729,7 @@ def create_network(cfg: ModelConfig) -> nn.Module:
             mlat_sample=r_cfg.mlat_sample,
             mlat_nkps=r_cfg.mlat_nkps,
             feature_channels=r_cfg.feature_channels,
+            conditional=r_cfg.conditional,
         )
     elif cfg.model_type == "correspondence_flow_diff_emb_mlp":
         c_cfg = cast(CorrespondenceFlowDiffEmbMLPConfig, cfg)

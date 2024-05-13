@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_eval_metrics@_here_
+  - override /model: taxpose_tc
+  - override /task: slide_block_to_target
+  - override /phase: postslide
+  - _self_
