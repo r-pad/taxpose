@@ -11,7 +11,7 @@ from rpad.visualize_3d.plots import pointcloud_fig, segmentation_fig
 from tqdm import tqdm
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
-from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
+from taxpose.nets.transformer_flow import create_network
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
@@ -101,19 +101,7 @@ def main(cfg):
 
     dm.setup(stage=cfg.split)
 
-    network = ResidualFlow_DiffEmbTransformer(
-        encoder_cfg=cfg.model.encoder,
-        cycle=cfg.model.cycle,
-        center_feature=cfg.model.center_feature,
-        pred_weight=cfg.model.pred_weight,
-        residual_on=cfg.model.residual_on,
-        freeze_embnn=cfg.model.freeze_embnn,
-        return_attn=cfg.model.return_attn,
-        multilaterate=cfg.model.multilaterate,
-        mlat_sample=cfg.model.mlat_sample,
-        mlat_nkps=cfg.model.mlat_nkps,
-        feature_channels=cfg.model.feature_channels,
-    )
+    network = create_network(cfg.model)
 
     model = EquivarianceTrainingModule(
         model=network,
@@ -175,12 +163,16 @@ def main(cfg):
             anchor_features = (
                 batch["anchor_features"].cuda() if "anchor_features" in batch else None
             )
+            phase_onehot = (
+                batch["phase_onehot"].cuda() if "phase_onehot" in batch else None
+            )
 
             res = model(
                 points_action_trans,
                 points_anchor_trans,
                 action_features,
                 anchor_features,
+                phase_onehot,
             )
 
             if "sampled_ixs_action" in res:

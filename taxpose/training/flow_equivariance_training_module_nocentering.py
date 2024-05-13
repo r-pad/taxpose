@@ -361,8 +361,17 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
 
+        if "phase_onehot" in batch:
+            phase_onehot = batch["phase_onehot"]
+        else:
+            phase_onehot = None
+
         model_output = self.model(
-            points_trans_action, points_trans_anchor, action_features, anchor_features
+            points_trans_action,
+            points_trans_anchor,
+            action_features,
+            anchor_features,
+            phase_onehot,
         )
 
         log_values = {}
@@ -377,9 +386,14 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         points_trans_anchor,
         action_features,
         anchor_features,
+        phase_onehot=None,
     ) -> Any:
         model_output = self.model(
-            points_trans_action, points_trans_anchor, action_features, anchor_features
+            points_trans_action,
+            points_trans_anchor,
+            action_features,
+            anchor_features,
+            phase_onehot,
         )
 
         # If we've applied some sampling, we need to extract the predictions too...
@@ -462,6 +476,7 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
         anchor_symmetry_rgb = (
             batch["anchor_symmetry_rgb"] if "anchor_symmetry_rgb" in batch else None
         )
+        onehot = batch["phase_onehot"] if "phase_onehot" in batch else None
 
         T0 = Transform3d(matrix=batch["T0"])
         T1 = Transform3d(matrix=batch["T1"])
@@ -471,6 +486,7 @@ class EquivarianceTrainingModule(PointCloudTrainingModule):
             points_trans_anchor,
             action_features,
             anchor_features,
+            onehot,
         )
         x_action = model_output["flow_action"]
         x_anchor = model_output["flow_anchor"]

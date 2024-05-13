@@ -482,6 +482,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         mlat_sample: bool = False,
         mlat_nkps: int = 100,
         feature_channels=0,  # Number of extra channels we'll pass into the network.
+        conditional: bool = False,
     ):
         super(ResidualFlow_DiffEmbTransformer, self).__init__()
         self.cycle = cycle
@@ -496,6 +497,7 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
         self.residual_on = residual_on
         self.freeze_embnn = freeze_embnn
         self.return_attn = return_attn
+        self.conditional = conditional
 
         self.transformer_action = CustomTransformer(
             emb_dims=emb_dims, return_attn=self.return_attn, bidirectional=False
@@ -529,6 +531,11 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
                 pred_weight=self.pred_weight,
                 residual_on=self.residual_on,
             )
+
+        if self.conditional:
+            # Simple projection to the embedding space. This will be concatenated to the embeddings at
+            # the attention layer.
+            self.proj_onehot = nn.Linear(5, emb_dims)
 
         if self.feature_channels > 0:
             # We're basically putting a few MLP layers in on top of the invariant module.
@@ -580,6 +587,17 @@ class ResidualFlow_DiffEmbTransformer(nn.Module):
             anchor_embedding = self.feature_channel_encoder_anchor(
                 anchor_embedding_stack
             )
+
+        if self.conditional:
+            # We first project the one-hot encoding to the embedding space.
+            onehot = input[4].float()  # B x C
+            # Extend the onehot vector so that C becomes 5.
+            onehot = F.pad(onehot, (0, 5 - onehot.shape[-1]), "constant", 0)
+            onehot_emb = self.proj_onehot(onehot)
+
+            # Then, we do a linear addition to the embeddings. This should broadcast correctly.
+            action_embedding = action_embedding + onehot_emb[..., None]
+            anchor_embedding = anchor_embedding + onehot_emb[..., None]
 
         # tilde_phi, phi are both B,512,N
         # Get the new cross-attention embeddings.
@@ -682,6 +700,7 @@ class ResidualFlowDiffEmbTransformerConfig:
 
     # Extra channels.
     feature_channels: int
+    conditional: bool
 
 
 @dataclass
@@ -710,6 +729,7 @@ def create_network(cfg: ModelConfig) -> nn.Module:
             mlat_sample=r_cfg.mlat_sample,
             mlat_nkps=r_cfg.mlat_nkps,
             feature_channels=r_cfg.feature_channels,
+            conditional=r_cfg.conditional,
         )
     elif cfg.model_type == "correspondence_flow_diff_emb_mlp":
         c_cfg = cast(CorrespondenceFlowDiffEmbMLPConfig, cfg)

@@ -1,0 +1,8 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_eval_metrics@_here_
+  - override /model: taxpose_tc
+  - override /task: put_money_in_safe
+  - override /phase: place
+  - _self_

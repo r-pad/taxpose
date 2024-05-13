@@ -67,6 +67,7 @@ class PointCloudDataset(Dataset):
         data = self.dataset[data_ix]
         points_action = torch.from_numpy(data["points_action"])
         points_anchor = torch.from_numpy(data["points_anchor"])
+        phase_onehot = torch.from_numpy(data["phase_onehot"])
 
         T0 = random_se3(
             1,
@@ -94,6 +95,7 @@ class PointCloudDataset(Dataset):
             "points_anchor_trans": points_anchor_trans.squeeze(0),
             "T0": T0.get_matrix().squeeze(0),
             "T1": T1.get_matrix().squeeze(0),
+            "phase_onehot": phase_onehot,
         }
 
         # Handle the extra features.
