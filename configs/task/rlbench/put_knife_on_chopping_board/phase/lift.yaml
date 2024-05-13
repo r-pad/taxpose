@@ -1,0 +1,7 @@
+# @package task
+
+action_class: knife_visual
+anchor_class: knife_visual
+name: lift
+softmax_temperature: 0.1
+weight_normalize: softmax
