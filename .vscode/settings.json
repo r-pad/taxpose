@@ -32,5 +32,8 @@
     },
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter"
-    }
+    },
+    "pylint.args": [
+        "\"--generated-members=numpy.* ,torch.*\" "
+    ]
 }

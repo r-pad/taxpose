@@ -1,0 +1,6 @@
+# @package _global_
+
+defaults:
+  - /commands/rlbench/_train@_here_
+  - _5
+  - override /model: taxpose
