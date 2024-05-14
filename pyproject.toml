@@ -58,8 +58,8 @@ develop = [
 ]
 rlbench = [
   # These should be installed manually...
-  "pyrep",
-  "rlbench",
+  # "pyrep",
+  # "rlbench @ git+https://github.com/stepjam/RLBench.git",
   "rpad-rlbench-utils @ git+https://github.com/r-pad/rlbench_utils.git",
 ]
 build_docs = ["mkdocs-material", "mkdocstrings[python]"]
