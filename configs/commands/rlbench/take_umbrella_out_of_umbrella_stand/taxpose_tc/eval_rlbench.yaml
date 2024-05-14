@@ -1,0 +1,7 @@
+# @package _global_
+
+defaults:
+- /eval_rlbench.yaml
+- override /model: taxpose_tc
+- override /task: take_umbrella_out_of_umbrella_stand
+- _self_

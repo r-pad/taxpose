@@ -24,6 +24,24 @@ echo Platform: $PLATFORM
 echo GPU Index: $GPU_INDEX
 echo Command: $COMMAND
 
+# We want to get the name of the current branch.
+branch_name=$(git branch --show-current)
+sanitized_branch_name="${branch_name//\//-}"
+
+# Now check to see if the branch name exists as a tag on docker
+if ! docker manifest inspect beisner/taxpose:${sanitized_branch_name} > /dev/null 2>&1; then
+    tag="latest"
+else
+    tag="${sanitized_branch_name}"
+fi
+
+# Override tag if DOCKER_IMAGE is set
+if [ ! -z "$DOCKER_TAG" ]; then
+    tag="${DOCKER_TAG}"
+fi
+
+echo "Using image: beisner/taxpose:${tag}"
+
 
 # If the platform is "autobot", then we need to use singularity to run the command.
 if [ $PLATFORM == "autobot" ]; then
@@ -55,7 +73,7 @@ if [ $PLATFORM == "autobot" ]; then
     -B /scratch/$(whoami)/.config:/opt/.config \
     -B /scratch/$(whoami)/tmp:/tmp \
     -B /scratch/$(whoami)/home:/home/$(whoami) \
-    docker://beisner/taxpose \
+    docker://beisner/taxpose:${tag} \
     $COMMAND \
     log_dir=/opt/logs \
     data_root=/data \
@@ -75,7 +93,7 @@ elif [ $PLATFORM == "local-docker" ]; then
     -v /home/beisner/code/rpad/taxpose/artifacts:/opt/artifacts \
     -v /home/beisner/code/rpad/taxpose/logs:/opt/logs \
     -v /home/beisner/code/rpad/taxpose:/opt/baeisner/code \
-    beisner/taxpose \
+    beisner/taxpose:${tag} \
     $COMMAND \
     log_dir=/opt/logs \
     data_root=/data \
@@ -102,7 +120,7 @@ elif [ $PLATFORM == "local-apptainer" ]; then
     -B /home/$(whoami)/.tmp:/tmp \
     -B /home/$(whoami)/tmp_home:/home/$(whoami) \
     -B /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json \
-    docker://beisner/taxpose \
+    docker://beisner/taxpose:${tag} \
     $COMMAND \
     log_dir=/opt/logs \
     data_root=/data \

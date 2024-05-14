@@ -6,8 +6,8 @@ defaults:
   - _logging
   - _self_
 
-  - optional task: stack_wine
   - benchmark: rlbench
+  - optional task: stack_wine
 
   # Machinery to load the correct model architecture.
   # The model config can be found in configs/model.
@@ -16,17 +16,16 @@ defaults:
   # Task-specific settings.
   - task/${benchmark}/${task}/task@task
 
-  # Load the checkpoints appropriately.
-  # - checkpoints/rlbench@grasp_checkpoints: ${task}/${model@grasp_model}
-  # - checkpoints/rlbench@place_checkpoints: ${task}/${model@place_model}
-  - optional checkpoints/rlbench@checkpoints: ${task}/${model}
-
-# policy_spec: ${model}
 policy_spec:
   collision_checking: True
+  num_points: 256
+  break_symmetry: False
   model: ${model}
 
+
+# Usually only a single checkpoint, but we could have multiple for each phase.
 checkpoints:
+  ckpt_file: ???
 
 task:
   action_mode: object
@@ -37,8 +36,5 @@ headless: True
 
 resources:
   num_workers: 10
-
-# For prediction.
-z_offset: 0.03
 
 seed: 123456

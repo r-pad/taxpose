@@ -47,7 +47,7 @@ from taxpose.datasets.rlbench import (
     remove_outliers,
     rotational_symmetry_labels,
 )
-from taxpose.nets.transformer_flow import ResidualFlow_DiffEmbTransformer
+from taxpose.nets.transformer_flow import create_network
 from taxpose.train_pm_placement import theta_err
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
@@ -253,8 +253,8 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
     ):
         self.models = {}
         for phase in TASK_DICT[task_cfg.name]["phase_order"]:
-            if hasattr(checkpoints_cfg, "single_model_override"):
-                model_path = checkpoints_cfg.single_model_override
+            if hasattr(checkpoints_cfg, "ckpt_file"):
+                model_path = checkpoints_cfg.ckpt_file
             else:
                 model_path = checkpoints_cfg[phase].ckpt_file
             self.models[phase] = self.load_model(
@@ -270,6 +270,7 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         self.debug_viz = debug_viz
         self.action_mode = task_cfg.action_mode
         self.anchor_mode = task_cfg.anchor_mode
+        self.policy_spec = policy_spec
 
     @staticmethod
     def render(obs, inputs, preds, T_action_world, T_actionfinal_world):
@@ -316,21 +317,8 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
 
     @staticmethod
     def load_model(model_path, model_cfg, wandb_cfg, task_cfg, run=None):
-        ckpt_file = get_weights_path(model_path, wandb_cfg, run=run)
-        network = ResidualFlow_DiffEmbTransformer(
-            pred_weight=model_cfg.pred_weight,
-            emb_nn=model_cfg.emb_nn,
-            emb_dims=model_cfg.emb_dims,
-            return_flow_component=model_cfg.return_flow_component,
-            center_feature=model_cfg.center_feature,
-            # inital_sampling_ratio=model_cfg.inital_sampling_ratio,
-            residual_on=model_cfg.residual_on,
-            multilaterate=model_cfg.multilaterate,
-            sample=model_cfg.mlat_sample,
-            mlat_nkps=model_cfg.mlat_nkps,
-            break_symmetry=model_cfg.break_symmetry,
-            conditional=model_cfg.conditional if "conditional" in model_cfg else False,
-        )
+
+        network = create_network(model_cfg)
         model = EquivarianceTrainingModule(
             network,
             weight_normalize=task_cfg.weight_normalize,
@@ -338,8 +326,10 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
             sigmoid_on=True,
             flow_supervision="both",
         )
-        weights = torch.load(ckpt_file)["state_dict"]
-        model.load_state_dict(weights)
+        if model_path is not None:
+            ckpt_file = get_weights_path(model_path, wandb_cfg, run=run)
+            weights = torch.load(ckpt_file)["state_dict"]
+            model.load_state_dict(weights)
 
         model.eval()
         model = model.cuda()
@@ -360,11 +350,11 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         action_pc = inputs["action_pc"].unsqueeze(0).to(device)
         anchor_pc = inputs["anchor_pc"].unsqueeze(0).to(device)
 
-        K = self.model_cfg.num_points
+        K = self.policy_spec.num_points
         action_pc, _ = sample_farthest_points(action_pc, K=K, random_start_point=True)
         anchor_pc, _ = sample_farthest_points(anchor_pc, K=K, random_start_point=True)
 
-        if self.model_cfg.break_symmetry:
+        if self.policy_spec.break_symmetry:
             raise NotImplementedError()
             action_symmetry_features = bottle_symmetry_features(
                 action_pc.cpu().numpy()[0]
@@ -684,16 +674,6 @@ def run_trial(
 
     # TODO: beisner need to seeeeeed.
 
-    # Create the policy.
-    # policy = TAXPosePickPlacePredictor(
-    #     policy_spec,
-    #     task_spec,
-    #     task_spec.wandb,
-    #     task_spec.checkpoints,
-    #     run=run,
-    #     debug_viz=not headless,
-    # )
-
     policy: RelativePosePredictor = TAXPoseRelativePosePredictor(
         policy_spec,
         task_spec,
@@ -702,9 +682,6 @@ def run_trial(
         run=run,
         debug_viz=not headless,
     )
-    # policy: RelativePosePredictor = RandomPickPlacePredictor(
-    #     policy_spec, (-0.3, 0.3), (-0.3, 0.3), (0.3, 0.5)
-    # )
 
     # Create the environment.
     collision_checking = (
