@@ -257,20 +257,20 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
                 model_path = checkpoints_cfg.ckpt_file
             else:
                 model_path = checkpoints_cfg[phase].ckpt_file
-            if model_path is not None:
-                self.models[phase] = self.load_model(
-                    model_path,
-                    policy_spec.model,
-                    wandb_cfg,
-                    task_cfg.phases[phase],
-                    run=run,
-                )
+            self.models[phase] = self.load_model(
+                model_path,
+                policy_spec.model,
+                wandb_cfg,
+                task_cfg.phases[phase],
+                run=run,
+            )
 
         self.model_cfg = policy_spec.model
         self.task_name = task_cfg.name
         self.debug_viz = debug_viz
         self.action_mode = task_cfg.action_mode
         self.anchor_mode = task_cfg.anchor_mode
+        self.policy_spec = policy_spec
 
     @staticmethod
     def render(obs, inputs, preds, T_action_world, T_actionfinal_world):
@@ -317,7 +317,7 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
 
     @staticmethod
     def load_model(model_path, model_cfg, wandb_cfg, task_cfg, run=None):
-        ckpt_file = get_weights_path(model_path, wandb_cfg, run=run)
+
         network = create_network(model_cfg)
         model = EquivarianceTrainingModule(
             network,
@@ -326,8 +326,10 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
             sigmoid_on=True,
             flow_supervision="both",
         )
-        weights = torch.load(ckpt_file)["state_dict"]
-        model.load_state_dict(weights)
+        if model_path is not None:
+            ckpt_file = get_weights_path(model_path, wandb_cfg, run=run)
+            weights = torch.load(ckpt_file)["state_dict"]
+            model.load_state_dict(weights)
 
         model.eval()
         model = model.cuda()
@@ -342,17 +344,18 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
             self.anchor_mode,
             handlemap,
         )
+
         model = self.models[phase]
         device = model.device
 
         action_pc = inputs["action_pc"].unsqueeze(0).to(device)
         anchor_pc = inputs["anchor_pc"].unsqueeze(0).to(device)
 
-        K = self.model_cfg.num_points
+        K = self.policy_spec.num_points
         action_pc, _ = sample_farthest_points(action_pc, K=K, random_start_point=True)
         anchor_pc, _ = sample_farthest_points(anchor_pc, K=K, random_start_point=True)
 
-        if self.model_cfg.break_symmetry:
+        if self.policy_spec.break_symmetry:
             raise NotImplementedError()
             action_symmetry_features = bottle_symmetry_features(
                 action_pc.cpu().numpy()[0]

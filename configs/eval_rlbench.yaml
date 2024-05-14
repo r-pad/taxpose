@@ -18,6 +18,8 @@ defaults:
 
 policy_spec:
   collision_checking: True
+  num_points: 256
+  break_symmetry: False
   model: ${model}
 
 
