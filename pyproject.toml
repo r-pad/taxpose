@@ -14,7 +14,6 @@ authors = [
 ]
 dependencies = [
   # "chamferdist",
-  "dill",
   "dgl",
   "dglgo",
   "h5py",
@@ -56,13 +55,14 @@ develop = [
   "pytest-xdist",
   "types-tqdm",
 ]
+build_docs = ["mkdocs-material", "mkdocstrings[python]"]
 rlbench = [
   # These should be installed manually...
   # "pyrep",
   # "rlbench @ git+https://github.com/stepjam/RLBench.git",
   "rpad-rlbench-utils @ git+https://github.com/r-pad/rlbench_utils.git",
 ]
-build_docs = ["mkdocs-material", "mkdocstrings[python]"]
+
 
 # This is required to allow us to have notebooks/ at the top level.
 [tool.setuptools]

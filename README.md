@@ -70,9 +70,6 @@ pip install -r requirements-gpu.txt
 ```
 
 
-# NOTE
-Cursed vglrun requires us to pipe in our own custom LD_LIBRARY_PATH. This is a hacky way to do it, but it works for now.
-
 ## Install `taxpose`.
 
 This part should be really simple:
