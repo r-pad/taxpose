@@ -1,0 +1,40 @@
+job_type: eval_rlbench_${task.name}
+
+data_root: ${oc.env:HOME}/datasets
+
+defaults:
+  - _logging
+  - _self_
+
+  - benchmark: rlbench
+  - optional task: stack_wine
+
+  # Machinery to load the correct model architecture.
+  # The model config can be found in configs/model.
+  - model: taxpose
+
+  # Task-specific settings.
+  - task/${benchmark}/${task}/task@task
+
+policy_spec:
+  collision_checking: True
+  num_points: 256
+  break_symmetry: False
+  model: ${model}
+
+
+# Usually only a single checkpoint, but we could have multiple for each phase.
+checkpoints:
+  ckpt_file: ???
+
+task:
+  action_mode: object
+  anchor_mode: single_object
+
+num_trials: 100
+headless: True
+
+resources:
+  num_workers: 10
+
+seed: 123456
