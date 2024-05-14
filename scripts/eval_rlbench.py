@@ -344,6 +344,7 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
             self.anchor_mode,
             handlemap,
         )
+
         model = self.models[phase]
         device = model.device
 
