@@ -1,5 +1,0 @@
-# @package _global_
-
-defaults:
-  - /eval_metrics
-  - override /benchmark: rlbench
