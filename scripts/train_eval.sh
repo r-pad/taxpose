@@ -38,9 +38,9 @@ output1=$(<"$tmpfile")
 run_id=$(echo $output1 | grep -oP 'Run ID: \K\w+')
 
 # Run the second command, passing output1 as an argument
-echo $cmd2 checkpoints.ckpt_file=r-pad/taxpose/model-${run_id}:v0
-$cmd2 checkpoints.ckpt_file=r-pad/taxpose/model-${run_id}:v0
+echo $cmd2 checkpoint=r-pad/taxpose/model-${run_id}:v0
+$cmd2 checkpoint=r-pad/taxpose/model-${run_id}:v0
 
 # Run the third command, passing output1 as an argument
-echo $cmd3 +checkpoints.single_model_override=r-pad/taxpose/model-${run_id}:v0
-$cmd3 +checkpoints.single_model_override=r-pad/taxpose/model-${run_id}:v0
+echo $cmd3 checkpoints.ckpt_file=r-pad/taxpose/model-${run_id}:v0
+$cmd3 checkpoints.ckpt_file=r-pad/taxpose/model-${run_id}:v0

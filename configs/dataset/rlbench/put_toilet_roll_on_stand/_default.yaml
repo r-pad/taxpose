@@ -1,10 +1,6 @@
 defaults:
 - ../_default@_here_
 - _self_
-test_dset:
-  demo_dset:
-    dataset_type: ${benchmark.name}
-    episodes: null
 train_dset:
   demo_dset:
     dataset_type: ${benchmark.name}
