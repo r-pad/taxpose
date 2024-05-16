@@ -6,3 +6,8 @@ defaults:
   - override /task: pick_and_lift
   - override /phase: all
   - _self_
+
+
+# Training needs to happen for longer with additional context.
+training:
+  max_epochs: 2000
