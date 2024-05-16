@@ -145,3 +145,42 @@ mkdir -p configs/checkpoints/rlbench/take_umbrella_out_of_umbrella_stand/pretrai
 ./launch.sh autobot 8 ./configs/commands/rlbench/take_money_out_safe/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 checkpoints.ckpt_file=r-pad/taxpose/model-1gmi342v:v0
 
 ./launch.sh local 1 ./configs/commands/rlbench/take_umbrella_out_of_umbrella_stand/taxpose_all/precision_eval/precision_eval.sh dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512 checkpoints.ckpt_file=r-pad/taxpose/model-1y7t5g4o:v0 data_root=/home/beisner/datasets
+
+
+
+
+# RGB
+
+RLBENCH_10_TASKS = [
+    "pick_and_lift",
+    "pick_up_cup",
+    "put_knife_on_chopping_board",
+    "put_money_in_safe",
+    "push_button",
+    "reach_target",
+    "slide_block_to_target",
+    "stack_wine",
+    "take_money_out_safe",
+    "take_umbrella_out_of_umbrella_stand",
+]
+
+
+./launch.sh autobot 5 python scripts/train_residual_flow.py --config-name commands/rlbench/pick_and_lift/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+
+./launch.sh autobot 1 python scripts/train_residual_flow.py --config-name commands/rlbench/pick_up_cup/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+
+./launch.sh autobot 2 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+
+./launch.sh autobot 3 python scripts/train_residual_flow.py --config-name commands/rlbench/put_money_in_safe/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+
+./launch.sh autobot 4 python scripts/train_residual_flow.py --config-name commands/rlbench/push_button/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+
+./launch.sh autobot 0 python scripts/train_residual_flow.py --config-name commands/rlbench/reach_target/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+
+./launch.sh autobot 6 python scripts/train_residual_flow.py --config-name commands/rlbench/slide_block_to_target/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+
+./launch.sh autobot 7 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+
+./launch.sh autobot 8 python scripts/train_residual_flow.py --config-name commands/rlbench/take_money_out_safe/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+
+./launch.sh autobot 9 python scripts/train_residual_flow.py --config-name commands/rlbench/take_umbrella_out_of_umbrella_stand/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
