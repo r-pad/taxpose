@@ -715,7 +715,7 @@ def run_trial(
         task_cls = name_to_task_class(task_spec.name)
         # task_cls = RecordedTask(task_cls, video_path="video.mp4")
         task = env.get_task(task_cls)
-        task.sample_variation()
+        task.set_variation(0)
 
         recorder = TaskVideoRecorder(task._scene, "front_rgb")
 
