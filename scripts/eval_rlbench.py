@@ -29,14 +29,11 @@ from rlbench.environment import Environment
 from rlbench.observation_config import ObservationConfig
 from rlbench.utils import name_to_task_class
 from rpad.rlbench_utils.placement_dataset import (
-    BACKGROUND_NAMES,
-    GRIPPER_OBJ_NAMES,
-    ROBOT_NONGRIPPER_NAMES,
     TASK_DICT,
     ActionMode,
     AnchorMode,
-    filter_out_names,
-    get_rgb_point_cloud_by_object_names,
+    get_action_points,
+    get_anchor_points,
     obs_to_rgb_point_cloud,
 )
 from scipy.spatial.transform import Rotation as R
@@ -335,14 +332,13 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         model = model.cuda()
         return model
 
-    def predict(self, obs, phase: str, handlemap) -> Tuple[np.ndarray, Dict[str, Any]]:
+    def predict(self, obs, phase: str) -> Tuple[np.ndarray, Dict[str, Any]]:
         inputs = obs_to_input(
             obs,
             self.task_name,
             phase,
             self.action_mode,
             self.anchor_mode,
-            handlemap,
         )
 
         model = self.models[phase]
@@ -350,10 +346,25 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
 
         action_pc = inputs["action_pc"].unsqueeze(0).to(device)
         anchor_pc = inputs["anchor_pc"].unsqueeze(0).to(device)
+        action_rgb = inputs["action_rgb"].unsqueeze(0).to(device)
+        anchor_rgb = inputs["anchor_rgb"].unsqueeze(0).to(device)
 
         K = self.policy_spec.num_points
-        action_pc, _ = sample_farthest_points(action_pc, K=K, random_start_point=True)
-        anchor_pc, _ = sample_farthest_points(anchor_pc, K=K, random_start_point=True)
+        action_pc, action_idx = sample_farthest_points(
+            action_pc, K=K, random_start_point=True
+        )
+        anchor_pc, anchor_idx = sample_farthest_points(
+            anchor_pc, K=K, random_start_point=True
+        )
+        action_rgb = action_rgb[0][action_idx[0]].unsqueeze(0) / 255.0
+        anchor_rgb = anchor_rgb[0][anchor_idx[0]].unsqueeze(0) / 255.0
+
+        if self.policy_spec.include_rgb_features:
+            action_features = action_rgb
+            anchor_features = anchor_rgb
+        else:
+            action_features = None
+            anchor_features = None
 
         if self.policy_spec.break_symmetry:
             raise NotImplementedError()
@@ -396,8 +407,8 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         preds = model(
             action_pc,
             anchor_pc,
-            action_symmetry_features,
-            anchor_symmetry_features,
+            action_features,
+            anchor_features,
             phase_onehot,
         )
 
@@ -494,47 +505,39 @@ def obs_to_input(
     phase,
     action_mode: ActionMode,
     anchor_mode: AnchorMode,
-    handlemap,
 ):
     rgb, point_cloud, mask = obs_to_rgb_point_cloud(obs)
 
-    action_names = TASK_DICT[task_name]["phase"][phase]["action_obj_names"]
-    if action_mode == ActionMode.GRIPPER_AND_OBJECT:
-        action_names += GRIPPER_OBJ_NAMES
-    elif action_mode == ActionMode.OBJECT:
-        pass
-    else:
-        raise ValueError(f"Invalid action mode: {action_mode}")
+    ##############################
+    # Action points.
+    ##############################
 
-    action_rgb, action_point_cloud = get_rgb_point_cloud_by_object_names(
-        rgb, point_cloud, mask, action_names
+    action_rgb, action_point_cloud = get_action_points(
+        action_mode,
+        rgb,
+        point_cloud,
+        mask,
+        task_name,
+        phase,
+        use_from_simulator=True,
     )
-
-    if anchor_mode == AnchorMode.RAW:
-        raise NotImplementedError()
-    elif anchor_mode == AnchorMode.BACKGROUND_REMOVED:
-        raise NotImplementedError()
-    elif anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED:
-        anchor_rgb, anchor_point_cloud = filter_out_names(
-            rgb,
-            point_cloud,
-            mask,
-            handlemap,
-            BACKGROUND_NAMES + ROBOT_NONGRIPPER_NAMES,
-        )
-    elif anchor_mode == AnchorMode.SINGLE_OBJECT:
-        # Get the rgb and point cloud for the anchor objects.
-        anchor_rgb, anchor_point_cloud = get_rgb_point_cloud_by_object_names(
-            rgb,
-            point_cloud,
-            mask,
-            TASK_DICT[task_name]["phase"][phase]["anchor_obj_names"],
-        )
-    else:
-        raise ValueError(f"Invalid anchor mode: {anchor_mode}")
 
     # Remove outliers in the same way...
     action_point_cloud = remove_outliers(action_point_cloud[None])[0]
+
+    ##############################
+    # Anchor points.
+    ##############################
+
+    anchor_rgb, anchor_point_cloud = get_anchor_points(
+        anchor_mode,
+        rgb,
+        point_cloud,
+        mask,
+        task_name,
+        phase,
+        use_from_simulator=True,
+    )
 
     if (
         anchor_mode != AnchorMode.RAW
@@ -718,8 +721,6 @@ def run_trial(
 
         task._scene.register_step_callback(recorder.step)
 
-        handlemap = get_handle_mapping()
-
         # Reset the environment. For now, ignore descriptions.
         _, obs = task.reset()
     except Exception as e:
@@ -735,7 +736,7 @@ def run_trial(
         for phase in phase_order:
             # Try to make a predictions.
             try:
-                T_gripper_world, extras = policy.predict(obs, phase, handlemap)
+                T_gripper_world, extras = policy.predict(obs, phase)
                 if "plot" in extras:
                     phase_plots.append((phase, extras["plot"]))
             except Exception as e:

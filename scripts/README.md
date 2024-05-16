@@ -28,7 +28,21 @@ High-resolution full set.
 taskset -c 0-50 python tools/dataset_generator.py --tasks=pick_and_lift,pick_up_cup,put_knife_on_chopping_board,put_money_in_safe,push_button,reach_target,slide_block_to_target,stack_wine,take_money_out_safe,take_umbrella_out_of_umbrella_stand --save_path="/opt/data/rlbench10_highres" --image_size=640,640 --processes=10 --episodes_per_task=110 --variations=1
 ```
 
+And for generating the tar files:
+
+```
+tar --exclude='rlbench10_collisions/.cache' -czvf rlbench10_collisions.tar.gz rlbench10_collisions
+tar --exclude='rlbench10_collisions_val/.cache' -czvf rlbench10_collisions_val.tar.gz rlbench10_collisions_val
+```
+
+And for copying:
+```
+rsync --progress -avP rlbench10_collisions.tar.gz  baeisner@autobot.vision.cs.cmu.edu:/project_data/held/baeisner/rlbench10_collisions.tar.gz
+rsync --progress -avP rlbench10_collisions_val.tar.gz  baeisner@autobot.vision.cs.cmu.edu:/project_data/held/baeisner/rlbench10_collisions_val.tar.gz
+```
+
 Here are some scratch commands for now.
+
 
 # New RLBench.
 
