@@ -13,6 +13,7 @@ dm:
     anchor_rot_sample_method: "axis_angle_uniform_z"
     dataset_size: 1000
     include_symmetry_features: False
+    include_rgb_features: False
 
   val_dset:
     demo_dset: ???
@@ -23,3 +24,4 @@ dm:
     anchor_rot_sample_method: ${..train_dset.anchor_rot_sample_method}
     dataset_size: ${..train_dset.dataset_size}
     include_symmetry_features: ${..train_dset.include_symmetry_features}
+    include_rgb_features: ${..train_dset.include_rgb_features}

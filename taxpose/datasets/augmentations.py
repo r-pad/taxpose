@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
@@ -11,16 +11,22 @@ from taxpose.utils.occlusion_utils import ball_occlusion, plane_occlusion
 
 def maybe_downsample(
     points: npt.NDArray[np.float32], num_points: Optional[int] = None
-) -> npt.NDArray[np.float32]:
+) -> Tuple[npt.NDArray[np.float32], npt.NDArray[np.int32]]:
     if num_points is None:
-        return points
+        return points, np.arange(points.shape[1])
 
     if points.shape[1] < num_points:
         # Randomly sample with replacement.
         n_missing = num_points - points.shape[1]
-        missing_points = points[:, np.random.choice(points.shape[1], n_missing)]
+        missing_ixs = np.random.choice(points.shape[1], n_missing)
+        missing_points = points[:, missing_ixs]
+
+        # get the indices of the points from the original
+        og_ixs = np.arange(points.shape[1])
+
         points = np.concatenate([points, missing_points], axis=1)
-        return points
+
+        return points, np.concatenate([og_ixs, missing_ixs])[None]
 
         # raise ValueError("Cannot downsample to more points than exist in the cloud.")
 
@@ -29,7 +35,7 @@ def maybe_downsample(
     )
 
     points = points_pt.numpy()
-    return points
+    return points, ids.numpy()
 
 
 @dataclass

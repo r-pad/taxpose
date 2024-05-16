@@ -26,6 +26,7 @@ class PointCloudDatasetConfig:
 
     # Handle the synthesizing of various features.
     include_symmetry_features: bool = False
+    include_rgb_features: bool = False
 
 
 def make_dataset(
@@ -103,6 +104,10 @@ class PointCloudDataset(Dataset):
         # We might have different features to include here.
         action_features = None
         anchor_features = None
+
+        if self.cfg.include_rgb_features and self.cfg.include_symmetry_features:
+            raise ValueError("Cannot include both symmetry and rgb features")
+
         if self.cfg.include_symmetry_features:
             if (
                 "action_symmetry_features" not in data
@@ -127,6 +132,18 @@ class PointCloudDataset(Dataset):
 
             action_features = action_sym_feats
             anchor_features = anchor_sym_feats
+
+        if self.cfg.include_rgb_features:
+            if "rgb_action" not in data or "rgb_anchor" not in data:
+                raise ValueError("expected rgb features to be present in dataset")
+            rgb_action = torch.from_numpy(data["rgb_action"]).squeeze(0)
+            rgb_anchor = torch.from_numpy(data["rgb_anchor"]).squeeze(0)
+
+            out_dict["rgb_action"] = rgb_action
+            out_dict["rgb_anchor"] = rgb_anchor
+
+            action_features = rgb_action
+            anchor_features = rgb_anchor
 
         if action_features is not None and anchor_features is not None:
             out_dict["action_features"] = action_features
