@@ -23,7 +23,7 @@ train_dset:
 
 val_dset:
   demo_dset:
-    dataset_root: ${benchmark.dataset_root}
+    dataset_root: ${benchmark.dataset_root}_val
     task_name: ${task.name}
     use_first_as_init_keyframe: False
     episodes: all
