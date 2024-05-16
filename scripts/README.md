@@ -2,6 +2,32 @@
 
 If you write some scripts which are meant to be run stand-alone, and not imported as part of the library, put them in this directory.
 
+# Generate the RLBench dataset (using my custom fork).
+
+ACTUALLY - the docker doesn't work because we have local changes....
+
+```
+docker run --gpus "device=1" -it -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json -v "/home/beisner/code/RLBench:/opt/baeisner/code" -v "/data:/opt/data" beisner/taxpose:latest /bin/bash
+```
+
+Training set.
+
+```
+taskset -c 0-50 python tools/dataset_generator.py --tasks=pick_and_lift,pick_up_cup,put_knife_on_chopping_board,put_money_in_safe,push_button,reach_target,slide_block_to_target,stack_wine,take_money_out_safe,take_umbrella_out_of_umbrella_stand --save_path="/opt/data/rlbench10_collisions" --image_size=256,256 --processes=10 --episodes_per_task=100 --variations=1
+```
+
+Val set.
+
+```
+taskset -c 0-50 python tools/dataset_generator.py --tasks=pick_and_lift,pick_up_cup,put_knife_on_chopping_board,put_money_in_safe,push_button,reach_target,slide_block_to_target,stack_wine,take_money_out_safe,take_umbrella_out_of_umbrella_stand --save_path="/opt/data/rlbench10_collisions_val" --image_size=256,256 --processes=10 --episodes_per_task=10 --variations=1
+```
+
+High-resolution full set.
+
+```
+taskset -c 0-50 python tools/dataset_generator.py --tasks=pick_and_lift,pick_up_cup,put_knife_on_chopping_board,put_money_in_safe,push_button,reach_target,slide_block_to_target,stack_wine,take_money_out_safe,take_umbrella_out_of_umbrella_stand --save_path="/opt/data/rlbench10_highres" --image_size=640,640 --processes=10 --episodes_per_task=110 --variations=1
+```
+
 Here are some scratch commands for now.
 
 # New RLBench.
@@ -44,11 +70,10 @@ mkdir -p configs/checkpoints/rlbench/push_button/pretraining && touch configs/ch
     echo
 
 <!-- reach_target -->
-mkdir -p configs/checkpoints/rlbench/reach_target/pretraining && touch configs/checkpoints/rlbench/reach_target/pretraining/all.yaml
-EXTRA_PARAMS="dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512" \
+EXTRA_PARAMS="" \
     ./scripts/train_eval.sh \
-    "./launch.sh local-docker 0 python scripts/train_residual_flow.py --config-name commands/rlbench/reach_target/train_taxpose_all.yaml wandb.group=rlbench_reach_target resources.num_workers=10 ${EXTRA_PARAMS}"  \
-    "./launch.sh local-docker 0 ./configs/commands/rlbench/reach_target/taxpose_all/precision_eval/precision_eval.sh ${EXTRA_PARAMS}" \
+    "./launch.sh local-docker 0 python scripts/train_residual_flow.py --config-name commands/rlbench/reach_target/train_taxpose_tc.yaml wandb.group=rlbench_reach_target resources.num_workers=10 ${EXTRA_PARAMS}"  \
+    "./launch.sh local-docker 0 ./configs/commands/rlbench/reach_target/taxpose_tc/precision_eval/precision_eval.sh ${EXTRA_PARAMS}" \
     "./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/reach_target/taxpose_all/eval_rlbench.yaml num_trials=100 resources.num_workers=10 wandb.group=rlbench_reach_target headless=True ${EXTRA_PARAMS}"
 
 EXTRA_PARAMS="dm.train_dset.demo_dset.anchor_mode=background_robot_removed dm.train_dset.demo_dset.action_mode=gripper_and_object dm.train_dset.demo_dset.num_points=512" \

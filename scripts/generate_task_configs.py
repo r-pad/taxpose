@@ -99,7 +99,7 @@ def generate_dataset_configs(task_name: str, config_root: str, dry_run: bool = F
         contents = yaml.load(f, Loader=yaml.FullLoader)
 
     contents["train_dset"]["demo_dset"]["episodes"] = list(range(100))
-    contents["val_dset"]["demo_dset"]["episodes"] = list(range(10))
+    contents["val_dset"]["demo_dset"]["episodes"] = list(range(100, 110))
 
     # Write the contents back to the file.
     contents_str = yaml.dump(contents)

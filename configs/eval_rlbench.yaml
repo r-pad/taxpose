@@ -18,7 +18,7 @@ defaults:
 
 policy_spec:
   collision_checking: True
-  num_points: 256
+  num_points: 512
   break_symmetry: False
   model: ${model}
 
@@ -28,8 +28,8 @@ checkpoints:
   ckpt_file: ???
 
 task:
-  action_mode: object
-  anchor_mode: single_object
+  action_mode: gripper_and_object
+  anchor_mode: background_robot_removed
 
 num_trials: 100
 headless: True

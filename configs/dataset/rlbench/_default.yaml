@@ -17,9 +17,9 @@ train_dset:
     teleport_initial_to_final: true
     with_symmetry: True
     occlusion_cfg: ???
-    num_points: 256
-    action_mode: "object"
-    anchor_mode: "single_object"
+    num_points: 512
+    action_mode: "gripper_and_object"
+    anchor_mode: "background_robot_removed"
 
 val_dset:
   demo_dset:

@@ -7,5 +7,5 @@ defaults:
 
 dm:
   train_dset:
-    num_points: 256
+    num_points: 512
     synthetic_occlusion: False
