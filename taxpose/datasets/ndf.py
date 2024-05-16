@@ -315,8 +315,8 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
             )
 
         # Downsample
-        points_action = maybe_downsample(points_action, self.min_num_points)
-        points_anchor = maybe_downsample(points_anchor, self.min_num_points)
+        points_action, _ = maybe_downsample(points_action, self.min_num_points)
+        points_anchor, _ = maybe_downsample(points_anchor, self.min_num_points)
 
         # Symmetry
         (
@@ -347,6 +347,8 @@ class NDFPointCloudDataset(Dataset[PlacementPointCloudData]):
         return {
             "points_action": points_action,
             "points_anchor": points_anchor,
+            "rgb_action": None,
+            "rgb_anchor": None,
             "action_symmetry_features": action_symmetry_features,
             "anchor_symmetry_features": anchor_symmetry_features,
             "action_symmetry_rgb": action_symmetry_rgb,

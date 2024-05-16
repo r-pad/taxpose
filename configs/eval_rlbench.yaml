@@ -21,6 +21,7 @@ policy_spec:
   num_points: 512
   break_symmetry: False
   model: ${model}
+  include_rgb_features: False
 
 
 # Usually only a single checkpoint, but we could have multiple for each phase.

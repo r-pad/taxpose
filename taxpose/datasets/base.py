@@ -7,6 +7,8 @@ import numpy.typing as npt
 class PlacementPointCloudData(TypedDict):
     points_action: npt.NDArray[np.float32]  # (1, num_points, 3)
     points_anchor: npt.NDArray[np.float32]  # (1, num_points, 3)
+    rgb_action: Optional[npt.NDArray[np.float32]]  # (1, num_points, 3)
+    rgb_anchor: Optional[npt.NDArray[np.float32]]  # (1, num_points, 3)
     action_symmetry_features: Optional[npt.NDArray[np.float32]]  # (1, num_points, 1)
     anchor_symmetry_features: Optional[npt.NDArray[np.float32]]  # (1, num_points, 1)
     action_symmetry_rgb: Optional[npt.NDArray[np.uint8]]  # (1, num_points, 3)
