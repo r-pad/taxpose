@@ -5,7 +5,7 @@ This is the official code release for our CoRL 2022 paper and ICLR 2024 paper:
 **TAX-Pose: Task-Specific Cross-Pose Estimation for Robot Manipulation**
 *Chuer Pan\*, Brian Okorn\*, Harry Zhang\*, Ben Eisner\*, David Held*
 CoRL 2022
-[website](https://sites.google.com/view/tax-pose/home) | [paper](https://openreview.net/forum?id=YmJi0bTfeNX)
+[website](https://sites.google.com/view/tax-pose/home) | [paper](https://arxiv.org/abs/2211.09325)
 
 ```
 @inproceedings{pan2022taxpose,
@@ -13,7 +13,7 @@ CoRL 2022
     author      = {Chuer Pan and Brian Okorn and Harry Zhang and Ben Eisner and David Held},
     booktitle   = {6th Annual Conference on Robot Learning},
     year        = {2022},
-    url         = {https://openreview.net/forum?id=YmJi0bTfeNX}
+    url         = {https://arxiv.org/abs/2211.09325}
 }
 ```
 
@@ -22,7 +22,7 @@ Commands to reproduce the results in the paper are detailed in [REPRODUCING_TAXP
 **Deep SE(3)-Equivariant Geometric Reasoning for Precise Placement Tasks**
 Ben Eisner, Yi Yang, Todor Davchev, Mel Vecerik, Jon Scholz, David Held
 ICLR 2024
-[website](https://sites.google.com/view/reldist-iclr-2023) | [paper](https://openreview.net/forum?id=2inBuwTyL2)
+[website](https://sites.google.com/view/reldist-iclr-2023) | [paper](https://arxiv.org/abs/2404.13478)
 
 ```
 @inproceedings{eisner2024deep,
@@ -30,7 +30,7 @@ ICLR 2024
     author      = {Ben Eisner and Yi Yang and Todor Davchev and Mel Vecerik and Jonathan Scholz and David Held},
     booktitle   = {The Twelfth International Conference on Learning Representations},
     year        = {2024},
-    url         = {https://openreview.net/forum?id=2inBuwTyL2}
+    url         = {https://arxiv.org/abs/2404.13478}
 }
 ```
 
