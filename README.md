@@ -127,31 +127,13 @@ python setup.py
 
 Things are a bit messy at the moment, but the main entrypoint for the model code is in `transformer_flow.py`. The `ResidualFlow_DiffEmbTransformer` class is the main TAX-Pose model, and can be configured in various ways to add different features / parameters.
 
-TODO(beisner): Add an example.
-
-TODO(beisner): fix up the model code to be more user-friendly, including predicting a rigid transform instead of in the "model" code.
-
 ## ...use the RelDist / multilateration code.
 
 See:
 * `taxpose/utils/multilateration.py`: The differentiable multilateration code.
 * `taxpose/nets/transformer_flow.py`: The `MultilaterationHead` class and the `MLPKernel` class are the main components of the multilateration code. They are used as drop-in replacements the TAX-Pose model.
 
-## ...use the data / dataset code used in these papers.
-
-TODO(beisner): Add instructions.
-
-### NDF raw data
-
-### Our post-processed NDF datasets (mug, bowl, bottle)
-
-### Partnet-Mobility
-
-### RLBench
-
 ## ...use a pre-trained TAX-Pose model.
-
-TODO(beisner): Add the pretrained models.
 
 ### NDF Mug.
 
@@ -171,10 +153,6 @@ This will download the pre-trained models for NDF mug and save them at:
 
 
 # Code Structure
-
-TODO(beisner): Clean this up.
-
-TODO(beisner): Clean up the code structure a little bit, one day.
 
 * `configs/`: Hydra configuration files for training and evaluation, for all the datasets.
     * `benchmark`: ndf, rlbench, or real_world
