@@ -101,7 +101,7 @@ TASK_TO_IGNORE_COLLISIONS = {
         "place": False,
     },
     "take_umbrella_out_of_umbrella_stand": {
-        "pregrasp": False,
+        "pregasp": False,
         "grasp": False,
         "lift": True,
     },
@@ -141,8 +141,10 @@ class TaskVideoRecorder:
         out.release()
 
         # ffmpeg -i "$file" -c:v libx264 -c:a aac "${file%.mp4}.mov"
+
+        # Redirect the output to /dev/null to suppress the output.
         os.system(
-            f"/usr/bin/ffmpeg -i {video_path}.mp4 -c:v libx264 -c:a aac {video_path}.mov"
+            f"/usr/bin/ffmpeg -i {video_path}.mp4 -c:v libx264 -c:a aac {video_path}.mov > /dev/null 2>&1"
         )
 
 
@@ -739,8 +741,8 @@ def run_trial(
                 T_gripper_world, extras = policy.predict(obs, phase)
                 if "plot" in extras:
                     phase_plots.append((phase, extras["plot"]))
-            except Exception as e:
-                print(e)
+            except Exception as ex:
+
                 phase_results[phase] = FailureReason.PREDICTION_FAILURE
                 success = False
                 return TrialResult(success, pr())
@@ -764,11 +766,14 @@ def run_trial(
                     ignore_collisions=TASK_TO_IGNORE_COLLISIONS[task_spec.name][phase],
                 )  # Eventually add collision checking.
 
-            except Exception as e:
-                if "workspace" in str(e):
+            except Exception as ex:
+                if "workspace" in str(ex):
                     phase_results[phase] = FailureReason.PREDICTION_OUTSIDE_WORKSPACE
-                else:
+                elif "A path could not be found." in str(ex):
                     phase_results[phase] = FailureReason.MOTION_PLANNING_FAILURE
+                else:
+                    logging.error(f"Unknown error: {ex}")
+                    phase_results[phase] = FailureReason.UNKNOWN_FAILURE
                 success = False
                 return TrialResult(success, pr())
 
@@ -913,6 +918,9 @@ def main(cfg):
         group=cfg.wandb.group,
         config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True),
     )
+
+    # Make sure the model weights can be downloaded.
+    get_weights_path(cfg.checkpoints.ckpt_file, cfg.wandb, run=run)
 
     results = run_trials(
         cfg.policy_spec,

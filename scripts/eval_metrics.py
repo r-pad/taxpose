@@ -99,8 +99,6 @@ def main(cfg):
         cfg=cfg.dm,
     )
 
-    dm.setup(stage=cfg.split)
-
     network = create_network(cfg.model)
 
     model = EquivarianceTrainingModule(
@@ -131,13 +129,6 @@ def main(cfg):
     model.eval()
 
     # model = torch.compile(model)
-
-    if cfg.split == "train":
-        loader = dm.train_dataloader()
-    elif cfg.split == "val":
-        loader = dm.val_dataloader()
-    elif cfg.split == "test":
-        loader = dm.test_dataloader()
 
     print("setting up train")
     dm.setup(stage="train")

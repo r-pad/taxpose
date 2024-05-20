@@ -149,7 +149,7 @@ mkdir -p configs/checkpoints/rlbench/take_umbrella_out_of_umbrella_stand/pretrai
 
 
 
-# RGB
+# RGB training + evals.
 
 RLBENCH_10_TASKS = [
     "pick_and_lift",
@@ -163,6 +163,8 @@ RLBENCH_10_TASKS = [
     "take_money_out_safe",
     "take_umbrella_out_of_umbrella_stand",
 ]
+
+## Training
 
 
 ./launch.sh autobot 5 python scripts/train_residual_flow.py --config-name commands/rlbench/pick_and_lift/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
@@ -184,3 +186,110 @@ RLBENCH_10_TASKS = [
 ./launch.sh autobot 8 python scripts/train_residual_flow.py --config-name commands/rlbench/take_money_out_safe/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
 
 ./launch.sh autobot 9 python scripts/train_residual_flow.py --config-name commands/rlbench/take_umbrella_out_of_umbrella_stand/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+
+## Checkpoints from this training run
+
+pick_and_lift:                          r-pad/taxpose/model-9tx1uje9:v0
+pick_up_cup:                            r-pad/taxpose/model-9pfjeq0j:v0
+put_knife_on_chopping_board:            r-pad/taxpose/model-c9u0u4np:v0
+put_money_in_safe:                      r-pad/taxpose/model-lq4b953m:v0
+push_button:                            r-pad/taxpose/model-0kxpww1x:v0
+reach_target:                           r-pad/taxpose/model-w5kjqoph:v0
+slide_block_to_target:                  r-pad/taxpose/model-fct8vbrq:v0
+stack_wine:                             r-pad/taxpose/model-cbe1hgx4:v0
+take_money_out_safe:                    r-pad/taxpose/model-j3swo5k7:v0
+take_umbrella_out_of_umbrella_stand:    r-pad/taxpose/model-txvpna0v:v0
+
+
+## Precision Eval.
+
+
+```
+# pick_and_lift
+
+./configs/commands/rlbench/pick_and_lift/taxpose_tc/precision_eval/precision_eval.sh dm.train_dset.include_rgb_features=True model.feature_channels=3 checkpoint=r-pad/taxpose/model-9tx1uje9:v0 benchmark.dataset_root=/data/rlbench10_collisions
+
+# pick_up_cup
+
+./configs/commands/rlbench/pick_up_cup/taxpose_tc/precision_eval/precision_eval.sh dm.train_dset.include_rgb_features=True model.feature_channels=3 checkpoint=r-pad/taxpose/model-9pfjeq0j:v0 benchmark.dataset_root=/data/rlbench10_collisions
+
+# put_knife_on_chopping_board
+
+./configs/commands/rlbench/put_knife_on_chopping_board/taxpose_tc/precision_eval/precision_eval.sh dm.train_dset.include_rgb_features=True model.feature_channels=3 checkpoint=r-pad/taxpose/model-c9u0u4np:v0 benchmark.dataset_root=/data/rlbench10_collisions
+
+# put_money_in_safe
+
+./configs/commands/rlbench/put_money_in_safe/taxpose_tc/precision_eval/precision_eval.sh dm.train_dset.include_rgb_features=True model.feature_channels=3 checkpoint=r-pad/taxpose/model-lq4b953m:v0 benchmark.dataset_root=/data/rlbench10_collisions
+
+# push_button
+
+./configs/commands/rlbench/push_button/taxpose_tc/precision_eval/precision_eval.sh dm.train_dset.include_rgb_features=True model.feature_channels=3 checkpoint=r-pad/taxpose/model-0kxpww1x:v0 benchmark.dataset_root=/data/rlbench10_collisions
+
+# reach_target
+
+./configs/commands/rlbench/reach_target/taxpose_tc/precision_eval/precision_eval.sh dm.train_dset.include_rgb_features=True model.feature_channels=3 checkpoint=r-pad/taxpose/model-w5kjqoph:v0 benchmark.dataset_root=/data/rlbench10_collisions
+
+# slide_block_to_target
+
+./configs/commands/rlbench/slide_block_to_target/taxpose_tc/precision_eval/precision_eval.sh dm.train_dset.include_rgb_features=True model.feature_channels=3 checkpoint=r-pad/taxpose/model-fct8vbrq:v0 benchmark.dataset_root=/data/rlbench10_collisions
+
+# stack_wine
+
+./configs/commands/rlbench/stack_wine/taxpose_tc/precision_eval/precision_eval.sh dm.train_dset.include_rgb_features=True model.feature_channels=3 checkpoint=r-pad/taxpose/model-cbe1hgx4:v0 benchmark.dataset_root=/data/rlbench10_collisions
+
+# take_money_out_safe
+
+./configs/commands/rlbench/take_money_out_safe/taxpose_tc/precision_eval/precision_eval.sh dm.train_dset.include_rgb_features=True model.feature_channels=3 checkpoint=r-pad/taxpose/model-j3swo5k7:v0 benchmark.dataset_root=/data/rlbench10_collisions
+
+# take_umbrella_out_of_umbrella_stand
+
+./configs/commands/rlbench/take_umbrella_out_of_umbrella_stand/taxpose_tc/precision_eval/precision_eval.sh dm.train_dset.include_rgb_features=True model.feature_channels=3 checkpoint=r-pad/taxpose/model-txvpna0v:v0 benchmark.dataset_root=/data/rlbench10_collisions
+
+```
+
+
+
+## RLBench Eval.
+
+```
+# pick_and_lift
+
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/pick_and_lift/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-9tx1uje9:v0 wandb.group=rlbench_pick_and_lift
+
+# pick_up_cup
+
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/pick_up_cup/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-9pfjeq0j:v0 wandb.group=rlbench_pick_up_cup
+
+# put_knife_on_chopping_board
+
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/put_knife_on_chopping_board/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-c9u0u4np:v0 wandb.group=rlbench_put_knife_on_chopping_board
+
+# put_money_in_safe
+
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/put_money_in_safe/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-lq4b953m:v0 wandb.group=rlbench_put_money_in_safe
+
+# push_button
+
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/push_button/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-0kxpww1x:v0 wandb.group=rlbench_push_button
+
+# reach_target
+
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/reach_target/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-w5kjqoph:v0 wandb.group=rlbench_reach_target
+
+# slide_block_to_target
+
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/slide_block_to_target/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-fct8vbrq:v0 wandb.group=rlbench_slide_block_to_target
+
+# stack_wine
+
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/stack_wine/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-cbe1hgx4:v0 wandb.group=rlbench_stack_wine
+
+# take_money_out_safe
+
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/take_money_out_safe/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-j3swo5k7:v0 wandb.group=rlbench_take_money_out_safe
+
+# take_umbrella_out_of_umbrella_stand
+
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/take_umbrella_out_of_umbrella_stand/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-txvpna0v:v0 wandb.group=rlbench_take_umbrella_out_of_umbrella_stand
+
+```
