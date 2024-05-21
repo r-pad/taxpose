@@ -268,7 +268,6 @@ def main(
             )
 
             if rlbench_eval:
-
                 generate_rlbench_eval_command_configs(
                     task_name, config_root, "taxpose_tc", dry_run=dry_run
                 )

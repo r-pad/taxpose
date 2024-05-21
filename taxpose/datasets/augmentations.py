@@ -12,6 +12,8 @@ from taxpose.utils.occlusion_utils import ball_occlusion, plane_occlusion
 def maybe_downsample(
     points: npt.NDArray[np.float32], num_points: Optional[int] = None
 ) -> Tuple[npt.NDArray[np.float32], npt.NDArray[np.int32]]:
+    assert len(points.shape) == 3
+
     if num_points is None:
         return points, np.arange(points.shape[1])
 

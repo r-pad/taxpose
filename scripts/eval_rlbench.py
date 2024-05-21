@@ -5,7 +5,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Protocol, Tuple
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 import hydra
 import joblib
@@ -21,7 +21,6 @@ import wandb
 from omegaconf import OmegaConf
 from pyrep.backend import sim
 from pyrep.const import RenderMode
-from pytorch3d.ops import sample_farthest_points
 from rlbench.action_modes.action_mode import MoveArmThenGripper
 from rlbench.action_modes.arm_action_modes import EndEffectorPoseViaPlanning
 from rlbench.action_modes.gripper_action_modes import Discrete
@@ -39,9 +38,11 @@ from rpad.rlbench_utils.placement_dataset import (
 from scipy.spatial.transform import Rotation as R
 
 import taxpose.utils.website as tuw
+from taxpose.datasets.augmentations import maybe_downsample
 from taxpose.datasets.rlbench import (
     colorize_symmetry_labels,
-    remove_outliers,
+    remove_outliers_action,
+    remove_outliers_anchor,
     rotational_symmetry_labels,
 )
 from taxpose.nets.transformer_flow import create_network
@@ -321,7 +322,6 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
 
     @staticmethod
     def load_model(model_path, model_cfg, wandb_cfg, task_cfg, run=None):
-
         network = create_network(model_cfg)
         model = EquivarianceTrainingModule(
             network,
@@ -346,6 +346,7 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
             phase,
             self.action_mode,
             self.anchor_mode,
+            n_pts=self.policy_spec.num_points,
         )
 
         model = self.models[phase]
@@ -356,15 +357,8 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         action_rgb = inputs["action_rgb"].unsqueeze(0).to(device)
         anchor_rgb = inputs["anchor_rgb"].unsqueeze(0).to(device)
 
-        K = self.policy_spec.num_points
-        action_pc, action_idx = sample_farthest_points(
-            action_pc, K=K, random_start_point=True
-        )
-        anchor_pc, anchor_idx = sample_farthest_points(
-            anchor_pc, K=K, random_start_point=True
-        )
-        action_rgb = action_rgb[0][action_idx[0]].unsqueeze(0) / 255.0
-        anchor_rgb = anchor_rgb[0][anchor_idx[0]].unsqueeze(0) / 255.0
+        action_rgb = action_rgb[0].unsqueeze(0) / 255.0
+        anchor_rgb = anchor_rgb[0].unsqueeze(0) / 255.0
 
         if self.policy_spec.include_rgb_features:
             action_features = action_rgb
@@ -532,6 +526,23 @@ def get_handle_mapping():
     return handles
 
 
+def crop_to_box(points, box):
+    x_min, x_max = box[0]
+    y_min, y_max = box[1]
+    z_min, z_max = box[2]
+
+    mask = (
+        (points[:, 0] > x_min)
+        & (points[:, 0] < x_max)
+        & (points[:, 1] > y_min)
+        & (points[:, 1] < y_max)
+        & (points[:, 2] > z_min)
+        & (points[:, 2] < z_max)
+    )
+
+    return points[mask]
+
+
 # TODO: put this in the original rlbench library.
 def obs_to_input(
     obs,
@@ -539,66 +550,60 @@ def obs_to_input(
     phase,
     action_mode: ActionMode,
     anchor_mode: AnchorMode,
+    n_pts: Optional[int] = 1024,
 ):
-    rgb, point_cloud, mask = obs_to_rgb_point_cloud(obs)
+    rgb, pc, mask = obs_to_rgb_point_cloud(obs)
 
-    ##############################
-    # Action points.
-    ##############################
+    ########################################
+    # Separate the action and anchor points.
+    ########################################
 
-    action_rgb, action_point_cloud = get_action_points(
+    action_rgb, action_pc = get_action_points(
         action_mode,
         rgb,
-        point_cloud,
+        pc,
         mask,
         task_name,
         phase,
         use_from_simulator=True,
     )
 
-    # Remove outliers in the same way...
-    action_point_cloud = remove_outliers(action_point_cloud[None])[0]
-
-    ##############################
-    # Anchor points.
-    ##############################
-
-    anchor_rgb, anchor_point_cloud = get_anchor_points(
+    anchor_rgb, anchor_pc = get_anchor_points(
         anchor_mode,
         rgb,
-        point_cloud,
+        pc,
         mask,
         task_name,
         phase,
         use_from_simulator=True,
     )
 
-    if (
-        anchor_mode != AnchorMode.RAW
-        and anchor_mode != AnchorMode.BACKGROUND_ROBOT_REMOVED
-    ):
-        anchor_point_cloud = remove_outliers(anchor_point_cloud[None])[0]
+    ##############################
+    # Remove outliers.
+    ##############################
 
-    # Visualize the point clouds.
-    # act_pc = o3d.geometry.PointCloud()
-    # act_pc.points = o3d.utility.Vector3dVector(action_point_cloud)
-    # act_pc.colors = o3d.utility.Vector3dVector(
-    #     np.array([1, 0, 0]) * np.ones((action_point_cloud.shape[0], 3))
-    # )
+    n_pts_2x = 2 * n_pts if n_pts is not None else None
+    action_pc, action_rgb = remove_outliers_action(
+        anchor_mode, action_pc, action_rgb, n_pts_2x
+    )
+    anchor_pc, anchor_rgb = remove_outliers_anchor(
+        anchor_mode, anchor_pc, anchor_rgb, n_pts_2x
+    )
 
-    # anc_pc = o3d.geometry.PointCloud()
-    # anc_pc.points = o3d.utility.Vector3dVector(anchor_point_cloud)
-    # anc_pc.colors = o3d.utility.Vector3dVector(
-    #     np.array([0, 1, 0]) * np.ones((anchor_point_cloud.shape[0], 3))
-    # )
+    ##############################
+    # Final downsample.
+    ##############################
 
-    # o3d.visualization.draw_geometries([act_pc, anc_pc])
+    action_pc, action_ixs = maybe_downsample(action_pc[None], n_pts)
+    action_pc, action_rgb = action_pc[0], action_rgb[action_ixs[0]]
+    anchor_pc, anchor_ixs = maybe_downsample(anchor_pc[None], n_pts)
+    anchor_pc, anchor_rgb = anchor_pc[0], anchor_rgb[anchor_ixs[0]]
 
     return {
         "action_rgb": torch.from_numpy(action_rgb),
-        "action_pc": torch.from_numpy(action_point_cloud).float(),
+        "action_pc": torch.from_numpy(action_pc).float(),
         "anchor_rgb": torch.from_numpy(anchor_rgb),
-        "anchor_pc": torch.from_numpy(anchor_point_cloud).float(),
+        "anchor_pc": torch.from_numpy(anchor_pc).float(),
     }
 
 
@@ -764,24 +769,20 @@ def run_trial(
         return TrialResult(success, pr())
 
     try:
-
         # Loop through the phases, and predict.
         phase_plots: List[go.Figure] = []
         for phase in phase_order:
-
             N_MOTION_PLANNING_SAMPLING_TRIES = 20
             motion_succeeded = False  # whether any of the predicted motions succeeded.
 
             # Try to make a prediction a number of times. Hopefully randomized.
             for i in range(N_MOTION_PLANNING_SAMPLING_TRIES):
-
                 # Try to make a predictions.
                 try:
                     T_gripper_world, extras = policy.predict(obs, phase)
                     if "plot" in extras:
                         phase_plots.append((f"{phase}-{i}", extras["plot"]))
                 except Exception as ex:
-
                     phase_results[phase] = FailureReason.PREDICTION_FAILURE
                     success = False
                     return TrialResult(success, pr())
@@ -895,7 +896,6 @@ def run_trial(
 
         # Save the episode results as a text file.
         with open(f"episodes/{trial_num}/results.txt", "w") as f:
-
             # Print overall task success.
             f.write(f"OVERALL TASK SUCCESS: {success}\n")
 

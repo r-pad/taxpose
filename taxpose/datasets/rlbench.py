@@ -186,9 +186,12 @@ def remove_outliers_o3d(original_points):
 
 def remove_outliers(original_points, min_neighbors=1):
     """Remove outliers which are far from other points using pure numpy"""
+
+    assert len(original_points.shape) == 3
+
     # Compute the distance between each point and every other point.
     dists = np.linalg.norm(
-        original_points[0, None, ..., :3] - original_points[0, :, None, ..., :3],
+        original_points[0, None, ...] - original_points[0, :, None, ...],
         axis=-1,
     )
 
@@ -208,11 +211,31 @@ def remove_outliers(original_points, min_neighbors=1):
     # Remove the outliers.
     points = np.delete(original_points, outliers, axis=1)
 
-    # Print how many were removed.
-    # print(
-    #     f"Removed {original_points.shape[1] - points.shape[1]} outliers from {original_points.shape[1]} points."
-    # )
-    return points
+    return points, outliers
+
+
+def remove_outliers_action(anchor_mode, action_pc, action_rgb, n_pts):
+    # Downsample the action point cloud to the number of points.
+    action_pc, action_ixs = maybe_downsample(action_pc[None], n_pts)
+    action_pc, action_rgb = action_pc[0], action_rgb[action_ixs[0]]
+
+    action_pc, action_outlier_ixs = remove_outliers(action_pc[None])
+    action_pc = action_pc[0]
+    action_rgb = np.delete(action_rgb, action_outlier_ixs, axis=0)
+
+    return action_pc, action_rgb
+
+
+def remove_outliers_anchor(anchor_mode, anchor_pc, anchor_rgb, n_pts):
+    anchor_pc, anchor_ixs = maybe_downsample(anchor_pc[None], n_pts)
+    anchor_pc, anchor_rgb = anchor_pc[0], anchor_rgb[anchor_ixs[0]]
+
+    if anchor_mode != AnchorMode.RAW:
+        anchor_pc, anchor_outlier_ixs = remove_outliers(anchor_pc[None])
+        anchor_pc = anchor_pc[0]
+        anchor_rgb = np.delete(anchor_rgb, anchor_outlier_ixs, axis=0)
+
+    return anchor_pc, anchor_rgb
 
 
 @dataclass
@@ -259,7 +282,7 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
 
     @functools.lru_cache(maxsize=1000)
     def _load_data(
-        self, index: int
+        self, index: int, n_pts: Optional[int] = None
     ) -> Tuple[
         npt.NDArray[np.float32],
         npt.NDArray[np.float32],
@@ -289,37 +312,21 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             )
             points_action = np.matmul(points_action, T_init_key.T)[:, :3]
 
-            points_action = points_action[None, ...]
-            points_anchor = points_anchor[None, ...]
-
         else:
-            points_action = data["key_action_pc"].numpy().astype(np.float32)[None, ...]
-            points_anchor = data["key_anchor_pc"].numpy().astype(np.float32)[None, ...]
+            points_action = data["key_action_pc"].numpy().astype(np.float32)
+            points_anchor = data["key_anchor_pc"].numpy().astype(np.float32)
 
             rgb_action = data["key_action_rgb"].numpy().astype(np.float32) / 255.0
             rgb_anchor = data["key_anchor_rgb"].numpy().astype(np.float32) / 255.0
 
-        rgb_action = rgb_action[None, ...]
-        rgb_anchor = rgb_anchor[None, ...]
-
-        # Quickly remove outliers...
-
-        # Since remove_outliers doesn't take additional args.. we do a hacky concat.
-        features_action = remove_outliers(
-            np.concatenate([points_action, rgb_action], axis=2)
+        n_pts_2x = 2 * n_pts if n_pts is not None else None
+        points_action, rgb_action = remove_outliers_action(
+            self.cfg.action_mode, points_action, rgb_action, n_pts_2x
         )
-        points_action = features_action[..., :3]
-        rgb_action = features_action[..., 3:]
 
-        if (
-            not self.cfg.anchor_mode == AnchorMode.RAW
-            and not self.cfg.anchor_mode == AnchorMode.BACKGROUND_ROBOT_REMOVED
-        ):
-            features_anchor = remove_outliers(
-                np.concatenate([points_anchor, rgb_anchor], axis=2)
-            )
-            points_anchor = features_anchor[..., :3]
-            rgb_anchor = features_anchor[..., 3:]
+        points_anchor, rgb_anchor = remove_outliers_anchor(
+            self.cfg.anchor_mode, points_anchor, rgb_anchor, n_pts_2x
+        )
 
         new_data = {
             "T_action_key_world": data["T_action_key_world"],
@@ -337,29 +344,26 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             rgb_action_np,
             rgb_anchor_np,
             data,
-        ) = self._load_data(index)
-        # breakpoint()
-        # Occlude if necessary.
-        # TODO: implement occlusions here.
+        ) = self._load_data(index, n_pts=self.cfg.num_points)
+
+        assert len(points_action_np.shape) == 2
+        assert len(points_anchor_np.shape) == 2
+        assert len(rgb_action_np.shape) == 2
+        assert len(rgb_anchor_np.shape) == 2
 
         # Downsample if necessary.
-        try:
-            points_action, ids_action = maybe_downsample(
-                points_action_np, self.cfg.num_points
-            )
-            rgb_action = rgb_action_np[0, ids_action]
+        points_action, ids_action = maybe_downsample(
+            points_action_np[None], self.cfg.num_points
+        )
+        points_action, rgb_action = points_action[0], rgb_action_np[ids_action[0]]
 
-            num_anchor_points = (
-                self.cfg.num_points
-                if not self.cfg.anchor_mode == AnchorMode.RAW
-                else 1024
-            )
-            points_anchor, ids_anchor = maybe_downsample(
-                points_anchor_np, num_anchor_points
-            )
-            rgb_anchor = rgb_anchor_np[0, ids_anchor]
-        except Exception as e:
-            print(f"Failed to downsample {index}: {e}")
+        n_anchor_pts = (
+            self.cfg.num_points if not self.cfg.anchor_mode == AnchorMode.RAW else 1024
+        )
+        points_anchor, ids_anchor = maybe_downsample(
+            points_anchor_np[None], n_anchor_pts
+        )
+        points_anchor, rgb_anchor = points_anchor[0], rgb_anchor_np[ids_anchor[0]]
 
         if self.cfg.with_symmetry:
             T_action_key_world = data["T_action_key_world"].numpy().astype(np.float32)
@@ -411,6 +415,12 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
         anchor_symmetry_rgb = colorize_symmetry_labels(
             anchor_symmetry_features[0, ..., 0]
         )[None]
+
+        # Reinflate rgb and point clouds.
+        points_action = points_action[None]
+        points_anchor = points_anchor[None]
+        rgb_action = rgb_action[None]
+        rgb_anchor = rgb_anchor[None]
 
         # Assert shapes
         assert len(points_action.shape) == 3
