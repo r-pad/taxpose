@@ -20,6 +20,7 @@ train_dset:
     num_points: 512
     action_mode: "gripper_and_object"
     anchor_mode: "background_robot_removed"
+    include_wrist_cam: True
 
 val_dset:
   demo_dset:
@@ -37,3 +38,4 @@ val_dset:
     num_points: ${...train_dset.demo_dset.num_points}
     action_mode: ${...train_dset.demo_dset.action_mode}
     anchor_mode: ${...train_dset.demo_dset.anchor_mode}
+    include_wrist_cam: ${...train_dset.demo_dset.include_wrist_cam}

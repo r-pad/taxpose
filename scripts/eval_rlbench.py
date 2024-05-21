@@ -551,8 +551,9 @@ def obs_to_input(
     action_mode: ActionMode,
     anchor_mode: AnchorMode,
     n_pts: Optional[int] = 1024,
+    include_wrist_cam=False,
 ):
-    rgb, pc, mask = obs_to_rgb_point_cloud(obs)
+    rgb, pc, mask = obs_to_rgb_point_cloud(obs, include_wrist_cam)
 
     ########################################
     # Separate the action and anchor points.
