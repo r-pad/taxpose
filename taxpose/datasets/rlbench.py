@@ -215,7 +215,6 @@ def remove_outliers(original_points, min_neighbors=1):
 
 
 def remove_outliers_action(anchor_mode, action_pc, action_rgb, n_pts):
-
     # Downsample the action point cloud to the number of points.
     action_pc, action_ixs = maybe_downsample(action_pc[None], n_pts)
     action_pc, action_rgb = action_pc[0], action_rgb[action_ixs[0]]
@@ -228,7 +227,6 @@ def remove_outliers_action(anchor_mode, action_pc, action_rgb, n_pts):
 
 
 def remove_outliers_anchor(anchor_mode, anchor_pc, anchor_rgb, n_pts):
-
     anchor_pc, anchor_ixs = maybe_downsample(anchor_pc[None], n_pts)
     anchor_pc, anchor_rgb = anchor_pc[0], anchor_rgb[anchor_ixs[0]]
 

@@ -322,7 +322,6 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
 
     @staticmethod
     def load_model(model_path, model_cfg, wandb_cfg, task_cfg, run=None):
-
         network = create_network(model_cfg)
         model = EquivarianceTrainingModule(
             network,
@@ -770,24 +769,20 @@ def run_trial(
         return TrialResult(success, pr())
 
     try:
-
         # Loop through the phases, and predict.
         phase_plots: List[go.Figure] = []
         for phase in phase_order:
-
             N_MOTION_PLANNING_SAMPLING_TRIES = 20
             motion_succeeded = False  # whether any of the predicted motions succeeded.
 
             # Try to make a prediction a number of times. Hopefully randomized.
             for i in range(N_MOTION_PLANNING_SAMPLING_TRIES):
-
                 # Try to make a predictions.
                 try:
                     T_gripper_world, extras = policy.predict(obs, phase)
                     if "plot" in extras:
                         phase_plots.append((f"{phase}-{i}", extras["plot"]))
                 except Exception as ex:
-
                     phase_results[phase] = FailureReason.PREDICTION_FAILURE
                     success = False
                     return TrialResult(success, pr())
@@ -901,7 +896,6 @@ def run_trial(
 
         # Save the episode results as a text file.
         with open(f"episodes/{trial_num}/results.txt", "w") as f:
-
             # Print overall task success.
             f.write(f"OVERALL TASK SUCCESS: {success}\n")
 
