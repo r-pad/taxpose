@@ -1,0 +1,147 @@
+name: ???
+
+plot_encoder_distribution: False
+
+# Misc. dataset settings
+compute_rpdiff_min_errors: False
+rpdiff_descriptions_path: /home/triind/workspace/rpad/data/rpdiff/data/descriptions
+
+# Network Settings
+center_feature: True
+diff_emb: True
+diff_transformer: True
+emb_nn: dgcnn # Encoder network type used for the TAXPose decoder module
+emb_dims: 512
+latent_z_linear_size: 40
+inital_sampling_ratio: 1
+flow_compute_type: 0
+residual_on: True
+pred_weight: True
+weight_normalize: softmax
+sigmoid_on: True
+softmax_temperature: 1
+mlp: False
+  #input_dims: 4 # set this within the script automatically
+gumbel_temp: 1 #0.01 #5
+division_smooth_factor: 1 #50
+add_smooth_factor: 0.05
+
+
+# Settings for p(z|Y) and p(z|X) encoders
+pzY_encoder_type: pn++
+pzY_input_dims: 3
+pzY_dropout_goal_emb: 0
+pzY_embedding_routine: joint2global
+pzY_embedding_option: 0
+
+pzcondx_encoder_type: 2_dgcnn
+pzX_input_dims: 3
+pzX_dropout_goal_emb: 0
+pzX_embedding_routine: anchor2action2global
+pzX_embedding_option: 2
+
+
+# General p(z|Y) and p(z|X) settings
+min_err_across_racks_debug: True
+error_mode_2rack: demo_rack
+conditioning: hybrid_pos_delta_l2norm_global # pos_delta_l2norm #latent_z_linear_internalcond # latent_z_1pred # pos_onehot #pos_delta_vec # latent_z # pos_delta_l2norm
+use_action_z: True # Whether to use the actual conditioning value or use a constant 0 for action z conditioning 
+taxpose_centering: z #z #z # mean, z
+shuffle_for_pzX: False
+latent_z_cond_logvar_limit: 5 # Limit the logvar of the latent z conditioning using: limit * tanh(logvar), 0 to disable
+hybrid_cond_logvar_limit: 5 # Limit the logvar of the hybrid conditioning using: limit * tanh(logvar), 0 to disable
+hybrid_cond_regularize_all: True # Whether to regularize all per-point latents, or only the selected point's latent
+hybrid_cond_pzX_regularize_type: global # [all, select, none] During pzX training, whether to regularize all goal emb per point latents, or only the selected point's goal emb latent
+hybrid_cond_pzX_sample_latent: False # Sample the latent from prior for the selected point during pzX training
+
+
+# Settings for TAXPose decoder
+decoder_type: taxpose
+flow_frame: original
+return_flow_component: True 
+flow_head_use_weighted_sum: all # Use weighted sum over the other pcd as the virtual correspondence
+flow_head_use_selected_point_feature: False # When not doing weight sum, add the selected correspondences embedding to the respective action embedding
+multilaterate: False # Requires return_flow_component to be True
+mlat_sample: True # Sub-sample points for multilateration
+mlat_nkps: 256 # Number of points to sample for multilateration
+pred_mlat_weight: False # Predict weights for weighted multilateration
+taxpose_conditioning_type: flow_fix-post_encoder_one_flow_head # [old, flow_fix, old-post_encoder, flow_fix-post_encoder, ...] replaces use_flow_weight_fix, post_encoder_conditioning
+post_encoder_input_dims: 4 # Input dimensions for Taxpose encoder when using a post encoder conditioning
+flow_direction: both # Compute both action->anchor and anchor->action flows, or just action->anchor flows
+relative_3d_encoding: False # Use RoPE for the TAXPose transformer self-attention
+
+# Settings for adding ghost points during TAXPose decoding
+ghost_points: none # none, p_center
+num_ghost_points: 512 # Number of ghost points to add, based on sampling method either gets exactly this many points, or closest perfect cube
+ghost_point_radius: 0.2 # Radius (half side length of cube) of the ghost points
+
+
+# Settings for p(z|Y) and p(z|X) goal embedding sampling
+pzY_n_samples: 1 # How many samples to draw from the p(z|Y) encoder embedding during forward pass/inference (i.e. How many predictions to generate per input)
+pzY_closest_point_conditioning: null # null or top_{k}_{prob}, Sometimes use pairs of close points for p, p' conditioning
+pzY_get_errors_across_samples: False # Calculate errors metrics across all samples (i.e. across all predictions for a given input)
+pzY_use_debug_sampling_methods: False # Use debug sampling methods when getting errors across samples (i.e. 3 random samples, top 3 samples, and argmax sample)
+pzX_n_samples: 1 # How many samples to draw from the p(z|X) encoder embedding during forward pass/inference (i.e. How many predictions to generate per input)
+pzX_get_errors_across_samples: False # Calculate errors metrics across all samples (i.e. across all predictions for a given input)
+pzX_use_debug_sampling_methods: False # Use debug sampling methods when getting errors across samples (i.e. 3 random samples, top 3 samples, and argmax sample)
+pzX_use_pzY_z_samples: False # Use the p(z|Y) z samples during p(z|X) forward pass
+
+
+# Settings for transformer based p(z|Y) and p(z|X)
+pzY_transformer: none # Use transformer for conditional/joint prediction of action/anchor z [cross_object, none]
+pzY_transformer_embnn_dims: 512 # Embedding network's embedding dimensions when using the transformer e.g. DGCNN encoder
+pzY_transformer_emb_dims: 512 # Transformer network's embedding dimensions when using the transformer
+
+pzX_transformer: cross_object # Use transformer for conditional/joint prediction of action/anchor z [cross_object, none]
+pzX_transformer_embnn_dims: 512 # Embedding network's embedding dimensions when using the transformer e.g. DGCNN encoder
+pzX_transformer_emb_dims: 512 # Transformer network's embedding dimensions when using the transformer
+
+
+# Settings for adversarial training of p(z|X) encoder
+pzX_adversarial: False # Use adversarial training for p(z|X) encoder
+pzX_adversarial_freeze_taxpose: False # Freeze the TAXPose model during p(z|X) adversarial training
+discriminator_encoder_type: dgcnn # Encoder network type used for the discriminator network encoders
+discriminator_input_dims: 4 # Input dimensions for the discriminator network encoders
+discriminator_emb_dims: 256 # Embedding dimensions for the discriminator network encoders
+discriminator_transformer_emb_dims: 256 # Transformer network's embedding dimensions when using the transformer
+discriminator_mlp_hidden_dims: 256 # Hidden dimensions for the discriminator final mlps
+discriminator_last_sigmoid: False # Use sigmoid activation on the last layer of the discriminator network
+
+pzX_overwrite_loss: True # During pzX training, (False) add the goal emb. loss to the pzX loss or (True) overwrite the pzX loss with the goal emb. loss
+
+
+# Loss Settings
+# Base TAXPose losses
+flow_supervision: both
+point_loss_type: 0
+action_weight: 1
+anchor_weight: 0
+displace_weight: 1
+consistency_weight: 1
+smoothness_weight: 0.1
+rotation_weight: 0
+
+# Latent and prior losses
+vae_reg_loss_weight: 1 #1
+goal_emb_cond_x_loss_weight: 1 #0.01
+goal_emb_cond_x_loss_type: js_div # choose between [forward_kl, reverse_kl, js_div, js_div_eps0, js_div_mod_0_0, js_div_mod_eps0_0_0, js_div_mod_1e-1_1e-1, etc.]
+spatial_distance_regularization_type: demo # Type of distance regularization, demo, pred, pred_sg
+spatial_distance_regularization_weight: 0
+
+# Auxialiary losses
+pzY_joint_infonce_loss_weight: 0
+pzY_taxpose_infonce_loss_weight: 0 # Weight for the TAXPose transformation infonce loss during p(z|Y) training
+pzY_taxpose_occ_infonce_loss_weight: 0 # Weight for the TAXPose occlusion infonce loss during p(z|Y) training
+pzX_joint_infonce_loss_weight: 0
+
+# Adversarial losses
+generator_loss_weight: 1 # Weight for the generator during p(z|X) adversarial training
+discriminator_loss_weight: 1 # Weight for the discriminator during p(z|X) adversarial training
+
+joint_train_prior: True # Jointly train p(z|Y) and p(z|X) at the same time
+freeze_embnn: True # Freeze the TAXPose encoders
+freeze_residual_flow: True # Freeze the entire TAXPose network 
+freeze_z_embnn: True # Freeze p(z|Y) encoders
+
+init_cond_x: True # Try to initialize p(z|X)
+load_cond_x: False # Whether checkpoint file for p(z|X)

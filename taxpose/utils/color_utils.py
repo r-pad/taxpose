@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from colour import Color
 
 # color scheme from https://personal.sron.nl/~pault/
 color_scheme = {}
@@ -118,3 +119,32 @@ def create_axis(length=1.0, num_points=100):
     pts = np.concatenate([x_axis, y_axis, z_axis], axis=0)
 
     return pts
+
+
+NUM_GRADIENT_COLORS = 100
+gradient_colors = np.array(
+    [c.get_rgb() for c in Color("blue").range_to(Color("green"), NUM_GRADIENT_COLORS)]
+)
+
+
+def color_gradient(vals, min_step=1e-6):
+    vals = vals.detach().cpu()
+    color_idxs = (
+        (vals - vals.min(axis=-1, keepdim=True)[0])
+        / max(
+            min_step,
+            vals.max(axis=-1, keepdim=True)[0]
+            - vals.min(axis=-1, keepdim=True)[0]
+            + 1e-6,
+        )
+        * NUM_GRADIENT_COLORS
+    ).int()
+    return (
+        np.array(
+            [
+                gradient_colors[color_idxs_batch]
+                for color_idxs_batch in color_idxs.numpy()
+            ]
+        )
+        * 255
+    )
