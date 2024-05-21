@@ -67,7 +67,8 @@ TASK_TO_IGNORE_COLLISIONS = {
         "pregrasp": False,
         "grasp": False,
         "lift": True,
-        "place": True,
+        # "place": True,
+        "place": False,
     },
     "put_money_in_safe": {
         "pregrasp": False,
@@ -271,6 +272,10 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         self.anchor_mode = task_cfg.anchor_mode
         self.policy_spec = policy_spec
 
+        self.phase_attempt_counts = {
+            phase: 0 for phase in TASK_DICT[task_cfg.name]["phase_order"]
+        }
+
     @staticmethod
     def render(obs, inputs, preds, T_action_world, T_actionfinal_world):
         # Draw a single point cloud.
@@ -421,6 +426,31 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
         T_gripperfinal_gripper = preds["pred_T_action"].get_matrix()[0].T.cpu().numpy()
         T_gripperfinal_world = T_gripperfinal_gripper @ T_gripper_world
 
+        pred_points = preds["pred_points_action"][0].cpu().numpy()
+
+        # If we've already attempted this phase, then we should add some random jitter.
+        if self.phase_attempt_counts[phase] > 0 and self.policy_spec.add_random_jitter:
+            # Add some random motion in the positive z
+            # T_gripperfinal_world[2, 3] += np.random.uniform(0, 0.03)
+
+            T_random_jitter = np.eye(4)
+
+            # Add some random uniform noise to the position.
+            T_random_jitter[:3, 3] = np.random.normal(0, 0.01, 3)
+
+            # Add some random noise to the rotation.
+            # R_random_jitter = R.from_euler(
+            #     "xyz", np.random.normal(0, 0.07, 3)
+            # ).as_matrix()
+            # T_random_jitter[:3, :3] = R_random_jitter
+
+            T_gripperfinal_world = T_random_jitter @ T_gripperfinal_world
+
+            # Also apply the same jitter to the predicted points.
+            pred_points = (T_random_jitter[:3, :3] @ pred_points.T).T + T_random_jitter[
+                :3, 3
+            ]
+
         if self.debug_viz:
             self.render(obs, inputs, preds, T_gripper_world, T_gripperfinal_world)
 
@@ -429,7 +459,7 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
                 [
                     inputs["action_pc"].cpu().numpy(),
                     inputs["anchor_pc"].cpu().numpy(),
-                    preds["pred_points_action"][0].cpu().numpy(),
+                    pred_points,
                 ],
                 axis=0,
             ),
@@ -446,6 +476,8 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
                 2: "pred",
             },
         )
+
+        self.phase_attempt_counts[phase] += 1
 
         return T_gripperfinal_world, {"plot": fig}
 
@@ -736,46 +768,72 @@ def run_trial(
         # Loop through the phases, and predict.
         phase_plots: List[go.Figure] = []
         for phase in phase_order:
-            # Try to make a predictions.
-            try:
-                T_gripper_world, extras = policy.predict(obs, phase)
-                if "plot" in extras:
-                    phase_plots.append((phase, extras["plot"]))
-            except Exception as ex:
 
-                phase_results[phase] = FailureReason.PREDICTION_FAILURE
-                success = False
-                return TrialResult(success, pr())
+            N_MOTION_PLANNING_SAMPLING_TRIES = 20
+            motion_succeeded = False  # whether any of the predicted motions succeeded.
 
-            # Compute the transform.
-            p_gripper_world = T_gripper_world[:3, 3]
-            q_gripper_world = R.from_matrix(T_gripper_world[:3, :3]).as_quat()
-            if TASK_DICT[task_spec.name]["phase"][phase]["gripper_open"]:
-                gripper_state = np.array([1.0])
-            else:
-                gripper_state = np.array([0.0])
-            action = np.concatenate([p_gripper_world, q_gripper_world, gripper_state])
+            # Try to make a prediction a number of times. Hopefully randomized.
+            for i in range(N_MOTION_PLANNING_SAMPLING_TRIES):
 
-            # Attempt the action.
-            try:
-                obs, reward, terminate = move(
-                    action,
-                    task,
-                    env,
-                    max_tries=10,
-                    ignore_collisions=TASK_TO_IGNORE_COLLISIONS[task_spec.name][phase],
-                )  # Eventually add collision checking.
+                # Try to make a predictions.
+                try:
+                    T_gripper_world, extras = policy.predict(obs, phase)
+                    if "plot" in extras:
+                        phase_plots.append((f"{phase}-{i}", extras["plot"]))
+                except Exception as ex:
 
-            except Exception as ex:
-                if "workspace" in str(ex):
-                    phase_results[phase] = FailureReason.PREDICTION_OUTSIDE_WORKSPACE
-                elif "A path could not be found." in str(ex):
-                    phase_results[phase] = FailureReason.MOTION_PLANNING_FAILURE
+                    phase_results[phase] = FailureReason.PREDICTION_FAILURE
+                    success = False
+                    return TrialResult(success, pr())
+
+                # Compute the transform.
+                p_gripper_world = T_gripper_world[:3, 3]
+                q_gripper_world = R.from_matrix(T_gripper_world[:3, :3]).as_quat()
+                if TASK_DICT[task_spec.name]["phase"][phase]["gripper_open"]:
+                    gripper_state = np.array([1.0])
                 else:
-                    logging.error(f"Unknown error: {ex}")
-                    phase_results[phase] = FailureReason.UNKNOWN_FAILURE
+                    gripper_state = np.array([0.0])
+                action = np.concatenate(
+                    [p_gripper_world, q_gripper_world, gripper_state]
+                )
+
+                # Attempt the action.
+                try:
+                    obs, reward, terminate = move(
+                        action,
+                        task,
+                        env,
+                        max_tries=10,
+                        ignore_collisions=TASK_TO_IGNORE_COLLISIONS[task_spec.name][
+                            phase
+                        ],
+                    )  # Eventually add collision checking.
+                    motion_succeeded = True
+
+                except Exception as ex:
+                    if "workspace" in str(ex):
+                        phase_results[
+                            phase
+                        ] = FailureReason.PREDICTION_OUTSIDE_WORKSPACE
+                    elif "A path could not be found." in str(ex):
+                        phase_results[phase] = FailureReason.MOTION_PLANNING_FAILURE
+                    else:
+                        logging.error(f"Unknown error: {ex}")
+                        phase_results[phase] = FailureReason.UNKNOWN_FAILURE
+
+                if motion_succeeded:
+                    break
+                else:
+                    logging.warning(
+                        f"Failed to execute action {i} for reason {phase_results[phase]}. Retrying..."
+                    )
+
+            # If we didn't succeed in any of the motions, then we failed.
+            if not motion_succeeded:
                 success = False
                 return TrialResult(success, pr())
+            elif i > 0:
+                logging.warning(f"Success on attempt {i}")
 
             phase_results[phase] = FailureReason.NO_FAILURE
 
