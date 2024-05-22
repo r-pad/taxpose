@@ -167,25 +167,25 @@ RLBENCH_10_TASKS = [
 ## Training
 
 
-./launch.sh autobot 5 python scripts/train_residual_flow.py --config-name commands/rlbench/pick_and_lift/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+DOCKER_TAG=beneisner-dataset_tweaks ./launch.sh autobot 0 python scripts/train_residual_flow.py --config-name commands/rlbench/pick_and_lift/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3 benchmark.dataset_root=/data/rlbench10_collisions
 
-./launch.sh autobot 1 python scripts/train_residual_flow.py --config-name commands/rlbench/pick_up_cup/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+DOCKER_TAG=beneisner-dataset_tweaks ./launch.sh autobot 1 python scripts/train_residual_flow.py --config-name commands/rlbench/pick_up_cup/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3 benchmark.dataset_root=/data/rlbench10_collisions
 
-./launch.sh autobot 2 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+DOCKER_TAG=beneisner-dataset_tweaks ./launch.sh autobot 2 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3 benchmark.dataset_root=/data/rlbench10_collisions
 
-./launch.sh autobot 3 python scripts/train_residual_flow.py --config-name commands/rlbench/put_money_in_safe/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+DOCKER_TAG=beneisner-dataset_tweaks ./launch.sh autobot 3 python scripts/train_residual_flow.py --config-name commands/rlbench/put_money_in_safe/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3 benchmark.dataset_root=/data/rlbench10_collisions
 
-./launch.sh autobot 4 python scripts/train_residual_flow.py --config-name commands/rlbench/push_button/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+DOCKER_TAG=beneisner-dataset_tweaks ./launch.sh autobot 4 python scripts/train_residual_flow.py --config-name commands/rlbench/push_button/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3 benchmark.dataset_root=/data/rlbench10_collisions
 
-./launch.sh autobot 0 python scripts/train_residual_flow.py --config-name commands/rlbench/reach_target/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+DOCKER_TAG=beneisner-dataset_tweaks ./launch.sh autobot 5 python scripts/train_residual_flow.py --config-name commands/rlbench/reach_target/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3 benchmark.dataset_root=/data/rlbench10_collisions
 
-./launch.sh autobot 6 python scripts/train_residual_flow.py --config-name commands/rlbench/slide_block_to_target/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+DOCKER_TAG=beneisner-dataset_tweaks ./launch.sh autobot 6 python scripts/train_residual_flow.py --config-name commands/rlbench/slide_block_to_target/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3 benchmark.dataset_root=/data/rlbench10_collisions
 
-./launch.sh autobot 7 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+DOCKER_TAG=beneisner-dataset_tweaks ./launch.sh autobot 7 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3 benchmark.dataset_root=/data/rlbench10_collisions
 
-./launch.sh autobot 8 python scripts/train_residual_flow.py --config-name commands/rlbench/take_money_out_safe/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+DOCKER_TAG=beneisner-dataset_tweaks ./launch.sh autobot 8 python scripts/train_residual_flow.py --config-name commands/rlbench/take_money_out_safe/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3 benchmark.dataset_root=/data/rlbench10_collisions
 
-./launch.sh autobot 9 python scripts/train_residual_flow.py --config-name commands/rlbench/take_umbrella_out_of_umbrella_stand/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3
+DOCKER_TAG=beneisner-dataset_tweaks ./launch.sh autobot 9 python scripts/train_residual_flow.py --config-name commands/rlbench/take_umbrella_out_of_umbrella_stand/train_taxpose_tc.yaml dm.train_dset.include_rgb_features=True model.feature_channels=3 benchmark.dataset_root=/data/rlbench10_collisions
 
 ## Checkpoints from this training run
 
