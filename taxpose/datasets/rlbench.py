@@ -263,6 +263,7 @@ class RLBenchPointCloudDatasetConfig:
 
     # Whether to include the wrist camera.
     include_wrist_cam: bool = False
+    gripper_in_first_phase: bool = False
 
 
 class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
@@ -277,6 +278,7 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             anchor_mode=cfg.anchor_mode,
             action_mode=cfg.action_mode,
             include_wrist_cam=cfg.include_wrist_cam,
+            gripper_in_first_phase=cfg.gripper_in_first_phase,
         )
 
         self.cfg = cfg
