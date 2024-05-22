@@ -119,6 +119,73 @@ def get_translation(T):
     return max, min, mean
 
 
+def get_2transform_min_rotation_errors(T1, T2):
+    angle_rad_T1 = (
+        so3_rotation_angle(T1.get_matrix()[:, :3, :3], eps=1e-2) * 180 / np.pi
+    )  # B
+    angle_rad_T2 = (
+        so3_rotation_angle(T2.get_matrix()[:, :3, :3], eps=1e-2) * 180 / np.pi
+    )  # B
+    angle_rad_min = torch.min(angle_rad_T1, angle_rad_T2)
+    max = torch.max(angle_rad_min).item()
+    min = torch.min(angle_rad_min).item()
+    mean = torch.mean(angle_rad_min).item()
+    return max, min, mean
+
+
+def get_2transform_min_translation_errors(T1, T2):
+    t1 = T1.get_matrix()[:, 3, :3]  # B,3
+    t2 = T2.get_matrix()[:, 3, :3]  # B,3
+    t1_norm = torch.norm(t1, dim=1)  # B
+    t2_norm = torch.norm(t2, dim=1)  # B
+
+    t_min = torch.min(t1_norm, t2_norm)
+    max = torch.max(t_min).item()
+    min = torch.min(t_min).item()
+    mean = torch.mean(t_min).item()
+    return max, min, mean
+
+
+def get_transform_list_min_rotation_errors(T1, T_list):
+    angle_rad_T1 = (
+        so3_rotation_angle(T1.get_matrix()[:, :3, :3], eps=1e-2) * 180 / np.pi
+    )  # B
+    angle_rad_T_list = []
+    for T in T_list:
+        angle_rad_T = (
+            so3_rotation_angle(T.get_matrix()[:, :3, :3], eps=1e-2) * 180 / np.pi
+        )
+        angle_rad_T_list.append(angle_rad_T)
+
+    angle_rad_min = torch.min(angle_rad_T1, angle_rad_T_list[0])
+    for angle_rad_T in angle_rad_T_list[1:]:
+        angle_rad_min = torch.min(angle_rad_min, angle_rad_T)
+
+    max = torch.max(angle_rad_min).item()
+    min = torch.min(angle_rad_min).item()
+    mean = torch.mean(angle_rad_min).item()
+    return max, min, mean
+
+
+def get_transform_list_min_translation_errors(T1, T_list):
+    t1 = T1.get_matrix()[:, 3, :3]  # B,3
+    t1_norm = torch.norm(t1, dim=1)  # B
+    t_list = []
+    for T in T_list:
+        t = T.get_matrix()[:, 3, :3]  # B,3
+        t_norm = torch.norm(t, dim=1)  # B
+        t_list.append(t_norm)
+
+    t_min = torch.min(t1_norm, t_list[0])
+    for t in t_list[1:]:
+        t_min = torch.min(t_min, t)
+
+    max = torch.max(t_min).item()
+    min = torch.min(t_min).item()
+    mean = torch.mean(t_min).item()
+    return max, min, mean
+
+
 def rotation_se3(N, axis, angle_degree, device=None):
     """
     Args

@@ -79,7 +79,7 @@ class VN_DGCNN(nn.Module):
         )
         self.conv11 = nn.Conv1d(128, num_part, kernel_size=1, bias=True)
 
-    def forward(self, x, l=None):
+    def forward(self, x, l=None, conditioning=None):
         batch_size = x.size(0)
         num_points = x.size(2)
 

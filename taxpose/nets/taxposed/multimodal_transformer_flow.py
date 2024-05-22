@@ -12,23 +12,18 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from equivariant_pose_graph.models.pointnet2 import PointNet2MSG, PointNet2SSG
-from equivariant_pose_graph.models.pointnet2pyg import (
+
+from taxpose.nets.taxposed.pointnet2 import PointNet2MSG, PointNet2SSG
+from taxpose.nets.taxposed.pointnet2pyg import (
     PN2DenseParams,
     PN2DenseWrapper,
     PN2EncoderParams,
     PN2EncoderWrapper,
     PN2HybridWrapper,
 )
-from equivariant_pose_graph.models.vn_dgcnn import VN_DGCNN, VNArgs
-from equivariant_pose_graph.utils.conditioning_utils import gumbel_softmax_topk
-from equivariant_pose_graph.utils.sample_utils import (
-    sample_closest_pairs,
-    sample_random_pair,
-)
-
-# from pointnets.models.pointnet2 import PN2Encoder, PN2EncoderParams
-from torch.distributions import Categorical
+from taxpose.nets.vn_dgcnn import VN_DGCNN, VNArgs
+from taxpose.utils.conditioning_utils import gumbel_softmax_topk
+from taxpose.utils.sample_utils import sample_closest_pairs, sample_random_pair
 
 # Part of the code is referred from: http://nlp.seas.harvard.edu/2018/04/03/attention.html#positional-encoding
 
