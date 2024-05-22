@@ -77,7 +77,7 @@ def setup_main(cfg):
                 ModelCheckpoint(
                     dirpath=cfg.lightning.checkpoint_dir,
                     filename="{epoch}-{step}-{train_loss:.2f}-weights-only",
-                    monitor="val_loss",
+                    monitor="val_loss/val_0",
                     mode="min",
                     save_weights_only=True,
                 ),
