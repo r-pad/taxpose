@@ -12,7 +12,7 @@ pretraining:
   mode: none
 
 training:
-  max_epochs: 500
+  max_epochs: 1000
   batch_size: 8
   check_val_every_n_epoch: 10
   log_every_n_steps: 100
