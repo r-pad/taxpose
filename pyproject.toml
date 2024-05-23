@@ -60,7 +60,7 @@ rlbench = [
   # These should be installed manually...
   # "pyrep",
   # "rlbench @ git+https://github.com/stepjam/RLBench.git",
-  "rpad-rlbench-utils @ git+https://github.com/r-pad/rlbench_utils.git@11722e4d803581cc79097f333c1f2c2eb536e15f",
+  "rpad-rlbench-utils @ git+https://github.com/r-pad/rlbench_utils.git@5d6167cbb07c25242e3a87a5d5a896c05a7370a7",
 ]
 
 

@@ -347,6 +347,8 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
             self.action_mode,
             self.anchor_mode,
             n_pts=self.policy_spec.num_points,
+            include_wrist_cam=self.policy_spec.include_wrist_cam,
+            gripper_in_first_phase=self.policy_spec.gripper_in_first_phase,
         )
 
         model = self.models[phase]
@@ -551,8 +553,16 @@ def obs_to_input(
     action_mode: ActionMode,
     anchor_mode: AnchorMode,
     n_pts: Optional[int] = 1024,
+    include_wrist_cam=False,
+    gripper_in_first_phase=False,
 ):
-    rgb, pc, mask = obs_to_rgb_point_cloud(obs)
+    rgb, pc, mask = obs_to_rgb_point_cloud(obs, include_wrist_cam)
+
+    # Filter out any points with the mask == 16777215
+    mask_ixs = (mask != 16777215).squeeze()
+    mask = mask[mask_ixs]
+    pc = pc[mask_ixs]
+    rgb = rgb[mask_ixs]
 
     ########################################
     # Separate the action and anchor points.
@@ -576,6 +586,7 @@ def obs_to_input(
         task_name,
         phase,
         use_from_simulator=True,
+        gripper_in_first_phase=gripper_in_first_phase,
     )
 
     ##############################

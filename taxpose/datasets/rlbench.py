@@ -261,6 +261,10 @@ class RLBenchPointCloudDatasetConfig:
     anchor_mode: AnchorMode = AnchorMode.SINGLE_OBJECT
     action_mode: ActionMode = ActionMode.OBJECT
 
+    # Whether to include the wrist camera.
+    include_wrist_cam: bool = False
+    gripper_in_first_phase: bool = False
+
 
 class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
     def __init__(self, cfg: RLBenchPointCloudDatasetConfig):
@@ -273,6 +277,8 @@ class RLBenchPointCloudDataset(Dataset[PlacementPointCloudData]):
             use_first_as_init_keyframe=cfg.use_first_as_init_keyframe,
             anchor_mode=cfg.anchor_mode,
             action_mode=cfg.action_mode,
+            include_wrist_cam=cfg.include_wrist_cam,
+            gripper_in_first_phase=cfg.gripper_in_first_phase,
         )
 
         self.cfg = cfg

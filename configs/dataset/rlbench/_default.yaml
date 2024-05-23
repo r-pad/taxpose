@@ -15,11 +15,13 @@ train_dset:
     cached: true
     phase: ${task.phase.name}
     teleport_initial_to_final: true
-    with_symmetry: True
+    with_symmetry: False
     occlusion_cfg: ???
     num_points: 512
     action_mode: "gripper_and_object"
     anchor_mode: "background_robot_removed"
+    include_wrist_cam: True
+    gripper_in_first_phase: False
 
 val_dset:
   demo_dset:
@@ -32,8 +34,10 @@ val_dset:
     cached: true
     phase: ${task.phase.name}
     teleport_initial_to_final: true
-    with_symmetry: True
+    with_symmetry: False
     occlusion_cfg: ???
     num_points: ${...train_dset.demo_dset.num_points}
     action_mode: ${...train_dset.demo_dset.action_mode}
     anchor_mode: ${...train_dset.demo_dset.anchor_mode}
+    include_wrist_cam: ${...train_dset.demo_dset.include_wrist_cam}
+    gripper_in_first_phase: ${...train_dset.demo_dset.gripper_in_first_phase}
