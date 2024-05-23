@@ -15,7 +15,7 @@ train_dset:
     cached: true
     phase: ${task.phase.name}
     teleport_initial_to_final: true
-    with_symmetry: True
+    with_symmetry: False
     occlusion_cfg: ???
     num_points: 512
     action_mode: "gripper_and_object"
@@ -34,7 +34,7 @@ val_dset:
     cached: true
     phase: ${task.phase.name}
     teleport_initial_to_final: true
-    with_symmetry: True
+    with_symmetry: False
     occlusion_cfg: ???
     num_points: ${...train_dset.demo_dset.num_points}
     action_mode: ${...train_dset.demo_dset.action_mode}
