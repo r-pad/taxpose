@@ -425,6 +425,21 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
 
         pred_points = preds["pred_points_action"][0].cpu().numpy()
 
+        # This is hacky. We should have a more principled approach to this.
+        if (
+            self.policy_spec.placement_offset != 0.0
+            and phase in {"place", "preplace"}
+            and self.task_name == "stack_wine"
+        ):
+            T_offset = np.eye(4)
+
+            # add some offset in the z direction.
+            T_offset[2, 3] = self.policy_spec.placement_offset
+            T_gripperfinal_world = T_offset @ T_gripperfinal_world
+
+            # Also apply the same offset to the predicted points.
+            pred_points += T_offset[:3, 3]
+
         # If we've already attempted this phase, then we should add some random jitter.
         if self.phase_attempt_counts[phase] > 0 and self.policy_spec.add_random_jitter:
             # Add some random motion in the positive z
