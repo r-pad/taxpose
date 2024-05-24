@@ -843,10 +843,28 @@ def run_trial(
                 if TASK_DICT[task_spec.name]["phase"][phase]["gripper_open"]:
                     gripper_state = np.array([1.0])
                 else:
-                    gripper_state = np.array([0.0])
+                    # We have a bug somewhere in keypointing where the gripper is not closing.
+                    # When we fix that, we should change this back to 0.0.
+                    # HACK: Remove.
+                    if task_spec.name == "push_button" and phase == "prepush":
+                        gripper_state = np.array([1.0])
+                    else:
+                        gripper_state = np.array([0.0])
                 action = np.concatenate(
                     [p_gripper_world, q_gripper_world, gripper_state]
                 )
+
+                # If the action is postpush, then we should first close the gripper.
+                # Super hacky, remove this once we fix the gripper closing bug.
+                # HACK: REMOVE.
+                if task_spec.name == "push_button" and phase == "postpush" and i == 0:
+                    close_pos = T_gripper_world[:3, 3]
+                    close_pos[2] += 0.06
+                    close_quat = R.from_matrix(T_gripper_world[:3, :3]).as_quat()
+                    close_action = np.concatenate(
+                        [close_pos, close_quat, np.array([0.0])]
+                    )
+                    obs, reward, terminate = task.step(close_action)
 
                 # Attempt the action.
                 try:
