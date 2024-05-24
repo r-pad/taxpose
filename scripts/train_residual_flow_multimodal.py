@@ -3,7 +3,6 @@ import os
 
 import torch
 import torch.multiprocessing
-import torch.nn as nn
 
 from taxpose.datasets.point_cloud_data_module import MultiviewDataModule
 from taxpose.nets.taxposed.multimodal_transformer_flow import (
@@ -22,7 +21,6 @@ from taxpose.training.taxposed.flow_equivariance_training_module_nocentering_mul
 torch.multiprocessing.set_sharing_strategy("file_system")
 
 import hydra
-import numpy as np
 import omegaconf
 import pytorch_lightning as pl
 from omegaconf import OmegaConf
@@ -77,7 +75,7 @@ def setup_main(cfg):
                 ModelCheckpoint(
                     dirpath=cfg.lightning.checkpoint_dir,
                     filename="{epoch}-{step}-{train_loss:.2f}-weights-only",
-                    monitor="val_loss/val_0",
+                    monitor="val_0/loss",
                     mode="min",
                     save_weights_only=True,
                 ),
