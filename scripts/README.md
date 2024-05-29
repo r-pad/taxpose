@@ -357,3 +357,26 @@ take_umbrella_out_of_umbrella_stand: b48mz8e1
 ./configs/commands/rlbench/take_umbrella_out_of_umbrella_stand/taxpose_tc/precision_eval/precision_eval.sh dm.train_dset.include_rgb_features=True model.feature_channels=3 checkpoint=r-pad/taxpose/model-b48mz8e1:v0 benchmark.dataset_root=/data/rlbench10_collisions
 
 ```
+
+
+# Final training for longer
+
+./launch.sh autobot 0 python scripts/train_residual_flow.py --config-name commands/rlbench/pick_and_lift/train_taxpose_tc.yaml benchmark.dataset_root=/data/rlbench10_collisions
+
+./launch.sh autobot 1 python scripts/train_residual_flow.py --config-name commands/rlbench/pick_up_cup/train_taxpose_tc.yaml benchmark.dataset_root=/data/rlbench10_collisions
+
+./launch.sh autobot 2 python scripts/train_residual_flow.py --config-name commands/rlbench/put_knife_on_chopping_board/train_taxpose_tc.yaml benchmark.dataset_root=/data/rlbench10_collisions
+
+./launch.sh autobot 3 python scripts/train_residual_flow.py --config-name commands/rlbench/put_money_in_safe/train_taxpose_tc.yaml benchmark.dataset_root=/data/rlbench10_collisions
+
+./launch.sh autobot 4 python scripts/train_residual_flow.py --config-name commands/rlbench/push_button/train_taxpose_tc.yaml benchmark.dataset_root=/data/rlbench10_collisions
+
+./launch.sh autobot 5 python scripts/train_residual_flow.py --config-name commands/rlbench/reach_target/train_taxpose_tc.yaml benchmark.dataset_root=/data/rlbench10_collisions
+
+./launch.sh autobot 6 python scripts/train_residual_flow.py --config-name commands/rlbench/slide_block_to_target/train_taxpose_tc.yaml benchmark.dataset_root=/data/rlbench10_collisions
+
+./launch.sh autobot 7 python scripts/train_residual_flow.py --config-name commands/rlbench/stack_wine/train_taxpose_tc.yaml benchmark.dataset_root=/data/rlbench10_collisions
+
+./launch.sh autobot 8 python scripts/train_residual_flow.py --config-name commands/rlbench/take_money_out_safe/train_taxpose_tc.yaml benchmark.dataset_root=/data/rlbench10_collisions
+
+./launch.sh autobot 9 python scripts/train_residual_flow.py --config-name commands/rlbench/take_umbrella_out_of_umbrella_stand/train_taxpose_tc.yaml benchmark.dataset_root=/data/rlbench10_collisions
