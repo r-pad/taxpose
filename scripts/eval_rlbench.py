@@ -404,6 +404,7 @@ class TAXPoseRelativePosePredictor(RelativePosePredictor):
             phase_onehot = np.zeros(len(TASK_DICT[self.task_name]["phase_order"]))
             phase_onehot[phase_ix] = 1
             phase_onehot = torch.from_numpy(phase_onehot).to(device)[None]
+            logging.info(f"Phase Onehot: {phase_onehot}")
         else:
             phase_onehot = None
 
@@ -783,6 +784,7 @@ def run_trial(
         # Loop through the phases, and predict.
         phase_plots: List[go.Figure] = []
         for phase in phase_order:
+            logging.info(f"Executing Phase: {phase}")
             N_MOTION_PLANNING_SAMPLING_TRIES = 20
             motion_succeeded = False  # whether any of the predicted motions succeeded.
 

@@ -46,24 +46,24 @@
 
 ########################### No gripper, wrist cam #############################
 
-# pick_and_lift: hbdcvydg
-# pick_up_cup: gwfjqpfk
+# pick_and_lift: 8pyp8zaw
+# pick_up_cup: 9m4fflcx
 # push_button: mmc5fhzu
 # put_knife_on_chopping_board: rjscih24
-# put_money_in_safe: gj3h3o3c
-# reach_target: v8vv53tx
+# put_money_in_safe: tpuvxzyg
+# reach_target: ffp30alr
 # slide_block_to_target: sejd7pz0
 # stack_wine: 3hyo3r7q
-# take_money_out_safe: 69gka1ew
+# take_money_out_safe: u4bpi2bf
 # take_umbrella_out_of_umbrella_stand: b48mz8e1
 
 # pick_and_lift
 
-./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/pick_and_lift/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-hbdcvydg:v0 wandb.group=rlbench_pick_and_lift
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/pick_and_lift/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-8pyp8zaw:v0 wandb.group=rlbench_pick_and_lift
 
 # pick_up_cup
 
-./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/pick_up_cup/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-gwfjqpfk:v0 wandb.group=rlbench_pick_up_cup
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/pick_up_cup/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-9m4fflcx:v0 wandb.group=rlbench_pick_up_cup
 
 # put_knife_on_chopping_board
 
@@ -71,7 +71,7 @@
 
 # put_money_in_safe
 
-./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/put_money_in_safe/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-gj3h3o3c:v0 wandb.group=rlbench_put_money_in_safe
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/put_money_in_safe/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-tpuvxzyg:v0 wandb.group=rlbench_put_money_in_safe
 
 # push_button
 
@@ -79,7 +79,7 @@
 
 # reach_target
 
-./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/reach_target/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-v8vv53tx:v0 wandb.group=rlbench_reach_target
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/reach_target/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-ffp30alr:v0 wandb.group=rlbench_reach_target
 
 # slide_block_to_target
 
@@ -91,7 +91,7 @@
 
 # take_money_out_safe
 
-./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/take_money_out_safe/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-69gka1ew:v0 wandb.group=rlbench_take_money_out_safe
+./launch.sh local-docker 0 python scripts/eval_rlbench.py --config-name commands/rlbench/take_money_out_safe/taxpose_tc/eval_rlbench.yaml num_trials=100 policy_spec.include_rgb_features=True model.feature_channels=3 checkpoints.ckpt_file=r-pad/taxpose/model-u4bpi2bf:v0 wandb.group=rlbench_take_money_out_safe
 
 # take_umbrella_out_of_umbrella_stand
 

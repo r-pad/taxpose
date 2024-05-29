@@ -223,6 +223,52 @@ def main(cfg):
                 }
             )
 
+            fig = segmentation_fig(
+                torch.cat(
+                    [
+                        points_action[0].cpu(),
+                        points_anchor[0].cpu(),
+                    ],
+                    dim=0,
+                ).numpy(),
+                torch.cat(
+                    [
+                        torch.ones(points_action.shape[1]),
+                        2 * torch.ones(points_anchor.shape[1]),
+                    ],
+                    dim=0,
+                )
+                .int()
+                .numpy(),
+                labelmap={1: "demo_action", 2: "demo_anchor"},
+            )
+            fig.show()
+
+            # Prediction.
+            fig = segmentation_fig(
+                torch.cat(
+                    [
+                        points_action_trans[0].cpu(),
+                        points_anchor_trans[0].cpu(),
+                        res["pred_points_action"][0].cpu(),
+                    ],
+                    dim=0,
+                ).numpy(),
+                torch.cat(
+                    [
+                        torch.ones(points_action_trans.shape[1]),
+                        2 * torch.ones(points_anchor_trans.shape[1]),
+                        3 * torch.ones(res["pred_points_action"].shape[1]),
+                    ],
+                    dim=0,
+                )
+                .int()
+                .numpy(),
+                labelmap={1: "action", 2: "anchor", 3: "pred"},
+            )
+            fig.show()
+            breakpoint()
+
         metrics = {
             k: np.concatenate([m[k] for m in metrics]) for k in metrics[0].keys()
         }
