@@ -680,16 +680,33 @@ def get_obs_config():
     return obs_config
 
 
-def move(action: np.ndarray, task, env, max_tries=10, ignore_collisions=False):
+def move(
+    action: np.ndarray,
+    task,
+    env,
+    prev_gripper_state,
+    max_tries=10,
+    ignore_collisions=False,
+):
     try_count = 0
 
     p_desired = action[:3]
     q_desired = action[3:7]
 
+    # Change grip at end
+    change_grip_at_end = prev_gripper_state != action[-1]
+
+    # Set the gripper state.
+    if change_grip_at_end:
+        desired_action_prev_grip = np.copy(action)
+        desired_action_prev_grip[-1] = prev_gripper_state
+    else:
+        desired_action_prev_grip = action
+
     env._action_mode.arm_action_mode._collision_checking = not ignore_collisions
 
     while try_count < max_tries:
-        obs, reward, terminate = task.step(action)
+        obs, reward, terminate = task.step(desired_action_prev_grip)
 
         # Check to make sure that the achieved pose is close to the desired pose.
         p_achieved = obs.gripper_pose[:3]
@@ -710,6 +727,10 @@ def move(action: np.ndarray, task, env, max_tries=10, ignore_collisions=False):
             f"Too far away (pos: {p_diff:.3f}, rot: {q_diff:.3f}... Retrying..."
         )
         try_count += 1
+
+    if change_grip_at_end:
+        # Change the gripper state at the end.
+        obs, reward, terminate = task.step(action)
 
     return obs, reward, terminate
 
@@ -783,6 +804,7 @@ def run_trial(
     try:
         # Loop through the phases, and predict.
         phase_plots: List[go.Figure] = []
+        prev_gripper_state = np.array([1.0])  # start with the gripper open.
         for phase in phase_order:
             logging.info(f"Executing Phase: {phase}")
             N_MOTION_PLANNING_SAMPLING_TRIES = 20
@@ -817,12 +839,14 @@ def run_trial(
                         action,
                         task,
                         env,
+                        prev_gripper_state,
                         max_tries=10,
                         ignore_collisions=TASK_TO_IGNORE_COLLISIONS[task_spec.name][
                             phase
                         ],
                     )  # Eventually add collision checking.
                     motion_succeeded = True
+                    prev_gripper_state = gripper_state[0]
 
                 except Exception as ex:
                     if "workspace" in str(ex):
