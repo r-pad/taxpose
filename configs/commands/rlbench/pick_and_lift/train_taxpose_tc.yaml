@@ -7,7 +7,9 @@ defaults:
   - override /phase: all
   - _self_
 
-
-# Training needs to happen for longer with additional context.
-training:
-  max_epochs: 2000
+# Include RGB features in the training dataset + model.
+dm:
+  train_dset:
+    include_rgb_features: True
+model:
+  feature_channels: 3
