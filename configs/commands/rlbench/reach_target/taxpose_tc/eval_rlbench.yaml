@@ -5,3 +5,10 @@ defaults:
 - override /model: taxpose_tc
 - override /task: reach_target
 - _self_
+
+# Make sure this one has rgb features.
+model:
+  feature_channels: 3
+
+policy_spec:
+  include_rgb_features: True
