@@ -14,6 +14,7 @@ from taxpose.nets.transformer_flow import create_network
 from taxpose.training.flow_equivariance_training_module_nocentering import (
     EquivarianceTrainingModule,
 )
+from taxpose.utils.load_model import get_weights_path
 
 
 def load_emb_weights(checkpoint_reference, wandb_cfg=None, run=None):
@@ -53,6 +54,24 @@ def main(cfg):
     # torch.set_float32_matmul_precision("medium")
     TESTING = "PYTEST_CURRENT_TEST" in os.environ
 
+    if cfg.resume_ckpt:
+        print("Resuming from checkpoint")
+        print(cfg.resume_ckpt)
+        resume_ckpt = get_weights_path(cfg.resume_ckpt, cfg.wandb)
+
+        # Resume the wandb run
+        if cfg.resume_ckpt.startswith(cfg.wandb.entity):
+            # Get the run_id from the checkpoint
+            resume_run_id = cfg.resume_ckpt.split("/")[2].split("-")[1].split(":")[0]
+        elif cfg.wandb.run_id_override is not None:
+            resume_run_id = cfg.wandb.run_id_override
+        else:
+            resume_run_id = None
+
+    else:
+        resume_ckpt = None
+        resume_run_id = None
+
     pl.seed_everything(cfg.seed)
     logger = WandbLogger(
         entity=cfg.wandb.entity,
@@ -62,6 +81,7 @@ def main(cfg):
         job_type=cfg.job_type,
         save_code=True,
         log_model=True,
+        id=resume_run_id,
         config=omegaconf.OmegaConf.to_container(cfg, resolve=True),
     )
     # logger.log_hyperparams(cfg)
@@ -174,7 +194,8 @@ def main(cfg):
                         cfg.model.pretraining.anchor.ckpt_path
                     )
                 )
-    trainer.fit(model, dm)
+
+    trainer.fit(model, dm, ckpt_path=resume_ckpt)
 
     # Print he run id of the current run
     print("Run ID: {} ".format(logger.experiment.id))

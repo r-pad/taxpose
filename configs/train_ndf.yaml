@@ -53,9 +53,11 @@ training:
   check_val_every_n_epoch: 5
 
 seed: 0
+resume_ckpt: null
 
 resources:
   num_workers: 8
 
 wandb:
   group: Null
+  run_id_override: Null
