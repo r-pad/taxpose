@@ -5,7 +5,7 @@ This is the official code release for our CoRL 2022 paper and ICLR 2024 paper:
 **TAX-Pose: Task-Specific Cross-Pose Estimation for Robot Manipulation**\
 *Chuer Pan\*, Brian Okorn\*, Harry Zhang\*, Ben Eisner\*, David Held*\
 CoRL 2022\
-[website](https://sites.google.com/view/tax-pose/home) | [paper](https://arxiv.org/abs/2211.09325)\
+[website](https://sites.google.com/view/tax-pose/home) | [paper](https://arxiv.org/abs/2211.09325)
 
 ```
 @inproceedings{pan2022taxpose,
@@ -22,7 +22,7 @@ Commands to reproduce the results in the paper are detailed in [REPRODUCING_TAXP
 **Deep SE(3)-Equivariant Geometric Reasoning for Precise Placement Tasks**\
 Ben Eisner, Yi Yang, Todor Davchev, Mel Vecerik, Jon Scholz, David Held\
 ICLR 2024\
-[website](https://sites.google.com/view/reldist-iclr-2023) | [paper](https://arxiv.org/abs/2404.13478)\
+[website](https://sites.google.com/view/reldist-iclr-2023) | [paper](https://arxiv.org/abs/2404.13478)
 
 ```
 @inproceedings{eisner2024deep,
